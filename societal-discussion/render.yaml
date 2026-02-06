@@ -1,0 +1,46 @@
+# Render Blueprint for Societal Discussion Research Project
+# https://render.com/docs/blueprint-spec
+
+services:
+  # FastAPI Backend
+  - type: web
+    name: societal-discussion-api
+    runtime: python
+    region: frankfurt  # EU region for GDPR compliance
+    plan: starter
+    buildCommand: |
+      cd apps/api && pip install -e .
+    startCommand: |
+      cd apps/api && uvicorn src.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: societal-discussion-db
+          property: connectionString
+      - key: ANTHROPIC_API_KEY
+        sync: false  # Set manually in dashboard
+      - key: ADMIN_PASSWORD
+        sync: false  # Set manually in dashboard
+      - key: CORS_ORIGINS
+        value: https://societal-discussion-web.onrender.com
+
+  # Next.js Frontend
+  - type: web
+    name: societal-discussion-web
+    runtime: node
+    region: frankfurt
+    plan: starter
+    buildCommand: |
+      cd apps/web && npm install && npm run build
+    startCommand: |
+      cd apps/web && npm start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://societal-discussion-api.onrender.com
+
+databases:
+  - name: societal-discussion-db
+    plan: starter
+    region: frankfurt
+    postgresMajorVersion: 15

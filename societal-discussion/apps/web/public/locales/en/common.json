@@ -1,0 +1,124 @@
+{
+  "app": {
+    "title": "Societal Discussion Research",
+    "description": "Participate in a research study about conversations on societal topics"
+  },
+  "language": {
+    "select": "Choose your language",
+    "en": "English",
+    "fi": "Suomi"
+  },
+  "consent": {
+    "title": "Research Participation",
+    "intro": "Thank you for your interest in participating in this research study about conversations on societal topics.",
+    "purpose": "The purpose of this study is to understand how people discuss various societal issues with AI assistants.",
+    "duration": "The study involves having a conversation about a topic of your choice, followed by a brief survey. This typically takes 10-15 minutes.",
+    "voluntary": "Participation is voluntary. You can stop at any time without giving a reason.",
+    "privacy": "Your responses are anonymous and will only be used for research purposes.",
+    "checkbox": "I have read and understood the information above, and I consent to participate in this study.",
+    "button": "Start Discussion"
+  },
+  "demographics": {
+    "title": "About You (Optional)",
+    "ageGroup": "Age Group",
+    "gender": "Gender",
+    "education": "Education Level",
+    "politicalLeaning": "Political Leaning (1=Very Left, 5=Very Right)",
+    "politicalKnowledge": "How would you rate your political knowledge? (1-5)"
+  },
+  "topics": {
+    "title": "Choose a Discussion Topic",
+    "subtitle": "Select a topic you'd like to discuss",
+    "immigration": "Immigration",
+    "healthcare": "Healthcare",
+    "economy": "Economy & Taxes",
+    "education": "Education",
+    "foreign_policy": "Foreign Policy",
+    "environment": "Environment",
+    "technology": "Technology & AI",
+    "equality": "Equality & Rights",
+    "social_welfare": "Social Welfare",
+    "sparseWarning": "Limited data available"
+  },
+  "chat": {
+    "title": "Discussion",
+    "placeholder": "Type your message...",
+    "send": "Send",
+    "endChat": "End Discussion",
+    "minMessages": "Have at least 3 exchanges before ending"
+  },
+  "survey": {
+    "title": "Your Experience",
+    "subtitle": "Please share your thoughts about the conversation",
+    "perspectiveQuestion": "What perspective did the AI seem to have?",
+    "perspectiveOptions": {
+      "conservative": "Traditional/Conservative",
+      "red-green": "Progressive/Left-leaning",
+      "moderate": "Centrist/Moderate",
+      "dissatisfied": "Anti-establishment"
+    },
+    "persuasiveness": "How convincing were the arguments?",
+    "naturalness": "How natural did the conversation feel?",
+    "confidence": "How confident are you in your assessment?",
+    "scale": {
+      "1": "Not at all",
+      "2": "Slightly",
+      "3": "Moderately",
+      "4": "Very",
+      "5": "Extremely"
+    },
+    "submit": "Submit",
+    "thankYou": "Thank you for participating!"
+  },
+  "common": {
+    "back": "Back",
+    "next": "Next",
+    "loading": "Loading...",
+    "error": "An error occurred"
+  },
+  "admin": {
+    "title": "Research Admin Panel",
+    "login": "Admin Access",
+    "password": "Admin password",
+    "loginButton": "Login",
+    "logout": "Logout",
+    "invalidPassword": "Invalid password",
+    "connectionError": "Failed to connect to API",
+    "tabs": {
+      "stats": "Statistics",
+      "coverage": "Coverage Matrix",
+      "test": "Test Chat"
+    },
+    "stats": {
+      "participants": "Participants",
+      "totalChats": "Total Chats",
+      "completed": "Completed",
+      "messages": "Messages",
+      "detectionAccuracy": "Detection Accuracy",
+      "correctGuesses": "Correct Guesses",
+      "incorrectGuesses": "Incorrect Guesses",
+      "accuracyRate": "Accuracy Rate",
+      "averageRatings": "Average Ratings",
+      "persuasiveness": "Persuasiveness (1-5)",
+      "naturalness": "Naturalness (1-5)",
+      "chatsByBlock": "Chats by Political Block",
+      "chatsByTopic": "Chats by Topic",
+      "refresh": "Refresh Stats"
+    },
+    "coverage": {
+      "title": "Dataset Coverage",
+      "statements": "statements",
+      "topic": "Topic",
+      "sparseWarning": "Sparse Combinations (<3 examples)"
+    },
+    "test": {
+      "title": "Test Chat with Specific Block",
+      "block": "Political Block",
+      "topic": "Topic",
+      "startButton": "Start Test Chat",
+      "createAndStart": "Create Test Participant & Start",
+      "endAndNew": "End Test & Start New",
+      "typing": "Typing..."
+    }
+  }
+}
