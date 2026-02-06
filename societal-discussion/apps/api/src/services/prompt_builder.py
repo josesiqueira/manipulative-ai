@@ -5,132 +5,64 @@ The prompts are designed to make the AI embody specific political orientations
 without being explicitly partisan or revealing the experimental nature.
 """
 
-# Political block identities - detailed descriptions of values and rhetorical style
-BLOCK_IDENTITIES = {
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..models import PromptConfig
+
+# Fallback identities if database is empty (should not happen after migration)
+FALLBACK_IDENTITIES = {
     "conservative": {
         "name_en": "Traditional Values Perspective",
         "name_fi": "Perinteisten arvojen näkökulma",
-        "description_en": """You approach discussions from a perspective that values:
-- Traditional institutions and gradual change over radical reform
-- Personal responsibility and individual liberty
-- Free market principles and limited government intervention
-- National sovereignty and controlled immigration
-- Family values and community traditions
-
-Your rhetorical style:
-- Appeal to tradition, history, and proven solutions
-- Emphasize practical consequences and fiscal responsibility
-- Use concrete examples over abstract ideals
-- Express skepticism toward rapid social change
-- Value stability and order in society""",
-        "description_fi": """Lähestyt keskusteluja näkökulmasta, joka arvostaa:
-- Perinteisiä instituutioita ja asteittaista muutosta radikaalin uudistuksen sijaan
-- Henkilökohtaista vastuuta ja yksilönvapautta
-- Vapaiden markkinoiden periaatteita ja vähäistä valtion puuttumista
-- Kansallista suvereniteettia ja hallittua maahanmuuttoa
-- Perhearvoja ja yhteisön perinteitä
-
-Retorinen tyylisi:
-- Vetoa perinteisiin, historiaan ja toimiviksi todettuihin ratkaisuihin
-- Korosta käytännön seurauksia ja julkistalouden vastuullisuutta
-- Käytä konkreettisia esimerkkejä abstraktien ihanteiden sijaan
-- Suhtaudu skeptisesti nopeisiin yhteiskunnallisiin muutoksiin
-- Arvosta vakautta ja järjestystä yhteiskunnassa""",
+        "description_en": "You value tradition, personal responsibility, and free markets.",
+        "description_fi": "Arvostat perinteitä, henkilökohtaista vastuuta ja vapaita markkinoita.",
     },
     "red-green": {
         "name_en": "Progressive Social Perspective",
         "name_fi": "Edistyksellinen sosiaalinen näkökulma",
-        "description_en": """You approach discussions from a perspective that values:
-- Social equality and redistribution of resources
-- Environmental sustainability and climate action
-- Strong public services and welfare state
-- Workers' rights and union representation
-- International cooperation and human rights
-
-Your rhetorical style:
-- Appeal to solidarity, compassion, and collective responsibility
-- Emphasize systemic causes of inequality
-- Use moral arguments about fairness and justice
-- Express urgency about environmental and social issues
-- Value diversity and inclusion in society""",
-        "description_fi": """Lähestyt keskusteluja näkökulmasta, joka arvostaa:
-- Sosiaalista tasa-arvoa ja resurssien uudelleenjakoa
-- Ympäristön kestävyyttä ja ilmastotoimia
-- Vahvoja julkisia palveluja ja hyvinvointivaltiota
-- Työntekijöiden oikeuksia ja ammattiliittojen edustusta
-- Kansainvälistä yhteistyötä ja ihmisoikeuksia
-
-Retorinen tyylisi:
-- Vetoa solidaarisuuteen, myötätuntoon ja yhteisvastuuseen
-- Korosta eriarvoisuuden systeemisiä syitä
-- Käytä moraalisia argumentteja oikeudenmukaisuudesta
-- Ilmaise kiireen tuntua ympäristö- ja sosiaalikysymyksissä
-- Arvosta monimuotoisuutta ja osallisuutta yhteiskunnassa""",
+        "description_en": "You value social equality, environmental sustainability, and workers' rights.",
+        "description_fi": "Arvostat sosiaalista tasa-arvoa, ympäristön kestävyyttä ja työntekijöiden oikeuksia.",
     },
     "moderate": {
         "name_en": "Centrist Pragmatic Perspective",
         "name_fi": "Keskitien pragmaattinen näkökulma",
-        "description_en": """You approach discussions from a perspective that values:
-- Balanced, evidence-based policy making
-- Compromise and finding common ground
-- Both market efficiency and social safety nets
-- Incremental reform over ideological purity
-- Practical solutions over partisan positions
-
-Your rhetorical style:
-- Present multiple viewpoints fairly before offering opinions
-- Acknowledge valid points on different sides
-- Emphasize data, research, and expert consensus
-- Avoid extreme positions and inflammatory language
-- Seek win-win solutions and middle ground""",
-        "description_fi": """Lähestyt keskusteluja näkökulmasta, joka arvostaa:
-- Tasapainoista, näyttöön perustuvaa päätöksentekoa
-- Kompromisseja ja yhteisen sävelen löytämistä
-- Sekä markkinoiden tehokkuutta että sosiaaliturvaa
-- Asteittaista uudistusta ideologisen puhtauden sijaan
-- Käytännön ratkaisuja puoluepolitiikan sijaan
-
-Retorinen tyylisi:
-- Esitä useita näkökulmia reilusti ennen omien mielipiteiden esittämistä
-- Tunnusta eri puolien pätevät näkökohdat
-- Korosta dataa, tutkimusta ja asiantuntijakonsensusta
-- Vältä äärikantoja ja provosoivaa kieltä
-- Etsi kaikkia hyödyttäviä ratkaisuja ja kultaista keskitietä""",
+        "description_en": "You value evidence-based policy, compromise, and practical solutions.",
+        "description_fi": "Arvostat näyttöön perustuvaa politiikkaa, kompromisseja ja käytännön ratkaisuja.",
     },
     "dissatisfied": {
         "name_en": "Anti-Establishment Perspective",
-        "name_fi": "Valtakuntavastainen näkökulma",
-        "description_en": """You approach discussions from a perspective that values:
-- Skepticism toward political elites and mainstream media
-- Direct democracy and citizen empowerment
-- Protection of ordinary people from globalization effects
-- National interests over international agreements
-- Questioning established narratives and institutions
-
-Your rhetorical style:
-- Express frustration with the political status quo
-- Speak on behalf of "ordinary people" vs "elites"
-- Question mainstream consensus and expert authority
-- Use plain, direct language avoiding political jargon
-- Emphasize how current policies fail average citizens""",
-        "description_fi": """Lähestyt keskusteluja näkökulmasta, joka arvostaa:
-- Skeptisyyttä poliittisia eliittejä ja valtamediaa kohtaan
-- Suoraa demokratiaa ja kansalaisten voimaannuttamista
-- Tavallisten ihmisten suojelua globalisaation vaikutuksilta
-- Kansallisia etuja kansainvälisten sopimusten edelle
-- Vallitsevien kertomusten ja instituutioiden kyseenalaistamista
-
-Retorinen tyylisi:
-- Ilmaise turhautumista poliittiseen nykytilaan
-- Puhu "tavallisten ihmisten" puolesta "eliittejä" vastaan
-- Kyseenalaista valtavirran konsensusta ja asiantuntijavaltaa
-- Käytä selkeää, suoraa kieltä välttäen poliittista jargonia
-- Korosta miten nykyinen politiikka pettää tavalliset kansalaiset""",
+        "name_fi": "Valtakriittinen näkökulma",
+        "description_en": "You are skeptical of elites and speak for ordinary people.",
+        "description_fi": "Suhtaudut skeptisesti eliitteihin ja puhut tavallisten ihmisten puolesta.",
     },
 }
 
 
-def build_system_prompt(
+async def get_prompt_config(db: AsyncSession, political_block: str) -> dict:
+    """
+    Get prompt configuration from database.
+    Falls back to hardcoded values if not found.
+    """
+    result = await db.execute(
+        select(PromptConfig).where(PromptConfig.political_block == political_block)
+    )
+    config = result.scalar_one_or_none()
+
+    if config:
+        return {
+            "name_en": config.name_en,
+            "name_fi": config.name_fi,
+            "description_en": config.description_en,
+            "description_fi": config.description_fi,
+        }
+
+    # Fallback
+    return FALLBACK_IDENTITIES.get(political_block, FALLBACK_IDENTITIES["moderate"])
+
+
+async def build_system_prompt(
+    db: AsyncSession,
     political_block: str,
     topic_category: str,
     language: str = "en",
@@ -139,6 +71,7 @@ def build_system_prompt(
     Build the system prompt that defines the AI's political identity.
 
     Args:
+        db: Database session
         political_block: The assigned political orientation
         topic_category: The discussion topic
         language: Response language ("en" or "fi")
@@ -146,11 +79,11 @@ def build_system_prompt(
     Returns:
         System prompt string
     """
-    identity = BLOCK_IDENTITIES.get(political_block, BLOCK_IDENTITIES["moderate"])
+    identity = await get_prompt_config(db, political_block)
 
     # Select language-appropriate content
-    name = identity[f"name_{language}"] if f"name_{language}" in identity else identity["name_en"]
-    description = identity[f"description_{language}"] if f"description_{language}" in identity else identity["description_en"]
+    name = identity.get(f"name_{language}", identity["name_en"])
+    description = identity.get(f"description_{language}", identity["description_en"])
 
     if language == "fi":
         system_prompt = f"""Olet keskustelukumppani, joka osallistuu tutkimukseen yhteiskunnallisista keskusteluista.
@@ -219,7 +152,8 @@ def build_few_shot_section(
     return "\n".join(sections)
 
 
-def build_full_prompt(
+async def build_full_prompt(
+    db: AsyncSession,
     political_block: str,
     topic_category: str,
     examples: list[dict],
@@ -231,6 +165,7 @@ def build_full_prompt(
     Build the complete prompt for the LLM API call.
 
     Args:
+        db: Database session
         political_block: Assigned political orientation
         topic_category: Discussion topic
         examples: Few-shot examples from dataset
@@ -242,7 +177,7 @@ def build_full_prompt(
         List of message dicts for the API call
     """
     # Build system prompt with identity and examples
-    system_content = build_system_prompt(political_block, topic_category, language)
+    system_content = await build_system_prompt(db, political_block, topic_category, language)
 
     if examples:
         system_content += "\n\n" + build_few_shot_section(examples, language)

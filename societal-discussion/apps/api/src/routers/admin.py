@@ -10,7 +10,7 @@ from sqlalchemy.orm import selectinload
 
 from ..config import get_settings
 from ..database import get_db
-from ..models import Participant, Chat, Message, PoliticalStatement
+from ..models import Participant, Chat, Message, PoliticalStatement, PromptConfig
 
 router = APIRouter()
 settings = get_settings()
@@ -483,3 +483,113 @@ async def export_data(
             media_type="text/csv",
             headers={"Content-Disposition": f"attachment; filename=research_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"},
         )
+
+
+# ============================================================================
+# Prompt Configuration Endpoints
+# ============================================================================
+
+class PromptConfigResponse(BaseModel):
+    """Response for a single prompt config."""
+
+    id: str
+    political_block: str
+    name_en: str
+    name_fi: str
+    description_en: str
+    description_fi: str
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PromptConfigUpdate(BaseModel):
+    """Request body for updating a prompt config."""
+
+    name_en: str
+    name_fi: str
+    description_en: str
+    description_fi: str
+
+
+@router.get("/prompts", response_model=list[PromptConfigResponse])
+async def get_all_prompts(
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Get all prompt configurations (admin only).
+    Returns all political block prompts that can be edited.
+    """
+    result = await db.execute(
+        select(PromptConfig).order_by(PromptConfig.political_block)
+    )
+    configs = result.scalars().all()
+    return configs
+
+
+@router.get("/prompts/{political_block}", response_model=PromptConfigResponse)
+async def get_prompt(
+    political_block: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """Get a specific prompt configuration by political block."""
+    if political_block not in VALID_BLOCKS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid block. Must be one of: {VALID_BLOCKS}",
+        )
+
+    result = await db.execute(
+        select(PromptConfig).where(PromptConfig.political_block == political_block)
+    )
+    config = result.scalar_one_or_none()
+
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Prompt config for '{political_block}' not found",
+        )
+
+    return config
+
+
+@router.put("/prompts/{political_block}", response_model=PromptConfigResponse)
+async def update_prompt(
+    political_block: str,
+    data: PromptConfigUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Update a prompt configuration (admin only).
+    Allows researchers to modify the AI's political persona prompts.
+    """
+    if political_block not in VALID_BLOCKS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid block. Must be one of: {VALID_BLOCKS}",
+        )
+
+    result = await db.execute(
+        select(PromptConfig).where(PromptConfig.political_block == political_block)
+    )
+    config = result.scalar_one_or_none()
+
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Prompt config for '{political_block}' not found",
+        )
+
+    # Update fields
+    config.name_en = data.name_en
+    config.name_fi = data.name_fi
+    config.description_en = data.description_en
+    config.description_fi = data.description_fi
+
+    await db.flush()
+    await db.refresh(config)
+
+    return config

@@ -45,7 +45,8 @@ async def generate_response(
     ]
 
     # Build the full prompt
-    messages = build_full_prompt(
+    messages = await build_full_prompt(
+        db=db,
         political_block=chat.political_block,
         topic_category=chat.topic_category,
         examples=examples,
@@ -101,7 +102,8 @@ async def generate_response_streaming(
     ]
 
     # Build the full prompt
-    messages = build_full_prompt(
+    messages = await build_full_prompt(
+        db=db,
         political_block=chat.political_block,
         topic_category=chat.topic_category,
         examples=examples,
