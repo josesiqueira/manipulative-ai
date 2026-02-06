@@ -1,8 +1,8 @@
 """
-LLM client for generating AI responses using Claude API.
+LLM client for generating AI responses using OpenAI API.
 """
 
-import anthropic
+from openai import OpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
@@ -54,23 +54,22 @@ async def generate_response(
         language=chat.language,
     )
 
-    # Call Claude API
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    # Call OpenAI API
+    client = OpenAI(api_key=settings.openai_api_key)
 
-    # Extract system message and user messages
-    system_content = messages[0]["content"]
-    user_messages = messages[1:]
+    # Convert to OpenAI format (system message is separate in our format)
+    openai_messages = [{"role": "system", "content": messages[0]["content"]}]
+    openai_messages.extend(messages[1:])
 
-    response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+    response = client.chat.completions.create(
+        model="gpt-4o",
         max_tokens=1024,
-        system=system_content,
-        messages=user_messages,
+        messages=openai_messages,
     )
 
     # Extract response text and token count
-    response_text = response.content[0].text
-    token_count = response.usage.input_tokens + response.usage.output_tokens
+    response_text = response.choices[0].message.content
+    token_count = response.usage.total_tokens
 
     return response_text, example_ids, token_count
 
@@ -110,27 +109,29 @@ async def generate_response_streaming(
         language=chat.language,
     )
 
-    # Call Claude API with streaming
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    # Call OpenAI API with streaming
+    client = OpenAI(api_key=settings.openai_api_key)
 
-    system_content = messages[0]["content"]
-    user_messages = messages[1:]
+    openai_messages = [{"role": "system", "content": messages[0]["content"]}]
+    openai_messages.extend(messages[1:])
 
-    with client.messages.stream(
-        model="claude-sonnet-4-20250514",
+    stream = client.chat.completions.create(
+        model="gpt-4o",
         max_tokens=1024,
-        system=system_content,
-        messages=user_messages,
-    ) as stream:
-        full_text = ""
-        for text in stream.text_stream:
+        messages=openai_messages,
+        stream=True,
+    )
+
+    full_text = ""
+    for chunk in stream:
+        if chunk.choices[0].delta.content:
+            text = chunk.choices[0].delta.content
             full_text += text
             yield text
 
-        # Return metadata after streaming completes
-        yield {
-            "type": "metadata",
-            "example_ids": example_ids,
-            "token_count": stream.get_final_message().usage.input_tokens
-            + stream.get_final_message().usage.output_tokens,
-        }
+    # Return metadata after streaming completes
+    yield {
+        "type": "metadata",
+        "example_ids": example_ids,
+        "token_count": len(full_text.split()) * 2,  # Rough estimate for streaming
+    }
