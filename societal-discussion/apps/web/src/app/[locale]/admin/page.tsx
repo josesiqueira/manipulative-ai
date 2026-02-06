@@ -27,6 +27,16 @@ interface Coverage {
   sparse_combinations: string[];
 }
 
+interface PromptConfig {
+  id: string;
+  political_block: string;
+  name_en: string;
+  name_fi: string;
+  description_en: string;
+  description_fi: string;
+  updated_at: string;
+}
+
 const TOPICS = [
   'immigration', 'healthcare', 'economy', 'education',
   'foreign_policy', 'environment', 'technology', 'equality', 'social_welfare'
@@ -42,8 +52,11 @@ export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [stats, setStats] = useState<Stats | null>(null);
   const [coverage, setCoverage] = useState<Coverage | null>(null);
+  const [prompts, setPrompts] = useState<PromptConfig[]>([]);
+  const [editingPrompt, setEditingPrompt] = useState<PromptConfig | null>(null);
+  const [isSavingPrompt, setIsSavingPrompt] = useState(false);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState<'stats' | 'coverage' | 'test'>('stats');
+  const [activeTab, setActiveTab] = useState<'stats' | 'coverage' | 'test' | 'prompts'>('stats');
 
   // Test chat state
   const [testParticipantId, setTestParticipantId] = useState('');
@@ -101,11 +114,59 @@ export default function AdminPage() {
     }
   }, [apiUrl, password]);
 
+  const fetchPrompts = useCallback(async () => {
+    try {
+      const response = await fetch(`${apiUrl}/api/admin/prompts`, {
+        headers: { 'X-Admin-Password': password },
+      });
+      if (response.ok) {
+        setPrompts(await response.json());
+      }
+    } catch {
+      console.error('Failed to fetch prompts');
+    }
+  }, [apiUrl, password]);
+
+  const savePrompt = async () => {
+    if (!editingPrompt) return;
+    setIsSavingPrompt(true);
+    try {
+      const response = await fetch(`${apiUrl}/api/admin/prompts/${editingPrompt.political_block}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Password': password,
+        },
+        body: JSON.stringify({
+          name_en: editingPrompt.name_en,
+          name_fi: editingPrompt.name_fi,
+          description_en: editingPrompt.description_en,
+          description_fi: editingPrompt.description_fi,
+        }),
+      });
+      if (response.ok) {
+        const updated = await response.json();
+        setPrompts(prev => prev.map(p => p.political_block === updated.political_block ? updated : p));
+        setEditingPrompt(null);
+      }
+    } catch {
+      console.error('Failed to save prompt');
+    } finally {
+      setIsSavingPrompt(false);
+    }
+  };
+
   useEffect(() => {
     if (isAuthenticated && activeTab === 'coverage' && !coverage) {
       fetchCoverage();
     }
   }, [isAuthenticated, activeTab, coverage, fetchCoverage]);
+
+  useEffect(() => {
+    if (isAuthenticated && activeTab === 'prompts' && prompts.length === 0) {
+      fetchPrompts();
+    }
+  }, [isAuthenticated, activeTab, prompts.length, fetchPrompts]);
 
   // Create test participant
   const createTestParticipant = async () => {
@@ -230,7 +291,7 @@ export default function AdminPage() {
       {/* Tabs */}
       <div className="max-w-7xl mx-auto px-4 py-4">
         <div className="flex gap-2 mb-6">
-          {(['stats', 'coverage', 'test'] as const).map((tab) => (
+          {(['stats', 'coverage', 'prompts', 'test'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -242,6 +303,7 @@ export default function AdminPage() {
             >
               {tab === 'stats' && 'Statistics'}
               {tab === 'coverage' && 'Coverage Matrix'}
+              {tab === 'prompts' && 'Bot Prompts'}
               {tab === 'test' && 'Test Chat'}
             </button>
           ))}
@@ -400,6 +462,133 @@ export default function AdminPage() {
                 </ul>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Prompts Tab */}
+        {activeTab === 'prompts' && (
+          <div className="space-y-6">
+            <div className="bg-white p-6 rounded-lg shadow">
+              <h2 className="text-lg font-semibold mb-4">Bot Prompt Configurations</h2>
+              <p className="text-gray-600 mb-6">
+                Edit the prompts that define each political persona. Changes take effect immediately for new chats.
+              </p>
+
+              {editingPrompt ? (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium capitalize">
+                      Editing: {editingPrompt.political_block}
+                    </h3>
+                    <button
+                      onClick={() => setEditingPrompt(null)}
+                      className="text-gray-500 hover:text-gray-700"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Name (English)
+                      </label>
+                      <input
+                        type="text"
+                        value={editingPrompt.name_en}
+                        onChange={(e) => setEditingPrompt({ ...editingPrompt, name_en: e.target.value })}
+                        className="w-full border rounded px-3 py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Name (Finnish)
+                      </label>
+                      <input
+                        type="text"
+                        value={editingPrompt.name_fi}
+                        onChange={(e) => setEditingPrompt({ ...editingPrompt, name_fi: e.target.value })}
+                        className="w-full border rounded px-3 py-2"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Prompt Description (English)
+                    </label>
+                    <textarea
+                      value={editingPrompt.description_en}
+                      onChange={(e) => setEditingPrompt({ ...editingPrompt, description_en: e.target.value })}
+                      rows={12}
+                      className="w-full border rounded px-3 py-2 font-mono text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Prompt Description (Finnish)
+                    </label>
+                    <textarea
+                      value={editingPrompt.description_fi}
+                      onChange={(e) => setEditingPrompt({ ...editingPrompt, description_fi: e.target.value })}
+                      rows={12}
+                      className="w-full border rounded px-3 py-2 font-mono text-sm"
+                    />
+                  </div>
+
+                  <div className="flex gap-4">
+                    <button
+                      onClick={savePrompt}
+                      disabled={isSavingPrompt}
+                      className="px-6 py-2 bg-primary-600 text-white rounded hover:bg-primary-700 disabled:bg-gray-400"
+                    >
+                      {isSavingPrompt ? 'Saving...' : 'Save Changes'}
+                    </button>
+                    <button
+                      onClick={() => setEditingPrompt(null)}
+                      className="px-6 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {prompts.map((prompt) => (
+                    <div
+                      key={prompt.political_block}
+                      className="border rounded-lg p-4 hover:bg-gray-50"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-semibold capitalize text-lg">
+                            {prompt.political_block}
+                          </h3>
+                          <p className="text-gray-600">{prompt.name_en}</p>
+                          <p className="text-gray-400 text-sm mt-1">
+                            Last updated: {new Date(prompt.updated_at).toLocaleString()}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setEditingPrompt(prompt)}
+                          className="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                      <div className="mt-3 p-3 bg-gray-100 rounded text-sm font-mono whitespace-pre-wrap max-h-40 overflow-y-auto">
+                        {prompt.description_en.substring(0, 300)}...
+                      </div>
+                    </div>
+                  ))}
+
+                  {prompts.length === 0 && (
+                    <p className="text-gray-500 text-center py-8">Loading prompts...</p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
