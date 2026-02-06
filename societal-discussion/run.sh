@@ -15,16 +15,16 @@ if [ ! -f .env ]; then
     echo -e "${GREEN}Creating .env from template...${NC}"
     cp .env.example .env
     echo ""
-    echo "⚠️  Please edit .env and add your ANTHROPIC_API_KEY"
+    echo "⚠️  Please edit .env and add your OPENAI_API_KEY"
     echo "   Then run this script again."
     echo ""
     exit 1
 fi
 
-# Check if ANTHROPIC_API_KEY is set
-if grep -q "ANTHROPIC_API_KEY=sk-ant-xxxxx" .env; then
+# Check if OPENAI_API_KEY is set
+if grep -q "OPENAI_API_KEY=sk-xxxxx" .env; then
     echo ""
-    echo "⚠️  Please edit .env and add your real ANTHROPIC_API_KEY"
+    echo "⚠️  Please edit .env and add your real OPENAI_API_KEY"
     echo ""
     exit 1
 fi

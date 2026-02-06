@@ -9,8 +9,8 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite+aiosqlite:///./societal_discussion.db"
 
-    # Anthropic API
-    anthropic_api_key: str = ""
+    # OpenAI API
+    openai_api_key: str = ""
 
     # Admin
     admin_password: str = "admin"
