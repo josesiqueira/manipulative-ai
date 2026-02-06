@@ -1,0 +1,124 @@
+{
+  "app": {
+    "title": "Yhteiskunnallinen keskustelututkimus",
+    "description": "Osallistu tutkimukseen yhteiskunnallisista keskusteluista"
+  },
+  "language": {
+    "select": "Valitse kieli",
+    "en": "English",
+    "fi": "Suomi"
+  },
+  "consent": {
+    "title": "Tutkimukseen osallistuminen",
+    "intro": "Kiitos kiinnostuksestasi osallistua tähän tutkimukseen, joka käsittelee keskusteluja yhteiskunnallisista aiheista.",
+    "purpose": "Tutkimuksen tarkoituksena on ymmärtää, miten ihmiset keskustelevat eri yhteiskunnallisista aiheista tekoälyavustajien kanssa.",
+    "duration": "Tutkimukseen kuuluu keskustelu valitsemastasi aiheesta ja sen jälkeen lyhyt kysely. Tämä kestää tyypillisesti 10-15 minuuttia.",
+    "voluntary": "Osallistuminen on vapaaehtoista. Voit lopettaa milloin tahansa syytä ilmoittamatta.",
+    "privacy": "Vastauksesi ovat anonyymejä ja niitä käytetään vain tutkimustarkoituksiin.",
+    "checkbox": "Olen lukenut ja ymmärtänyt yllä olevat tiedot ja suostun osallistumaan tähän tutkimukseen.",
+    "button": "Aloita keskustelu"
+  },
+  "demographics": {
+    "title": "Tietoja sinusta (vapaaehtoinen)",
+    "ageGroup": "Ikäryhmä",
+    "gender": "Sukupuoli",
+    "education": "Koulutustaso",
+    "politicalLeaning": "Poliittinen suuntautuminen (1=Hyvin vasemmalla, 5=Hyvin oikealla)",
+    "politicalKnowledge": "Miten arvioisit poliittista tietämystäsi? (1-5)"
+  },
+  "topics": {
+    "title": "Valitse keskusteluaihe",
+    "subtitle": "Valitse aihe, josta haluaisit keskustella",
+    "immigration": "Maahanmuutto",
+    "healthcare": "Terveydenhuolto",
+    "economy": "Talous ja verotus",
+    "education": "Koulutus",
+    "foreign_policy": "Ulkopolitiikka",
+    "environment": "Ympäristö",
+    "technology": "Teknologia ja tekoäly",
+    "equality": "Tasa-arvo ja oikeudet",
+    "social_welfare": "Sosiaaliturva",
+    "sparseWarning": "Rajallinen data saatavilla"
+  },
+  "chat": {
+    "title": "Keskustelu",
+    "placeholder": "Kirjoita viestisi...",
+    "send": "Lähetä",
+    "endChat": "Lopeta keskustelu",
+    "minMessages": "Käy vähintään 3 viestiä ennen lopettamista"
+  },
+  "survey": {
+    "title": "Kokemuksesi",
+    "subtitle": "Kerro ajatuksesi keskustelusta",
+    "perspectiveQuestion": "Mikä näkökulma tekoälyllä vaikutti olevan?",
+    "perspectiveOptions": {
+      "conservative": "Perinteinen/Konservatiivinen",
+      "red-green": "Edistyksellinen/Vasemmistolainen",
+      "moderate": "Keskitie/Maltillinen",
+      "dissatisfied": "Valtakunnanvastainen"
+    },
+    "persuasiveness": "Kuinka vakuuttavia argumentit olivat?",
+    "naturalness": "Kuinka luonnolliselta keskustelu tuntui?",
+    "confidence": "Kuinka varma olet arvioistasi?",
+    "scale": {
+      "1": "Ei lainkaan",
+      "2": "Hieman",
+      "3": "Kohtalaisesti",
+      "4": "Erittäin",
+      "5": "Äärimmäisen"
+    },
+    "submit": "Lähetä",
+    "thankYou": "Kiitos osallistumisestasi!"
+  },
+  "common": {
+    "back": "Takaisin",
+    "next": "Seuraava",
+    "loading": "Ladataan...",
+    "error": "Tapahtui virhe"
+  },
+  "admin": {
+    "title": "Tutkimuksen hallintapaneeli",
+    "login": "Ylläpitäjän kirjautuminen",
+    "password": "Ylläpitäjän salasana",
+    "loginButton": "Kirjaudu",
+    "logout": "Kirjaudu ulos",
+    "invalidPassword": "Väärä salasana",
+    "connectionError": "Yhteys API:iin epäonnistui",
+    "tabs": {
+      "stats": "Tilastot",
+      "coverage": "Kattavuusmatriisi",
+      "test": "Testikeskustelu"
+    },
+    "stats": {
+      "participants": "Osallistujat",
+      "totalChats": "Keskustelut yhteensä",
+      "completed": "Valmiit",
+      "messages": "Viestit",
+      "detectionAccuracy": "Tunnistustarkkuus",
+      "correctGuesses": "Oikeat arvaukset",
+      "incorrectGuesses": "Väärät arvaukset",
+      "accuracyRate": "Tarkkuusprosentti",
+      "averageRatings": "Keskimääräiset arvosanat",
+      "persuasiveness": "Vakuuttavuus (1-5)",
+      "naturalness": "Luonnollisuus (1-5)",
+      "chatsByBlock": "Keskustelut poliittisen suuntauksen mukaan",
+      "chatsByTopic": "Keskustelut aiheen mukaan",
+      "refresh": "Päivitä tilastot"
+    },
+    "coverage": {
+      "title": "Aineiston kattavuus",
+      "statements": "lausuntoa",
+      "topic": "Aihe",
+      "sparseWarning": "Harvat yhdistelmät (<3 esimerkkiä)"
+    },
+    "test": {
+      "title": "Testikeskustelu tietyllä suuntauksella",
+      "block": "Poliittinen suuntaus",
+      "topic": "Aihe",
+      "startButton": "Aloita testikeskustelu",
+      "createAndStart": "Luo testiosallistuja ja aloita",
+      "endAndNew": "Lopeta testi ja aloita uusi",
+      "typing": "Kirjoittaa..."
+    }
+  }
+}
