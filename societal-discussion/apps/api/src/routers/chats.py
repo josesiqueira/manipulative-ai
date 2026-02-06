@@ -10,6 +10,7 @@ from ..database import get_db
 from ..models import Participant, Chat, Message
 from ..services.block_assignment import assign_political_block
 from ..services.llm_client import generate_response
+from ..services.conversation_logger import save_conversation_log
 
 router = APIRouter()
 
@@ -281,8 +282,13 @@ async def complete_chat(
 
     After completion, the political block is revealed to allow
     the participant to see if their guess was correct.
+    Also saves the conversation log to a file.
     """
-    result = await db.execute(select(Chat).where(Chat.id == chat_id))
+    result = await db.execute(
+        select(Chat)
+        .options(selectinload(Chat.messages), selectinload(Chat.participant))
+        .where(Chat.id == chat_id)
+    )
     chat = result.scalar_one_or_none()
 
     if not chat:
@@ -326,6 +332,13 @@ async def complete_chat(
 
     await db.flush()
     await db.refresh(chat)
+
+    # Save conversation log to file
+    try:
+        log_path = save_conversation_log(chat, chat.participant)
+        print(f"Conversation log saved: {log_path}")
+    except Exception as e:
+        print(f"Warning: Failed to save conversation log: {e}")
 
     # NOW we can reveal the political block
     return ChatCompleteResponse(
