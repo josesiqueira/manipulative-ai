@@ -63,7 +63,7 @@ async def generate_response(
 
     response = client.chat.completions.create(
         model="gpt-5.2",
-        max_tokens=1024,
+        max_completion_tokens=1024,
         messages=openai_messages,
     )
 
@@ -117,7 +117,7 @@ async def generate_response_streaming(
 
     stream = client.chat.completions.create(
         model="gpt-5.2",
-        max_tokens=1024,
+        max_completion_tokens=1024,
         messages=openai_messages,
         stream=True,
     )

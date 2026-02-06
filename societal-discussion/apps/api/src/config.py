@@ -1,6 +1,11 @@
 from functools import lru_cache
+from pathlib import Path
 from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
+
+# Find .env in project root (two levels up from this file)
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+ENV_FILE = PROJECT_ROOT / ".env"
 
 
 class Settings(BaseSettings):
@@ -22,7 +27,7 @@ class Settings(BaseSettings):
     debug: bool = False
 
     model_config = ConfigDict(
-        env_file=".env",
+        env_file=str(ENV_FILE),
         env_file_encoding="utf-8",
         extra="ignore",  # Ignore frontend-only env vars like NEXT_PUBLIC_API_URL
     )
