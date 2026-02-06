@@ -1,89 +1,39 @@
-.PHONY: install dev test lint build clean docker-up docker-down import-data validate-coverage
+.PHONY: run install dev test clean
 
-# Development setup
+# One command to rule them all
+run:
+	@chmod +x run.sh && ./run.sh
+
+# Install dependencies only
 install:
-	cd apps/api && pip install -e ".[dev]"
+	cd apps/api && uv sync --dev
 	cd apps/web && npm install
 
-# Run development servers
+# Run dev servers (assumes already installed)
 dev:
-	@echo "Starting development servers..."
-	@echo "API: http://localhost:8000"
-	@echo "Web: http://localhost:3000"
+	@echo "API:   http://localhost:8000"
+	@echo "Web:   http://localhost:3000"
 	@echo "Admin: http://localhost:3000/en/admin"
-	@make -j2 dev-api dev-web
+	@trap 'kill $$(jobs -p) 2>/dev/null' EXIT; \
+	(cd apps/api && uv run uvicorn src.main:app --reload --port 8000) & \
+	(cd apps/web && npm run dev) & \
+	wait
 
-dev-api:
-	cd apps/api && uvicorn src.main:app --reload --port 8000
-
-dev-web:
-	cd apps/web && npm run dev
-
-# Testing
+# Run tests
 test:
-	cd apps/api && pytest tests/ -v
-	cd apps/web && npm run test --if-present
-
-test-api:
-	cd apps/api && pytest tests/ -v
-
-test-web:
-	cd apps/web && npm run test --if-present
-
-# Linting
-lint:
-	cd apps/api && ruff check src/
-	cd apps/web && npm run lint
-
-# Build
-build:
-	cd apps/web && npm run build
-
-build-docker:
-	docker-compose -f docker/docker-compose.yml build
-
-# Docker
-docker-up:
-	docker-compose -f docker/docker-compose.yml up -d
-
-docker-down:
-	docker-compose -f docker/docker-compose.yml down
-
-docker-logs:
-	docker-compose -f docker/docker-compose.yml logs -f
+	cd apps/api && uv run pytest tests/ -v
 
 # Database
 migrate:
-	cd apps/api && alembic upgrade head
+	cd apps/api && uv run alembic upgrade head
 
-migrate-create:
-	cd apps/api && alembic revision --autogenerate -m "$(msg)"
-
-# Data management
 import-data:
-	python scripts/import_dataset.py --file data/raw/persuasion_dataset_Unified_EN-3_CLEANED.xlsx
-
-validate-coverage:
-	python scripts/validate_coverage.py
+	uv run python scripts/import_dataset.py --file data/raw/persuasion_dataset_Unified_EN-3_CLEANED.xlsx
 
 # Cleanup
 clean:
-	find . -type d -name __pycache__ -exec rm -rf {} +
-	find . -type d -name .pytest_cache -exec rm -rf {} +
-	find . -type d -name .next -exec rm -rf {} +
-	find . -type d -name node_modules -exec rm -rf {} +
+	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name .pytest_cache -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name .venv -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name node_modules -exec rm -rf {} + 2>/dev/null || true
 	rm -f apps/api/*.db
-
-# Help
-help:
-	@echo "Available commands:"
-	@echo "  make install          - Install all dependencies"
-	@echo "  make dev              - Start development servers"
-	@echo "  make test             - Run all tests"
-	@echo "  make lint             - Run linters"
-	@echo "  make build            - Build frontend"
-	@echo "  make docker-up        - Start Docker containers"
-	@echo "  make docker-down      - Stop Docker containers"
-	@echo "  make migrate          - Run database migrations"
-	@echo "  make import-data      - Import dataset into database"
-	@echo "  make validate-coverage - Validate dataset coverage"
