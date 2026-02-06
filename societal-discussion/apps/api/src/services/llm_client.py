@@ -64,6 +64,7 @@ async def generate_response(
     response = client.chat.completions.create(
         model="gpt-5.2",
         max_completion_tokens=1024,
+        temperature=0.1,
         messages=openai_messages,
     )
 
