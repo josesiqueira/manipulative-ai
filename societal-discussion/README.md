@@ -23,65 +23,36 @@ This application allows participants to engage in conversations about societal t
 
 ### Prerequisites
 
-- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) (Python package manager)
 - Node.js 20+
-- PostgreSQL (or SQLite for development)
+- An [Anthropic API key](https://console.anthropic.com)
 
-### Local Development
-
-1. **Clone and setup**
-   ```bash
-   git clone <repository-url>
-   cd societal-discussion
-   ```
-
-2. **Configure environment**
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your ANTHROPIC_API_KEY
-   ```
-
-3. **Install dependencies**
-   ```bash
-   # Backend
-   cd apps/api
-   pip install -e ".[dev]"
-
-   # Frontend
-   cd ../web
-   npm install
-   ```
-
-4. **Import dataset**
-   ```bash
-   cd ../..
-   python scripts/import_dataset.py --file data/raw/persuasion_dataset_Unified_EN-3_CLEANED.xlsx
-   python scripts/validate_coverage.py
-   ```
-
-5. **Start development servers**
-   ```bash
-   # Terminal 1: Backend
-   cd apps/api
-   uvicorn src.main:app --reload --port 8000
-
-   # Terminal 2: Frontend
-   cd apps/web
-   npm run dev
-   ```
-
-6. **Access the application**
-   - Participant UI: http://localhost:3000/en
-   - Admin Panel: http://localhost:3000/en/admin
-   - API Docs: http://localhost:8000/docs
-
-### Using Make
+### Run Everything with One Command
 
 ```bash
-make install        # Install all dependencies
-make dev            # Start both servers
-make test           # Run all tests
-make import-data    # Import dataset
+cd societal-discussion
+
+# First run: creates .env, installs deps, imports data, starts servers
+./run.sh
+```
+
+On first run, it will create `.env` and ask you to add your `ANTHROPIC_API_KEY`. Edit the file and run again.
+
+### What You Get
+
+| URL | Purpose |
+|-----|---------|
+| http://localhost:3000 | Participant UI |
+| http://localhost:3000/en/admin | Admin Panel |
+| http://localhost:8000/docs | API Docs |
+
+### Other Commands
+
+```bash
+make run      # Same as ./run.sh
+make dev      # Just start servers (skip install)
+make test     # Run tests
+make clean    # Remove all generated files
 ```
 
 ## Project Structure
