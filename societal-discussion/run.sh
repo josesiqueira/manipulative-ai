@@ -49,7 +49,9 @@ cd ../..
 
 # Import dataset if database is empty
 echo -e "${GREEN}Importing dataset...${NC}"
-uv run python scripts/import_dataset.py --file data/raw/persuasion_dataset_Unified_EN-3_CLEANED.xlsx 2>/dev/null || true
+cd apps/api
+uv run python ../../scripts/import_dataset.py --file ../../data/raw/persuasion_dataset_Unified_EN-3_CLEANED.xlsx || true
+cd ../..
 
 echo ""
 echo -e "${GREEN}✓ Setup complete!${NC}"
@@ -63,7 +65,9 @@ echo ""
 # Start both servers
 trap 'kill $(jobs -p) 2>/dev/null' EXIT
 
-cd apps/api && uv run uvicorn src.main:app --reload --port 8000 &
-cd apps/web && npm run dev &
+PROJECT_DIR="$(pwd)"
+
+(cd "$PROJECT_DIR/apps/api" && uv run uvicorn src.main:app --reload --port 8000) &
+(cd "$PROJECT_DIR/apps/web" && npm run dev) &
 
 wait
