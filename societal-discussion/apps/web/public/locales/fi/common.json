@@ -1,6 +1,7 @@
 {
   "app": {
-    "title": "Yhteiskunnallinen keskustelututkimus",
+    "title": "Käyttöehdot ja tietoinen suostumus",
+    "subtitle": "Eri poliittisia suuntauksia edustavat tekoälychatbotit",
     "description": "Osallistu tutkimukseen yhteiskunnallisista keskusteluista"
   },
   "language": {
@@ -9,26 +10,102 @@
     "fi": "Suomi"
   },
   "consent": {
-    "title": "Tutkimukseen osallistuminen",
-    "intro": "Kiitos kiinnostuksestasi osallistua tähän tutkimukseen, joka käsittelee keskusteluja yhteiskunnallisista aiheista.",
-    "purpose": "Tutkimuksen tarkoituksena on ymmärtää, miten ihmiset keskustelevat eri yhteiskunnallisista aiheista tekoälyavustajien kanssa.",
-    "duration": "Tutkimukseen kuuluu keskustelu valitsemastasi aiheesta ja sen jälkeen lyhyt kysely. Tämä kestää tyypillisesti 10-15 minuuttia.",
-    "voluntary": "Osallistuminen on vapaaehtoista. Voit lopettaa milloin tahansa syytä ilmoittamatta.",
-    "privacy": "Vastauksesi ovat anonyymejä ja niitä käytetään vain tutkimustarkoituksiin.",
-    "checkbox": "Olen lukenut ja ymmärtänyt yllä olevat tiedot ja suostun osallistumaan tähän tutkimukseen.",
-    "button": "Aloita keskustelu"
+    "title": "Käyttöehdot ja tietoinen suostumus",
+    "welcome": "Tervetuloa tekoälychatbot-alustallemme. Tämä koe on osa Suomen Akatemian rahoittamaa ja Tampereen yliopistossa toteutettavaa SYNTHETICA-tutkimushanketta. Alusta mahdollistaa vuorovaikutuksen tekoälychatbottien kanssa, jotka edustavat erilaisia poliittisia suuntauksia. Tämä koe ei ole virallinen mielipidegeneraattori. Ennen aloittamista lue ja hyväksy seuraavat ehdot:",
+    "sections": {
+      "researchPurpose": {
+        "title": "Tutkimuksen tarkoitus",
+        "content": "Tämä koe tutkii, miten ihmiset havaitsevat ja ovat vuorovaikutuksessa eri poliittisia suuntauksia edustavien tekoälychatbottien kanssa. Osallistumisesi edistää ihmisen ja tekoälyn vuorovaikutusta koskevaa tieteellistä tutkimusta."
+      },
+      "eligibility": {
+        "title": "Osallistumiskelpoisuus",
+        "content": "Sinun tulee olla vähintään 18-vuotias osallistuaksesi tähän kokeeseen."
+      },
+      "demonstrationPeriod": {
+        "title": "Demonstraatiojakso",
+        "content": "Tämä palvelu on tutkimusdemonstration ja on käytettävissä ainoastaan [ALKAMISPÄIVÄ]–[PÄÄTTYMISPÄIVÄ]."
+      },
+      "dataCollection": {
+        "title": "Tietojen kerääminen",
+        "intro": "Osallistumalla annat suostumuksesi seuraavien tietojen keräämiseen ainoastaan tutkimustarkoituksiin:",
+        "items": [
+          "Rekisteröitymisen yhteydessä annetut demografiset tiedot (anonymisoituina)",
+          "Kaikki keskustelut tekoälychatbottien kanssa",
+          "Aiheiden valinnat ja vuorovaikutusmallit",
+          "Vuorovaikutuksen jälkeiset kyselyvastaukset, mukaan lukien arviot vakuuttavuudesta, luonnollisuudesta ja suuntauksen tunnistamisesta"
+        ],
+        "outro": "Kaikki kerätyt tiedot anonymisoidaan, ja niitä käytetään ainoastaan akateemisiin tutkimustarkoituksiin. Tutkimusaineisto säilytetään turvallisesti ja tuhotaan SYNTHETICA-hankkeen päättyessä."
+      },
+      "studyProcedure": {
+        "title": "Tutkimuksen kulku",
+        "content": "Tutkimus sisältää keskusteluaiheen valinnan, keskustelun tekoälychatbotin kanssa (vähintään 3 viestienvaihtoa vaaditaan) ja lyhyen kyselyn kokemuksestasi."
+      },
+      "noPersonalInfo": {
+        "title": "Ei henkilötietoja",
+        "content": "Älä paljasta henkilökohtaisia tunnistetietoja (kuten koko nimeäsi, osoitettasi, puhelinnumeroasi tai sähköpostiosoitettasi) vuorovaikutuksessa tekoälychatbottien kanssa. Alustaa ei ole suunniteltu tällaisten tietojen käsittelyyn tai suojaamiseen."
+      },
+      "rightToWithdraw": {
+        "title": "Oikeus vetäytyä",
+        "content": "Osallistumisesi on täysin vapaaehtoista. Voit lopettaa osallistumisen milloin tahansa syytä ilmoittamatta ja ilman kielteisiä seurauksia. Jos vetäydyt, siihen mennessä kerättyjä tietoja voidaan edelleen käyttää anonymisoituna tutkimustarkoituksiin."
+      },
+      "aiResponses": {
+        "title": "Tekoälyn tuottamat vastaukset",
+        "content": "Tekoälychatbottien antamat vastaukset ovat keinotekoisesti rakennettuja poliittisten suuntausten esityksiä. Ne eivät edusta minkään todellisen poliittisen puolueen, poliitikon tai organisaation todellisia kantoja. Chatbotin vastaukset ovat tekoälyn tuottamia, eivätkä ne välttämättä heijasta tarkasti mitään tiettyä todellista poliittista ohjelmaa."
+      },
+      "notBasis": {
+        "title": "Ei perusta poliittisille päätöksille",
+        "content": "Chatboteilta saatuja tietoja ei tule käyttää äänestyspäätösten tai poliittisen toiminnan perusteena. Kehotamme sinua tutustumaan luotettaviin lähteisiin ja käyttämään kriittistä ajattelua poliittisia päätöksiä tehdessäsi."
+      },
+      "respectfulInteraction": {
+        "title": "Kunnioittava vuorovaikutus",
+        "content": "Osallistujien odotetaan olevan vuorovaikutuksessa tekoälychatbottien kanssa kunnioittavasti ja asiallisesti. Sopimaton tai loukkaava kielenkäyttö voi johtaa kokeen käytön keskeyttämiseen."
+      },
+      "noEndorsement": {
+        "title": "Ei kannanottoja",
+        "content": "Tämä koe on puolueeton eikä tue tai edistä mitään poliittista suuntausta, puoluetta tai ehdokasta. Simuloidut vuorovaikutukset on tarkoitettu ainoastaan tutkimustarkoituksiin."
+      },
+      "serviceInterruption": {
+        "title": "Palvelun keskeytyminen",
+        "content": "Palvelu voidaan keskeyttää milloin tahansa ilman ennakkoilmoitusta."
+      },
+      "changesToTerms": {
+        "title": "Ehtojen muutokset",
+        "content": "Pidätämme oikeuden muuttaa näitä ehtoja milloin tahansa. Jatkamalla alustan käyttöä muutosten jälkeen hyväksyt päivitetyt ehdot."
+      },
+      "ethicsApproval": {
+        "title": "Eettinen hyväksyntä",
+        "content": "Tämä tutkimus on arvioitu ja hyväksytty [EETTISEN TOIMIKUNNAN NIMI JA VIITENUMERO]."
+      },
+      "contactInfo": {
+        "title": "Yhteystiedot",
+        "intro": "Jos sinulla on kysyttävää tai huolenaiheita tästä kokeesta, ota yhteyttä:",
+        "pi": "Vastuullinen tutkija: [NIMI], [SÄHKÖPOSTI]",
+        "project": "SYNTHETICA-hanke, Tampereen yliopisto"
+      }
+    },
+    "checkboxIntro": "Klikkaamalla \"Hyväksyn\" vahvistat, että:",
+    "checkboxItems": [
+      "Olet vähintään 18-vuotias",
+      "Olet lukenut, ymmärtänyt ja hyväksynyt nämä ehdot",
+      "Annat suostumuksesi anonymisoitujen tietojesi keräämiseen ja käyttöön tutkimustarkoituksiin",
+      "Ymmärrät, että osallistumisesi on vapaaehtoista ja voit vetäytyä milloin tahansa"
+    ],
+    "checkbox": "Hyväksyn",
+    "button": "Hyväksyn"
   },
   "demographics": {
     "title": "Tietoja sinusta (vapaaehtoinen)",
     "ageGroup": "Ikäryhmä",
     "gender": "Sukupuoli",
     "education": "Koulutustaso",
+    "educationHint": "Valitse korkein suorittamasi koulutustaso",
     "politicalLeaning": "Poliittinen suuntautuminen (1=Hyvin vasemmalla, 5=Hyvin oikealla)",
     "politicalKnowledge": "Miten arvioisit poliittista tietämystäsi? (1-5)"
   },
   "topics": {
     "title": "Valitse keskusteluaihe",
     "subtitle": "Valitse aihe, josta haluaisit keskustella",
+    "minExchangesNote": "Jokainen keskustelu vaatii vähintään 3 viestienvaihtoa ennen kuin voit siirtyä kyselyyn.",
     "immigration": "Maahanmuutto",
     "healthcare": "Terveydenhuolto",
     "economy": "Talous ja verotus",
@@ -38,24 +115,45 @@
     "technology": "Teknologia ja tekoäly",
     "equality": "Tasa-arvo ja oikeudet",
     "social_welfare": "Sosiaaliturva",
-    "sparseWarning": "Rajallinen data saatavilla"
+    "sparseWarning": "Rajallinen data saatavilla",
+    "welcomeMessages": {
+      "immigration": "Hei! Olen täällä keskustelemassa maahanmuutosta kanssasi. Tämä aihe koskettaa rajoja, kulttuurista integraatiota ja työvoiman tarpeita. Mitä ajatuksia tai kysymyksiä sinulla on maahanmuuttopolitiikasta?",
+      "healthcare": "Hei! Olen valmis keskustelemaan terveydenhuollosta kanssasi. Tämä aihe kattaa pääsyn terveyspalveluihin, rahoitusmallit ja kansanterveyden prioriteetit. Mitä terveydenhuollon näkökulmia haluaisit käsitellä?",
+      "economy": "Hei! Keskustellaan taloudesta ja verotuksesta. Tämä kattaa työpaikkojen luomisen, julkiset menot ja yhteiskunnan rahoituksen. Mitä talousasioita sinulla on mielessäsi?",
+      "education": "Hei! Olen täällä keskustelemassa koulutuksesta kanssasi. Varhaiskasvatuksesta korkeakoulutukseen, koulutus muokkaa tulevia sukupolvia. Mitkä koulutusaiheet kiinnostavat sinua?",
+      "foreign_policy": "Hei! Keskustellaan ulkopolitiikasta yhdessä. Tämä sisältää kansainväliset suhteet, puolustuksen ja roolimme maailmassa. Mitä ulkopolitiikan kysymyksiä haluaisit käsitellä?",
+      "environment": "Hei! Olen valmis keskustelemaan ympäristöasioista kanssasi. Ilmastonmuutoksesta luonnonsuojeluun, nämä aiheet vaikuttavat planeettamme tulevaisuuteen. Mitä ympäristökysymyksiä haluaisit käsitellä?",
+      "technology": "Hei! Tutkitaan teknologiaa ja tekoälyä yhdessä. Nämä nopeasti kehittyvät alat muokkaavat yhteiskuntaa merkittävillä tavoilla. Mitä teknologian näkökulmia haluaisit keskustella?",
+      "equality": "Hei! Olen täällä keskustelemassa tasa-arvosta ja oikeuksista kanssasi. Tämä kattaa kansalaisoikeudet, sosiaalisen oikeudenmukaisuuden ja yhtäläiset mahdollisuudet kaikille. Mitkä tasa-arvokysymykset ovat sinulle tärkeimpiä?",
+      "social_welfare": "Hei! Keskustellaan sosiaaliturvasta yhdessä. Tämä kattaa tukijärjestelmät, sosiaaliturvan ja haavoittuvassa asemassa olevien auttamisen. Mitkä sosiaaliturva-aiheet kiinnostavat sinua?"
+    }
   },
   "chat": {
     "title": "Keskustelu",
     "placeholder": "Kirjoita viestisi...",
     "send": "Lähetä",
     "endChat": "Lopeta keskustelu",
-    "minMessages": "Käy vähintään 3 viestiä ennen lopettamista"
+    "minMessages": "Käy vähintään 3 viestiä ennen lopettamista",
+    "minMessagesTooltip": "Käy vähintään 3 viestienvaihtoa lopettaaksesi keskustelun",
+    "maxExchangesReached": "Viestienvaihtojen enimmäismäärä saavutettu. Lopeta keskustelu jatkaaksesi.",
+    "theme": "Teema",
+    "selectTheme": "Valitse teema"
   },
   "survey": {
     "title": "Kokemuksesi",
     "subtitle": "Kerro ajatuksesi keskustelusta",
     "perspectiveQuestion": "Mikä näkökulma tekoälyllä vaikutti olevan?",
     "perspectiveOptions": {
-      "conservative": "Perinteinen/Konservatiivinen",
-      "red-green": "Edistyksellinen/Vasemmistolainen",
-      "moderate": "Keskitie/Maltillinen",
-      "dissatisfied": "Valtakunnanvastainen"
+      "conservative": "Konservatiivinen",
+      "dissatisfied": "Tyytymätön",
+      "moderate": "Maltillinen",
+      "red-green": "Punavihreä"
+    },
+    "perspectiveHints": {
+      "conservative": "Perinteet, kansallinen identiteetti, tiukempi maahanmuuttopolitiikka, vapaat markkinat",
+      "dissatisfied": "Establishment-vastainen, poliittisen eliitin kritisointi, epäluottamus instituutioihin",
+      "moderate": "Pragmaattinen, tasapainoinen, konsensushakuinen, näyttöön perustuva",
+      "red-green": "Sosiaalinen tasa-arvo, ympäristönsuojelu, inklusiivinen maahanmuuttopolitiikka, hyvinvointivaltio"
     },
     "persuasiveness": "Kuinka vakuuttavia argumentit olivat?",
     "naturalness": "Kuinka luonnolliselta keskustelu tuntui?",
@@ -119,6 +217,15 @@
       "createAndStart": "Luo testiosallistuja ja aloita",
       "endAndNew": "Lopeta testi ja aloita uusi",
       "typing": "Kirjoittaa..."
+    },
+    "export": {
+      "title": "Vie keskustelulokit",
+      "description": "Lataa kaikki keskustelulokitiedostot ZIP-arkistona.",
+      "downloadZip": "Lataa ZIP",
+      "downloading": "Ladataan...",
+      "fileCount": "tiedostoa",
+      "totalSize": "Kokonaiskoko",
+      "noLogs": "Keskustelulokeja ei ole vielä saatavilla."
     }
   }
 }
