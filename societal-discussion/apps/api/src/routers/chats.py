@@ -7,19 +7,38 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
-from ..models import Participant, Chat, Message
+from ..models import Participant, Chat, Message, TopicConfig
 from ..services.block_assignment import assign_political_block
 from ..services.llm_client import generate_response
 from ..services.conversation_logger import save_conversation_log
 
 router = APIRouter()
 
-VALID_TOPICS = [
-    "immigration", "healthcare", "economy", "education",
-    "foreign_policy", "environment", "technology", "equality", "social_welfare"
-]
-
 VALID_BLOCKS = ["conservative", "red-green", "moderate", "dissatisfied"]
+
+
+async def get_enabled_topic_keys(db: AsyncSession) -> set[str]:
+    """
+    Get the set of enabled topic keys from the database.
+    Used for validating topic_category in chat creation.
+    """
+    result = await db.execute(
+        select(TopicConfig.topic_key).where(TopicConfig.is_enabled == True)
+    )
+    return {row[0] for row in result.all()}
+
+
+async def validate_topic(db: AsyncSession, topic_key: str) -> bool:
+    """
+    Validate that a topic exists and is enabled.
+    Returns True if valid, False otherwise.
+    """
+    result = await db.execute(
+        select(TopicConfig)
+        .where(TopicConfig.topic_key == topic_key)
+        .where(TopicConfig.is_enabled == True)
+    )
+    return result.scalar_one_or_none() is not None
 
 
 class ChatCreate(BaseModel):
@@ -98,11 +117,12 @@ async def create_chat(
     The political block is secretly assigned using stratified randomization.
     NEVER expose the block to the participant until survey completion.
     """
-    # Validate topic
-    if data.topic_category not in VALID_TOPICS:
+    # Validate topic exists and is enabled in database
+    if not await validate_topic(db, data.topic_category):
+        enabled_topics = await get_enabled_topic_keys(db)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid topic. Must be one of: {VALID_TOPICS}",
+            detail=f"Invalid or disabled topic. Available topics: {sorted(enabled_topics)}",
         )
 
     # Validate language

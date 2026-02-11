@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     # OpenAI API
     openai_api_key: str = ""
 
+    # Encryption
+    encryption_secret: str = ""
+
     # Admin
     admin_password: str = "admin"
 

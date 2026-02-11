@@ -61,10 +61,10 @@ function SurveyContent() {
   };
 
   const leaningOptions = [
-    { id: 'conservative', label: t('survey.perspectiveOptions.conservative') },
-    { id: 'red-green', label: t('survey.perspectiveOptions.red-green') },
-    { id: 'moderate', label: t('survey.perspectiveOptions.moderate') },
-    { id: 'dissatisfied', label: t('survey.perspectiveOptions.dissatisfied') },
+    { id: 'conservative', label: t('survey.perspectiveOptions.conservative'), hint: t('survey.perspectiveHints.conservative') },
+    { id: 'dissatisfied', label: t('survey.perspectiveOptions.dissatisfied'), hint: t('survey.perspectiveHints.dissatisfied') },
+    { id: 'moderate', label: t('survey.perspectiveOptions.moderate'), hint: t('survey.perspectiveHints.moderate') },
+    { id: 'red-green', label: t('survey.perspectiveOptions.red-green'), hint: t('survey.perspectiveHints.red-green') },
   ];
 
   if (isComplete && result) {
@@ -99,30 +99,73 @@ function SurveyContent() {
         <p className="text-center text-gray-600 mb-8">{t('survey.subtitle')}</p>
 
         <form onSubmit={handleSubmit} className="space-y-8">
-          {/* Perceived Leaning */}
+          {/* Perceived Leaning and Confidence */}
           <div className="bg-white rounded-lg shadow-md p-6">
             <h2 className="text-lg font-semibold mb-4">{t('survey.perspectiveQuestion')}</h2>
             <div className="space-y-2">
               {leaningOptions.map((option) => (
                 <label
                   key={option.id}
-                  className={`flex items-center p-3 rounded-lg border cursor-pointer transition-colors ${
+                  className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
                     perceivedLeaning === option.id
                       ? 'bg-primary-50 border-primary-500'
                       : 'bg-white border-gray-200 hover:bg-gray-50'
                   }`}
                 >
-                  <input
-                    type="radio"
-                    name="perceivedLeaning"
-                    value={option.id}
-                    checked={perceivedLeaning === option.id}
-                    onChange={(e) => setPerceivedLeaning(e.target.value)}
-                    className="sr-only"
-                  />
-                  <span className="text-gray-900">{option.label}</span>
+                  <div className="flex items-center">
+                    <input
+                      type="radio"
+                      name="perceivedLeaning"
+                      value={option.id}
+                      checked={perceivedLeaning === option.id}
+                      onChange={(e) => setPerceivedLeaning(e.target.value)}
+                      className="sr-only"
+                    />
+                    <span className="text-gray-900 font-medium">{option.label}</span>
+                  </div>
+                  <span className="relative group">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      className="w-5 h-5 text-gray-400 cursor-help"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM8.94 6.94a.75.75 0 11-1.061-1.061 3 3 0 112.871 5.026v.345a.75.75 0 01-1.5 0v-.5c0-.72.57-1.172 1.081-1.287A1.5 1.5 0 108.94 6.94zM10 15a1 1 0 100-2 1 1 0 000 2z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    <span className="absolute bottom-full right-0 mb-2 px-3 py-2 text-xs text-white bg-gray-800 rounded-md w-64 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                      {option.hint}
+                    </span>
+                  </span>
                 </label>
               ))}
+            </div>
+
+            {/* Confidence */}
+            <div className="mt-6 pt-6 border-t">
+              <h3 className="font-medium text-gray-900 mb-3">{t('survey.confidence')}</h3>
+              <div className="flex gap-2">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setConfidence(n)}
+                    className={`flex-1 py-3 rounded-lg border transition-colors ${
+                      confidence === n
+                        ? 'bg-primary-600 text-white border-primary-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="block font-medium">{n}</span>
+                    <span className="block text-xs mt-1">
+                      {t(`survey.scale.${n}` as any)}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -163,30 +206,6 @@ function SurveyContent() {
                     onClick={() => setNaturalness(n)}
                     className={`flex-1 py-3 rounded-lg border transition-colors ${
                       naturalness === n
-                        ? 'bg-primary-600 text-white border-primary-600'
-                        : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span className="block font-medium">{n}</span>
-                    <span className="block text-xs mt-1">
-                      {t(`survey.scale.${n}` as any)}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Confidence */}
-            <div>
-              <h3 className="font-medium text-gray-900 mb-3">{t('survey.confidence')}</h3>
-              <div className="flex gap-2">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setConfidence(n)}
-                    className={`flex-1 py-3 rounded-lg border transition-colors ${
-                      confidence === n
                         ? 'bg-primary-600 text-white border-primary-600'
                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                     }`}

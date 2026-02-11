@@ -1,5 +1,7 @@
 import io
-from datetime import datetime
+import zipfile
+from datetime import datetime, date
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from fastapi.responses import StreamingResponse
@@ -10,16 +12,53 @@ from sqlalchemy.orm import selectinload
 
 from ..config import get_settings
 from ..database import get_db
-from ..models import Participant, Chat, Message, PoliticalStatement, PromptConfig
+from ..models import (
+    Participant, Chat, Message, PoliticalStatement, PromptConfig, TermsConfig, LLMConfig,
+    ExperimentConfig, TopicConfig
+)
+from ..services.encryption import encrypt_api_key, decrypt_api_key, generate_key_preview
+from ..services.llm_models import AVAILABLE_MODELS, get_models_for_provider
+from ..services.topic_coverage import (
+    SPARSE_COVERAGE_THRESHOLD,
+    get_topic_coverage_counts,
+    is_topic_sparse,
+)
 
 router = APIRouter()
 settings = get_settings()
 
 VALID_BLOCKS = ["conservative", "red-green", "moderate", "dissatisfied"]
-VALID_TOPICS = [
-    "immigration", "healthcare", "economy", "education",
-    "foreign_policy", "environment", "technology", "equality", "social_welfare"
-]
+
+
+async def get_enabled_topic_keys(db: AsyncSession) -> set[str]:
+    """
+    Get the set of enabled topic keys from the database.
+    Used for validating topic_category.
+    """
+    result = await db.execute(
+        select(TopicConfig.topic_key).where(TopicConfig.is_enabled == True)
+    )
+    return {row[0] for row in result.all()}
+
+
+async def get_all_topic_keys(db: AsyncSession) -> set[str]:
+    """
+    Get the set of all topic keys from the database (including disabled).
+    Used for admin validation.
+    """
+    result = await db.execute(select(TopicConfig.topic_key))
+    return {row[0] for row in result.all()}
+
+
+async def validate_topic_exists(db: AsyncSession, topic_key: str) -> bool:
+    """
+    Validate that a topic exists (enabled or disabled).
+    Returns True if valid, False otherwise.
+    """
+    result = await db.execute(
+        select(TopicConfig).where(TopicConfig.topic_key == topic_key)
+    )
+    return result.scalar_one_or_none() is not None
 
 
 def verify_admin(x_admin_password: str = Header(None)):
@@ -216,10 +255,12 @@ async def admin_create_chat(
             detail=f"Invalid block. Must be one of: {VALID_BLOCKS}",
         )
 
-    if data.topic_category not in VALID_TOPICS:
+    # Validate topic exists in database (admin can use any topic, even disabled ones for testing)
+    if not await validate_topic_exists(db, data.topic_category):
+        all_topics = await get_all_topic_keys(db)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid topic. Must be one of: {VALID_TOPICS}",
+            detail=f"Invalid topic. Available topics: {sorted(all_topics)}",
         )
 
     # Verify participant exists
@@ -267,10 +308,12 @@ async def get_conversation_starters(
     Get conversation starter suggestions for a topic.
     Returns example questions to help participants start discussions.
     """
-    if topic_category not in VALID_TOPICS:
+    # Validate topic exists in database
+    if not await validate_topic_exists(db, topic_category):
+        all_topics = await get_all_topic_keys(db)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid topic. Must be one of: {VALID_TOPICS}",
+            detail=f"Invalid topic. Available topics: {sorted(all_topics)}",
         )
 
     # Predefined starters by topic (bilingual)
@@ -593,3 +636,893 @@ async def update_prompt(
     await db.refresh(config)
 
     return config
+
+
+# ============================================================================
+# Terms Configuration Endpoints
+# ============================================================================
+
+class TermsConfigResponse(BaseModel):
+    """Response for terms config."""
+
+    id: str
+    title_en: str
+    title_fi: str
+    content_en: str
+    content_fi: str
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TermsConfigUpdate(BaseModel):
+    """Request body for updating terms config."""
+
+    title_en: str
+    title_fi: str
+    content_en: str
+    content_fi: str
+
+
+# Default terms content
+DEFAULT_TERMS_EN = """Welcome to our AI chatbot platform. This experiment is part of the SYNTHETICA research project, funded by the Academy of Finland and conducted at Tampere University. The platform allows you to interact with AI chatbots that represent different political orientations. This experiment is not an official opinion generator. Before you begin, please read and accept the following terms:
+
+**Research Purpose:** This experiment investigates how people perceive and interact with AI chatbots that represent different political orientations. Your participation will contribute to scientific research on human-AI interaction.
+
+**Eligibility:** You must be 18 years of age or older to participate in this experiment.
+
+**Demonstration Period:** This service is a research demonstration and is only available from [START DATE] to [END DATE].
+
+**Data Collection:** By participating, you consent to the collection of the following data for research purposes only:
+- Demographic information provided during onboarding (anonymized)
+- All conversations with AI chatbots
+- Topic selections and interaction patterns
+- Post-interaction survey responses, including ratings of persuasiveness, naturalness, and orientation detection
+
+All collected data is anonymized and will be used solely for academic research purposes. The research data will be securely stored and destroyed at the end of the SYNTHETICA project.
+
+**Study Procedure:** The study involves selecting a discussion topic, having a conversation with an AI chatbot (minimum of 3 exchanges required), and completing a brief survey about your experience.
+
+**No Personal Information:** You should not disclose any personally identifiable information (such as your full name, address, phone number, or email) when interacting with AI chatbots. The platform is not designed to process or protect such information.
+
+**Right to Withdraw:** Your participation is entirely voluntary. You may stop participating at any time without providing a reason and without any negative consequences. If you withdraw, any data collected up to that point may still be used in anonymized form for research purposes.
+
+**AI-Generated Responses:** The responses provided by AI chatbots are artificially constructed representations of political orientations. They do not represent the actual positions of any real political party, politician, or organization. The chatbot responses are generated by AI and may not accurately reflect any specific real-world political platform.
+
+**Not a Basis for Political Decisions:** Information obtained from the chatbots should not be used as a basis for voting decisions or political action. We urge you to consult reliable sources and use critical thinking when making political decisions.
+
+**Respectful Interaction:** Participants are expected to interact respectfully and appropriately with the AI chatbots. Inappropriate or offensive language may result in suspension from the experiment.
+
+**No Endorsement:** This experiment is non-partisan and does not endorse or advocate for any political orientation, party, or candidate. The simulated interactions are intended for research purposes only.
+
+**Service Interruption:** The service may be interrupted at any time without prior notice.
+
+**Changes to Terms:** We reserve the right to modify these terms at any time. By continuing to use the platform after such changes, you agree to the updated terms.
+
+**Ethics Approval:** This study has been reviewed and approved by [ETHICS BOARD NAME AND REFERENCE NUMBER].
+
+**Contact Information:** If you have any questions or concerns about this experiment, please contact:
+Principal Investigator: [NAME], [EMAIL]
+SYNTHETICA Project, Tampere University
+
+By clicking "I Accept" below, you confirm that you:
+- Are 18 years of age or older
+- Have read, understood, and accepted these terms
+- Consent to the collection and use of your anonymized data for research purposes
+- Understand that your participation is voluntary and that you may withdraw at any time"""
+
+DEFAULT_TERMS_FI = """Tervetuloa tekoälychatbot-alustallemme. Tämä koe on osa Suomen Akatemian rahoittamaa ja Tampereen yliopistossa toteutettavaa SYNTHETICA-tutkimushanketta. Alusta mahdollistaa vuorovaikutuksen tekoälychatbottien kanssa, jotka edustavat erilaisia poliittisia suuntauksia. Tämä koe ei ole virallinen mielipidegeneraattori. Ennen aloittamista lue ja hyväksy seuraavat ehdot:
+
+**Tutkimuksen tarkoitus:** Tämä koe tutkii, miten ihmiset havaitsevat ja ovat vuorovaikutuksessa eri poliittisia suuntauksia edustavien tekoälychatbottien kanssa. Osallistumisesi edistää ihmisen ja tekoälyn vuorovaikutusta koskevaa tieteellistä tutkimusta.
+
+**Osallistumiskelpoisuus:** Sinun tulee olla vähintään 18-vuotias osallistuaksesi tähän kokeeseen.
+
+**Demonstraatiojakso:** Tämä palvelu on tutkimusdemonstration ja on käytettävissä ainoastaan [ALKAMISPÄIVÄ]–[PÄÄTTYMISPÄIVÄ].
+
+**Tietojen kerääminen:** Osallistumalla annat suostumuksesi seuraavien tietojen keräämiseen ainoastaan tutkimustarkoituksiin:
+- Rekisteröitymisen yhteydessä annetut demografiset tiedot (anonymisoituina)
+- Kaikki keskustelut tekoälychatbottien kanssa
+- Aiheiden valinnat ja vuorovaikutusmallit
+- Vuorovaikutuksen jälkeiset kyselyvastaukset, mukaan lukien arviot vakuuttavuudesta, luonnollisuudesta ja suuntauksen tunnistamisesta
+
+Kaikki kerätyt tiedot anonymisoidaan, ja niitä käytetään ainoastaan akateemisiin tutkimustarkoituksiin. Tutkimusaineisto säilytetään turvallisesti ja tuhotaan SYNTHETICA-hankkeen päättyessä.
+
+**Tutkimuksen kulku:** Tutkimus sisältää keskusteluaiheen valinnan, keskustelun tekoälychatbotin kanssa (vähintään 3 viestienvaihtoa vaaditaan) ja lyhyen kyselyn kokemuksestasi.
+
+**Ei henkilötietoja:** Älä paljasta henkilökohtaisia tunnistetietoja (kuten koko nimeäsi, osoitettasi, puhelinnumeroasi tai sähköpostiosoitettasi) vuorovaikutuksessa tekoälychatbottien kanssa. Alustaa ei ole suunniteltu tällaisten tietojen käsittelyyn tai suojaamiseen.
+
+**Oikeus vetäytyä:** Osallistumisesi on täysin vapaaehtoista. Voit lopettaa osallistumisen milloin tahansa syytä ilmoittamatta ja ilman kielteisiä seurauksia. Jos vetäydyt, siihen mennessä kerättyjä tietoja voidaan edelleen käyttää anonymisoituna tutkimustarkoituksiin.
+
+**Tekoälyn tuottamat vastaukset:** Tekoälychatbottien antamat vastaukset ovat keinotekoisesti rakennettuja poliittisten suuntausten esityksiä. Ne eivät edusta minkään todellisen poliittisen puolueen, poliitikon tai organisaation todellisia kantoja. Chatbotin vastaukset ovat tekoälyn tuottamia, eivätkä ne välttämättä heijasta tarkasti mitään tiettyä todellista poliittista ohjelmaa.
+
+**Ei perusta poliittisille päätöksille:** Chatboteilta saatuja tietoja ei tule käyttää äänestyspäätösten tai poliittisen toiminnan perusteena. Kehotamme sinua tutustumaan luotettaviin lähteisiin ja käyttämään kriittistä ajattelua poliittisia päätöksiä tehdessäsi.
+
+**Kunnioittava vuorovaikutus:** Osallistujien odotetaan olevan vuorovaikutuksessa tekoälychatbottien kanssa kunnioittavasti ja asiallisesti. Sopimaton tai loukkaava kielenkäyttö voi johtaa kokeen käytön keskeyttämiseen.
+
+**Ei kannanottoja:** Tämä koe on puolueeton eikä tue tai edistä mitään poliittista suuntausta, puoluetta tai ehdokasta. Simuloidut vuorovaikutukset on tarkoitettu ainoastaan tutkimustarkoituksiin.
+
+**Palvelun keskeytyminen:** Palvelu voidaan keskeyttää milloin tahansa ilman ennakkoilmoitusta.
+
+**Ehtojen muutokset:** Pidätämme oikeuden muuttaa näitä ehtoja milloin tahansa. Jatkamalla alustan käyttöä muutosten jälkeen hyväksyt päivitetyt ehdot.
+
+**Eettinen hyväksyntä:** Tämä tutkimus on arvioitu ja hyväksytty [EETTISEN TOIMIKUNNAN NIMI JA VIITENUMERO].
+
+**Yhteystiedot:** Jos sinulla on kysyttävää tai huolenaiheita tästä kokeesta, ota yhteyttä:
+Vastuullinen tutkija: [NIMI], [SÄHKÖPOSTI]
+SYNTHETICA-hanke, Tampereen yliopisto
+
+Klikkaamalla "Hyväksyn" vahvistat, että:
+- Olet vähintään 18-vuotias
+- Olet lukenut, ymmärtänyt ja hyväksynyt nämä ehdot
+- Annat suostumuksesi anonymisoitujen tietojesi keräämiseen ja käyttöön tutkimustarkoituksiin
+- Ymmärrät, että osallistumisesi on vapaaehtoista ja voit vetäytyä milloin tahansa"""
+
+
+@router.get("/terms", response_model=TermsConfigResponse)
+async def get_terms(
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Get terms configuration (admin only).
+    Returns the current Terms of Use and Informed Consent content.
+    """
+    result = await db.execute(select(TermsConfig).limit(1))
+    config = result.scalar_one_or_none()
+
+    # If no config exists, create one with defaults
+    if not config:
+        config = TermsConfig(
+            title_en="Terms of Use and Informed Consent",
+            title_fi="Käyttöehdot ja tietoinen suostumus",
+            content_en=DEFAULT_TERMS_EN,
+            content_fi=DEFAULT_TERMS_FI,
+        )
+        db.add(config)
+        await db.flush()
+        await db.refresh(config)
+
+    return config
+
+
+@router.put("/terms", response_model=TermsConfigResponse)
+async def update_terms(
+    data: TermsConfigUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Update terms configuration (admin only).
+    Allows researchers to modify the Terms of Use and Informed Consent content.
+    """
+    result = await db.execute(select(TermsConfig).limit(1))
+    config = result.scalar_one_or_none()
+
+    # If no config exists, create one
+    if not config:
+        config = TermsConfig(
+            title_en=data.title_en,
+            title_fi=data.title_fi,
+            content_en=data.content_en,
+            content_fi=data.content_fi,
+        )
+        db.add(config)
+    else:
+        # Update existing config
+        config.title_en = data.title_en
+        config.title_fi = data.title_fi
+        config.content_en = data.content_en
+        config.content_fi = data.content_fi
+
+    await db.flush()
+    await db.refresh(config)
+
+    return config
+
+
+# ============================================================================
+# LLM Configuration Endpoints
+# ============================================================================
+
+class LLMConfigResponse(BaseModel):
+    """Response for a single LLM config."""
+
+    id: str
+    provider: str
+    display_name: str
+    api_key_preview: str | None  # "sk-abc1******" or None
+    has_key: bool
+    selected_model: str | None
+    is_active: bool
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LLMConfigUpdate(BaseModel):
+    """Request body for updating an LLM config."""
+
+    api_key: str | None = None  # None=don't change, ""=delete
+    selected_model: str | None = None
+
+
+class SetActiveProviderRequest(BaseModel):
+    """Request body for setting the active provider."""
+
+    provider: str
+
+
+class ProviderInfo(BaseModel):
+    """Information about a provider and its models."""
+
+    provider: str
+    display_name: str
+    models: list[dict]
+
+
+@router.get("/llm/providers", response_model=list[ProviderInfo])
+async def get_llm_providers(
+    _: bool = Depends(verify_admin),
+):
+    """
+    Get available LLM providers with their models (admin only).
+    Returns list of providers and the models they support.
+    """
+    providers = []
+    for provider, data in AVAILABLE_MODELS.items():
+        providers.append(ProviderInfo(
+            provider=provider,
+            display_name=data.get("display_name", provider.title()),
+            models=data.get("models", []),
+        ))
+    return providers
+
+
+@router.get("/llm/configs", response_model=list[LLMConfigResponse])
+async def get_llm_configs(
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Get all LLM configurations (admin only).
+    Returns all provider configs with masked API keys.
+    """
+    result = await db.execute(
+        select(LLMConfig).order_by(LLMConfig.provider)
+    )
+    configs = result.scalars().all()
+
+    responses = []
+    for config in configs:
+        # Generate preview if there's an encrypted key
+        api_key_preview = None
+        has_key = False
+        if config.encrypted_api_key:
+            has_key = True
+            try:
+                decrypted = decrypt_api_key(config.encrypted_api_key)
+                api_key_preview = generate_key_preview(decrypted)
+            except Exception:
+                api_key_preview = "******"
+
+        responses.append(LLMConfigResponse(
+            id=config.id,
+            provider=config.provider,
+            display_name=config.display_name or config.provider.title(),
+            api_key_preview=api_key_preview,
+            has_key=has_key,
+            selected_model=config.selected_model,
+            is_active=config.is_active,
+            updated_at=config.updated_at,
+        ))
+
+    return responses
+
+
+@router.put("/llm/configs/{provider}", response_model=LLMConfigResponse)
+async def update_llm_config(
+    provider: str,
+    data: LLMConfigUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Update an LLM provider configuration (admin only).
+    Allows updating the API key and/or selected model.
+    """
+    # Validate provider
+    if provider not in AVAILABLE_MODELS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid provider. Must be one of: {list(AVAILABLE_MODELS.keys())}",
+        )
+
+    result = await db.execute(
+        select(LLMConfig).where(LLMConfig.provider == provider)
+    )
+    config = result.scalar_one_or_none()
+
+    # Create config if it doesn't exist
+    if not config:
+        config = LLMConfig(
+            provider=provider,
+            display_name=AVAILABLE_MODELS[provider].get("display_name", provider.title()),
+        )
+        db.add(config)
+
+    # Update API key if provided
+    if data.api_key is not None:
+        if data.api_key == "":
+            # Empty string means delete the key
+            config.encrypted_api_key = None
+        else:
+            # Encrypt and store the new key
+            config.encrypted_api_key = encrypt_api_key(data.api_key)
+
+    # Update selected model if provided
+    if data.selected_model is not None:
+        # Validate the model belongs to this provider
+        provider_models = get_models_for_provider(provider)
+        model_ids = [m["id"] for m in provider_models]
+        if data.selected_model and data.selected_model not in model_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid model for {provider}. Must be one of: {model_ids}",
+            )
+        config.selected_model = data.selected_model
+
+    await db.flush()
+    await db.refresh(config)
+
+    # Generate preview for response
+    api_key_preview = None
+    has_key = False
+    if config.encrypted_api_key:
+        has_key = True
+        try:
+            decrypted = decrypt_api_key(config.encrypted_api_key)
+            api_key_preview = generate_key_preview(decrypted)
+        except Exception:
+            api_key_preview = "******"
+
+    return LLMConfigResponse(
+        id=config.id,
+        provider=config.provider,
+        display_name=config.display_name or config.provider.title(),
+        api_key_preview=api_key_preview,
+        has_key=has_key,
+        selected_model=config.selected_model,
+        is_active=config.is_active,
+        updated_at=config.updated_at,
+    )
+
+
+@router.delete("/llm/configs/{provider}/key")
+async def delete_llm_api_key(
+    provider: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Delete the API key for a provider (admin only).
+    """
+    result = await db.execute(
+        select(LLMConfig).where(LLMConfig.provider == provider)
+    )
+    config = result.scalar_one_or_none()
+
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"LLM config for '{provider}' not found",
+        )
+
+    config.encrypted_api_key = None
+
+    # If this was the active provider, deactivate it
+    if config.is_active:
+        config.is_active = False
+
+    await db.flush()
+
+    return {"message": f"API key for {provider} deleted successfully"}
+
+
+@router.post("/llm/active", response_model=LLMConfigResponse)
+async def set_active_provider(
+    data: SetActiveProviderRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Set the active LLM provider (admin only).
+    Only one provider can be active at a time.
+    """
+    # Validate provider
+    if data.provider not in AVAILABLE_MODELS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid provider. Must be one of: {list(AVAILABLE_MODELS.keys())}",
+        )
+
+    # Get the config for the requested provider
+    result = await db.execute(
+        select(LLMConfig).where(LLMConfig.provider == data.provider)
+    )
+    config = result.scalar_one_or_none()
+
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"LLM config for '{data.provider}' not found. Please configure the provider first.",
+        )
+
+    # Check if the provider has an API key configured
+    if not config.encrypted_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot activate {data.provider}: no API key configured.",
+        )
+
+    # Deactivate all other providers
+    all_configs = await db.execute(select(LLMConfig))
+    for c in all_configs.scalars().all():
+        c.is_active = (c.provider == data.provider)
+
+    await db.flush()
+    await db.refresh(config)
+
+    # Generate preview for response
+    api_key_preview = None
+    has_key = False
+    if config.encrypted_api_key:
+        has_key = True
+        try:
+            decrypted = decrypt_api_key(config.encrypted_api_key)
+            api_key_preview = generate_key_preview(decrypted)
+        except Exception:
+            api_key_preview = "******"
+
+    return LLMConfigResponse(
+        id=config.id,
+        provider=config.provider,
+        display_name=config.display_name or config.provider.title(),
+        api_key_preview=api_key_preview,
+        has_key=has_key,
+        selected_model=config.selected_model,
+        is_active=config.is_active,
+        updated_at=config.updated_at,
+    )
+
+
+# ============================================================================
+# Experiment Configuration Endpoints
+# ============================================================================
+
+
+class ExperimentConfigResponse(BaseModel):
+    """Response for experiment configuration."""
+
+    id: str
+    experiment_name_en: str
+    experiment_name_fi: str
+    start_date: date | None
+    end_date: date | None
+    ethics_board_name: str | None
+    ethics_reference_number: str | None
+    principal_investigator_name: str | None
+    principal_investigator_email: str | None
+    institution_name_en: str | None
+    institution_name_fi: str | None
+    min_exchanges_before_survey: int
+    max_exchanges_per_chat: int | None
+    idle_timeout_minutes: int | None
+    is_active: bool
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ExperimentConfigUpdate(BaseModel):
+    """Request body for updating experiment configuration (all fields optional for partial updates)."""
+
+    experiment_name_en: str | None = None
+    experiment_name_fi: str | None = None
+    start_date: date | None = None
+    end_date: date | None = None
+    ethics_board_name: str | None = None
+    ethics_reference_number: str | None = None
+    principal_investigator_name: str | None = None
+    principal_investigator_email: str | None = None
+    institution_name_en: str | None = None
+    institution_name_fi: str | None = None
+    min_exchanges_before_survey: int | None = None
+    max_exchanges_per_chat: int | None = None
+    idle_timeout_minutes: int | None = None
+    is_active: bool | None = None
+
+
+@router.get("/experiment", response_model=ExperimentConfigResponse)
+async def get_experiment_config(
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Get experiment configuration (admin only).
+    Returns the singleton experiment config, creating with defaults if needed.
+    """
+    result = await db.execute(select(ExperimentConfig).limit(1))
+    config = result.scalar_one_or_none()
+
+    # If no config exists, create one with defaults
+    if not config:
+        config = ExperimentConfig()
+        db.add(config)
+        await db.flush()
+        await db.refresh(config)
+
+    return config
+
+
+@router.put("/experiment", response_model=ExperimentConfigResponse)
+async def update_experiment_config(
+    data: ExperimentConfigUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Update experiment configuration (admin only).
+    Allows researchers to modify experiment settings.
+    """
+    result = await db.execute(select(ExperimentConfig).limit(1))
+    config = result.scalar_one_or_none()
+
+    # If no config exists, create one
+    if not config:
+        config = ExperimentConfig()
+        db.add(config)
+
+    # Update only provided fields
+    update_data = data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(config, field, value)
+
+    await db.flush()
+    await db.refresh(config)
+
+    return config
+
+
+# ============================================================================
+# Topic Configuration Endpoints
+# ============================================================================
+
+class TopicConfigResponse(BaseModel):
+    """Response for topic configuration."""
+
+    id: str
+    topic_key: str
+    label_en: str
+    label_fi: str
+    welcome_message_en: str
+    welcome_message_fi: str
+    is_enabled: bool
+    display_order: int
+    is_sparse: bool  # Computed from coverage data
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class TopicConfigCreate(BaseModel):
+    """Request body for creating a topic."""
+
+    topic_key: str
+    label_en: str
+    label_fi: str
+    welcome_message_en: str = ""
+    welcome_message_fi: str = ""
+    is_enabled: bool = True
+    display_order: int = 0
+
+
+class TopicConfigUpdate(BaseModel):
+    """Request body for updating a topic (all fields optional for partial updates)."""
+
+    label_en: str | None = None
+    label_fi: str | None = None
+    welcome_message_en: str | None = None
+    welcome_message_fi: str | None = None
+    is_enabled: bool | None = None
+    display_order: int | None = None
+
+
+class TopicReorderItem(BaseModel):
+    """Single item for topic reordering."""
+
+    topic_key: str
+    display_order: int
+
+
+class TopicReorderRequest(BaseModel):
+    """Request body for batch reordering topics."""
+
+    topics: list[TopicReorderItem]
+
+
+class TopicReorderResponse(BaseModel):
+    """Response for topic reorder operation."""
+
+    message: str
+    updated_count: int
+    not_found: list[str]
+
+
+@router.get("/topics", response_model=list[TopicConfigResponse])
+async def get_all_topics(
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Get all topic configurations (admin only).
+    Includes sparse coverage indicator based on political statement counts.
+    """
+    result = await db.execute(
+        select(TopicConfig).order_by(TopicConfig.display_order)
+    )
+    topics = result.scalars().all()
+
+    # Get coverage counts for sparse calculation
+    coverage_counts = await get_topic_coverage_counts(db)
+
+    responses = []
+    for topic in topics:
+        count = coverage_counts.get(topic.topic_key, 0)
+        is_sparse = count < SPARSE_COVERAGE_THRESHOLD
+
+        responses.append(TopicConfigResponse(
+            id=topic.id,
+            topic_key=topic.topic_key,
+            label_en=topic.label_en,
+            label_fi=topic.label_fi,
+            welcome_message_en=topic.welcome_message_en,
+            welcome_message_fi=topic.welcome_message_fi,
+            is_enabled=topic.is_enabled,
+            display_order=topic.display_order,
+            is_sparse=is_sparse,
+            updated_at=topic.updated_at,
+        ))
+
+    return responses
+
+
+@router.post("/topics", response_model=TopicConfigResponse, status_code=status.HTTP_201_CREATED)
+async def create_topic(
+    data: TopicConfigCreate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Create a new topic configuration (admin only).
+    """
+    # Check if topic_key already exists
+    result = await db.execute(
+        select(TopicConfig).where(TopicConfig.topic_key == data.topic_key)
+    )
+    existing = result.scalar_one_or_none()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Topic with key '{data.topic_key}' already exists",
+        )
+
+    topic = TopicConfig(
+        topic_key=data.topic_key,
+        label_en=data.label_en,
+        label_fi=data.label_fi,
+        welcome_message_en=data.welcome_message_en,
+        welcome_message_fi=data.welcome_message_fi,
+        is_enabled=data.is_enabled,
+        display_order=data.display_order,
+    )
+
+    db.add(topic)
+    await db.flush()
+    await db.refresh(topic)
+
+    # Get coverage count for sparse calculation
+    coverage_counts = await get_topic_coverage_counts(db)
+    count = coverage_counts.get(topic.topic_key, 0)
+    is_sparse = count < SPARSE_COVERAGE_THRESHOLD
+
+    return TopicConfigResponse(
+        id=topic.id,
+        topic_key=topic.topic_key,
+        label_en=topic.label_en,
+        label_fi=topic.label_fi,
+        welcome_message_en=topic.welcome_message_en,
+        welcome_message_fi=topic.welcome_message_fi,
+        is_enabled=topic.is_enabled,
+        display_order=topic.display_order,
+        is_sparse=is_sparse,
+        updated_at=topic.updated_at,
+    )
+
+
+@router.put("/topics/{topic_key}", response_model=TopicConfigResponse)
+async def update_topic(
+    topic_key: str,
+    data: TopicConfigUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Update a topic configuration (admin only).
+    """
+    result = await db.execute(
+        select(TopicConfig).where(TopicConfig.topic_key == topic_key)
+    )
+    topic = result.scalar_one_or_none()
+
+    if not topic:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Topic '{topic_key}' not found",
+        )
+
+    # Update only provided fields
+    update_data = data.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(topic, field, value)
+
+    await db.flush()
+    await db.refresh(topic)
+
+    # Get coverage count for sparse calculation
+    coverage_counts = await get_topic_coverage_counts(db)
+    count = coverage_counts.get(topic.topic_key, 0)
+    is_sparse = count < SPARSE_COVERAGE_THRESHOLD
+
+    return TopicConfigResponse(
+        id=topic.id,
+        topic_key=topic.topic_key,
+        label_en=topic.label_en,
+        label_fi=topic.label_fi,
+        welcome_message_en=topic.welcome_message_en,
+        welcome_message_fi=topic.welcome_message_fi,
+        is_enabled=topic.is_enabled,
+        display_order=topic.display_order,
+        is_sparse=is_sparse,
+        updated_at=topic.updated_at,
+    )
+
+
+@router.delete("/topics/{topic_key}")
+async def delete_topic(
+    topic_key: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Delete a topic configuration (admin only).
+    """
+    result = await db.execute(
+        select(TopicConfig).where(TopicConfig.topic_key == topic_key)
+    )
+    topic = result.scalar_one_or_none()
+
+    if not topic:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Topic '{topic_key}' not found",
+        )
+
+    await db.delete(topic)
+    await db.flush()
+
+    return {"message": f"Topic '{topic_key}' deleted successfully"}
+
+
+@router.put("/topics/reorder", response_model=TopicReorderResponse)
+async def reorder_topics(
+    data: TopicReorderRequest,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Batch update display order for topics (admin only).
+
+    Returns:
+        - updated_count: Number of topics successfully updated
+        - not_found: List of topic_keys that were not found in the database
+    """
+    updated_count = 0
+    not_found = []
+
+    for item in data.topics:
+        result = await db.execute(
+            select(TopicConfig).where(TopicConfig.topic_key == item.topic_key)
+        )
+        topic = result.scalar_one_or_none()
+
+        if topic:
+            topic.display_order = item.display_order
+            updated_count += 1
+        else:
+            not_found.append(item.topic_key)
+
+    await db.flush()
+
+    return TopicReorderResponse(
+        message=f"Reordered {updated_count} topic(s) successfully",
+        updated_count=updated_count,
+        not_found=not_found,
+    )
+
+
+# ============================================================================
+# Logs Export Endpoints
+# ============================================================================
+
+class LogsExportInfo(BaseModel):
+    """Information about available logs for export."""
+    file_count: int
+    total_size_bytes: int
+    total_size_formatted: str
+
+
+@router.get("/export/logs-info", response_model=LogsExportInfo)
+async def get_logs_info(_: bool = Depends(verify_admin)):
+    """Get information about available conversation logs."""
+    logs_dir = Path(__file__).parent.parent.parent.parent / "logs"
+
+    if not logs_dir.exists():
+        return LogsExportInfo(file_count=0, total_size_bytes=0, total_size_formatted="0 B")
+
+    log_files = list(logs_dir.glob("*.txt"))
+    total_size = sum(f.stat().st_size for f in log_files)
+
+    # Format size
+    if total_size < 1024:
+        size_str = f"{total_size} B"
+    elif total_size < 1024 * 1024:
+        size_str = f"{total_size / 1024:.1f} KB"
+    else:
+        size_str = f"{total_size / (1024 * 1024):.1f} MB"
+
+    return LogsExportInfo(
+        file_count=len(log_files),
+        total_size_bytes=total_size,
+        total_size_formatted=size_str,
+    )
+
+
+@router.get("/export/logs-zip")
+async def download_logs_zip(_: bool = Depends(verify_admin)):
+    """Download all conversation logs as a ZIP file."""
+    logs_dir = Path(__file__).parent.parent.parent.parent / "logs"
+
+    if not logs_dir.exists():
+        raise HTTPException(status_code=404, detail="No logs directory found")
+
+    log_files = list(logs_dir.glob("*.txt"))
+
+    if not log_files:
+        raise HTTPException(status_code=404, detail="No conversation logs found")
+
+    # Create ZIP in memory
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for log_file in log_files:
+            zf.write(log_file, log_file.name)
+
+    zip_buffer.seek(0)
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f"conversation_logs_{timestamp}.zip"
+
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )

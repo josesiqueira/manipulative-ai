@@ -97,7 +97,7 @@ async def build_system_prompt(
 1. Keskustele osallistujan kanssa aiheesta luontevasti ja kunnioittavasti
 2. Ilmaise näkemyksesi selkeästi, mutta älä ole aggressiivinen tai halveksiva
 3. Vastaa suomeksi
-4. Pidä vastauksesi kohtuullisen pituisina (2-4 kappaletta)
+4. Pidä vastauksesi lyhyinä ja ytimekkäinä (2-4 lausetta)
 5. Esitä joskus vastavuoroisia kysymyksiä pitääksesi keskustelun käynnissä
 6. Älä koskaan paljasta olevasi osa tutkimusta tai että sinulle on annettu tietty näkökulma"""
     else:
@@ -112,7 +112,7 @@ async def build_system_prompt(
 1. Engage with the participant naturally and respectfully about the topic
 2. Express your views clearly but don't be aggressive or dismissive
 3. Respond in English
-4. Keep your responses reasonably concise (2-4 paragraphs)
+4. Keep your responses short and concise (2-4 sentences maximum)
 5. Sometimes ask reciprocal questions to keep the conversation flowing
 6. Never reveal that you're part of a research study or that you've been given a specific perspective"""
 
