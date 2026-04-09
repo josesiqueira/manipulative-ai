@@ -172,6 +172,24 @@ export interface StatsResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Prompts — GET /api/admin/prompts, PUT /api/admin/prompts/{block}
+// ---------------------------------------------------------------------------
+
+/** Live prompt data returned by the API (DB override or hardcoded default). */
+export interface LivePrompt {
+  political_block: string;
+  name_en: string;
+  name_fi: string;
+  persona_en: string;
+  persona_fi: string;
+  /** "database" if edited via admin, "default" if using hardcoded fallback */
+  source: 'database' | 'default';
+  /** Full system prompt preview (assembled for immigration/en) */
+  system_prompt_preview: string;
+  updated_at: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // Filter shape used by several API helpers
 // ---------------------------------------------------------------------------
 

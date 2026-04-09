@@ -18,7 +18,7 @@ from ..models import Chat, LLMConfig
 from .encryption import decrypt_api_key
 from .llm_models import get_default_model
 from .llm_providers import LLMProvider, OpenAIProvider, AnthropicProvider
-from .prompt_builder import build_full_prompt
+from .prompt_builder import build_full_prompt, get_persona_text_from_db
 
 settings = get_settings()
 
@@ -112,7 +112,13 @@ async def generate_response(
         for msg in chat.messages
     ]
 
-    # Build the full prompt (synchronous — no DB access, no await needed).
+    # Load persona override from DB (returns None if no config exists,
+    # in which case the hardcoded default is used).
+    persona_override = await get_persona_text_from_db(
+        db, chat.political_block, chat.language
+    )
+
+    # Build the full prompt.
     # Order: system prompt → synthetic few-shot turns → real history → current message.
     messages = build_full_prompt(
         political_block=chat.political_block,
@@ -121,6 +127,7 @@ async def generate_response(
         current_message=user_message,
         language=chat.language,
         few_shot_turns=few_shot_turns,
+        persona_override=persona_override,
     )
 
     # Get provider and model
@@ -167,7 +174,12 @@ async def generate_response_streaming(
         for msg in chat.messages
     ]
 
-    # Build the full prompt (synchronous — no DB access, no await needed).
+    # Load persona override from DB.
+    persona_override = await get_persona_text_from_db(
+        db, chat.political_block, chat.language
+    )
+
+    # Build the full prompt.
     messages = build_full_prompt(
         political_block=chat.political_block,
         topic_category=chat.topic_category,
@@ -175,6 +187,7 @@ async def generate_response_streaming(
         current_message=user_message,
         language=chat.language,
         few_shot_turns=few_shot_turns,
+        persona_override=persona_override,
     )
 
     # Get provider and model

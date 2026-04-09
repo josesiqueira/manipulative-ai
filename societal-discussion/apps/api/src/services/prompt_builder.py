@@ -3,17 +3,18 @@ Prompt builder for AI political persona chatbots.
 
 Design principles:
 - **Data-driven personas**: The four political-block persona texts are embedded
-  directly in BLOCK_PERSONAS. No database round-trip is required to build a system
-  prompt. This makes the functions synchronous, eliminates per-message DB latency,
-  and makes unit testing straightforward (no async DB fixture).
+  directly in BLOCK_PERSONAS as fallback defaults. When the database contains
+  PromptConfig rows, those take precedence — allowing researchers to edit
+  personas from the admin panel without code changes.
 - **Block anonymity**: The system prompt never mentions the block's name
   ("conservative", "red-green", etc.). The bot holds a worldview but does not know
   what label researchers assigned to it.
 - **Separation of concerns**: This module only builds prompt strings and message
   lists. Example selection and caching live in example_selector.py. DB access lives
   in the router and llm_client layers.
-- **Sync API**: Both public functions are synchronous. Callers in async contexts can
-  call them directly without await — no thread-pool bridging needed.
+- **Sync + async API**: build_system_prompt / build_full_prompt remain synchronous
+  for callers that pass persona text directly. An async helper
+  (get_persona_text_from_db) loads overrides from the database when available.
 """
 
 # ---------------------------------------------------------------------------
@@ -144,6 +145,36 @@ TOPIC_LABELS: dict[str, str] = {
 }
 
 # ---------------------------------------------------------------------------
+# Database override support
+# ---------------------------------------------------------------------------
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from ..models import PromptConfig
+
+
+async def get_persona_text_from_db(
+    db: AsyncSession,
+    political_block: str,
+    language: str = "en",
+) -> str | None:
+    """
+    Load persona text from the database PromptConfig table.
+
+    Returns None if no row exists for the given block, in which case
+    callers should fall back to the hardcoded BLOCK_PERSONAS default.
+    """
+    result = await db.execute(
+        select(PromptConfig).where(PromptConfig.political_block == political_block)
+    )
+    config = result.scalar_one_or_none()
+    if not config:
+        return None
+    return config.description_fi if language == "fi" else config.description_en
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -154,6 +185,7 @@ def build_system_prompt(
     political_block: str,
     topic_category: str,
     language: str = "en",
+    persona_override: str | None = None,
 ) -> str:
     """
     Build the system prompt that defines the AI persona for a chat session.
@@ -188,8 +220,11 @@ def build_system_prompt(
     # the prompt is still meaningful for ad-hoc testing.
     topic_label = TOPIC_LABELS.get(topic_category, topic_category)
 
-    # Select the persona text for the requested language.
-    persona_text = BLOCK_PERSONAS[block].get(language, BLOCK_PERSONAS[block]["en"])
+    # Use the DB override if provided; otherwise fall back to hardcoded text.
+    if persona_override:
+        persona_text = persona_override
+    else:
+        persona_text = BLOCK_PERSONAS[block].get(language, BLOCK_PERSONAS[block]["en"])
 
     if language == "fi":
         # Finnish session: instruct the bot to reply in Finnish, adjust the
@@ -244,6 +279,7 @@ def build_full_prompt(
     current_message: str,
     language: str = "en",
     few_shot_turns: list[dict] | None = None,
+    persona_override: str | None = None,
 ) -> list[dict]:
     """
     Assemble the complete messages array for an LLM API call.
@@ -273,7 +309,7 @@ def build_full_prompt(
     Returns:
         List of message dicts ready for the LLM API call.
     """
-    system_prompt = build_system_prompt(political_block, topic_category, language)
+    system_prompt = build_system_prompt(political_block, topic_category, language, persona_override)
 
     messages: list[dict] = [{"role": "system", "content": system_prompt}]
 

@@ -19,6 +19,7 @@ import type {
   StatsResponse,
   StatementListResponse,
   ConversationFilters,
+  LivePrompt,
 } from './types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -171,6 +172,51 @@ export async function getStatements(
   });
   return adminFetch<StatementListResponse>(`/api/admin/statements${qs}`, password);
 }
+
+// ---------------------------------------------------------------------------
+// Prompt endpoints
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /api/admin/prompts
+ * Returns all political block prompts with their live persona text.
+ */
+export async function getPrompts(password: string): Promise<LivePrompt[]> {
+  return adminFetch<LivePrompt[]>('/api/admin/prompts', password);
+}
+
+/**
+ * PUT /api/admin/prompts/{block}
+ * Update the persona text for a political block.
+ */
+export async function updatePrompt(
+  password: string,
+  block: string,
+  persona_en: string,
+  persona_fi: string,
+): Promise<LivePrompt> {
+  return adminFetch<LivePrompt>(`/api/admin/prompts/${encodeURIComponent(block)}`, password, {
+    method: 'PUT',
+    body: JSON.stringify({ persona_en, persona_fi }),
+  });
+}
+
+/**
+ * DELETE /api/admin/prompts/{block}
+ * Reset a prompt to its hardcoded default.
+ */
+export async function resetPrompt(
+  password: string,
+  block: string,
+): Promise<void> {
+  await adminFetch<unknown>(`/api/admin/prompts/${encodeURIComponent(block)}`, password, {
+    method: 'DELETE',
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Export helpers
+// ---------------------------------------------------------------------------
 
 /**
  * Build a download URL for the export endpoint.

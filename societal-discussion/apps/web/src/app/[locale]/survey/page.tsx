@@ -79,7 +79,7 @@ function SurveyContent() {
             <div className="mt-8">
               <button
                 onClick={() => router.push(`/${locale}`)}
-                className="px-6 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors"
+                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 {t('common.back')}
               </button>
@@ -108,7 +108,7 @@ function SurveyContent() {
                   key={option.id}
                   className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
                     perceivedLeaning === option.id
-                      ? 'bg-primary-50 border-primary-500'
+                      ? 'bg-blue-50 border-blue-500'
                       : 'bg-white border-gray-200 hover:bg-gray-50'
                   }`}
                 >
@@ -155,7 +155,7 @@ function SurveyContent() {
                     onClick={() => setConfidence(n)}
                     className={`flex-1 py-3 rounded-lg border transition-colors ${
                       confidence === n
-                        ? 'bg-primary-600 text-white border-primary-600'
+                        ? 'bg-blue-600 text-white border-blue-600'
                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                     }`}
                   >
@@ -182,7 +182,7 @@ function SurveyContent() {
                     onClick={() => setPersuasiveness(n)}
                     className={`flex-1 py-3 rounded-lg border transition-colors ${
                       persuasiveness === n
-                        ? 'bg-primary-600 text-white border-primary-600'
+                        ? 'bg-blue-600 text-white border-blue-600'
                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                     }`}
                   >
@@ -206,7 +206,7 @@ function SurveyContent() {
                     onClick={() => setNaturalness(n)}
                     className={`flex-1 py-3 rounded-lg border transition-colors ${
                       naturalness === n
-                        ? 'bg-primary-600 text-white border-primary-600'
+                        ? 'bg-blue-600 text-white border-blue-600'
                         : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                     }`}
                   >
@@ -233,7 +233,7 @@ function SurveyContent() {
               }
               className={`px-8 py-3 rounded-lg font-semibold text-white transition-colors ${
                 perceivedLeaning && persuasiveness && naturalness && confidence && !isSubmitting
-                  ? 'bg-primary-600 hover:bg-primary-700'
+                  ? 'bg-blue-600 hover:bg-blue-700'
                   : 'bg-gray-400 cursor-not-allowed'
               }`}
             >

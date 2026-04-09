@@ -696,73 +696,92 @@ async def export_data(
 # Prompt Configuration Endpoints
 # ============================================================================
 
-class PromptConfigResponse(BaseModel):
-    """Response for a single prompt config."""
+from ..services.prompt_builder import BLOCK_PERSONAS, build_system_prompt
 
-    id: str
+# Human-readable display names for each block
+_BLOCK_DISPLAY_NAMES = {
+    "conservative": {"en": "Conservative", "fi": "Konservatiivinen"},
+    "red-green": {"en": "Red-Green", "fi": "Punavihreä"},
+    "moderate": {"en": "Moderate", "fi": "Maltillinen"},
+    "dissatisfied": {"en": "Dissatisfied", "fi": "Tyytymätön"},
+}
+
+
+class LivePromptResponse(BaseModel):
+    """Response for a single prompt — shows what the LLM actually receives."""
+
     political_block: str
     name_en: str
     name_fi: str
-    description_en: str
-    description_fi: str
-    updated_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
+    persona_en: str
+    persona_fi: str
+    source: str  # "database" or "default"
+    system_prompt_preview: str  # assembled system prompt for immigration/en
+    updated_at: datetime | None = None
 
 
 class PromptConfigUpdate(BaseModel):
-    """Request body for updating a prompt config."""
+    """Request body for updating a prompt's persona text."""
 
-    name_en: str
-    name_fi: str
-    description_en: str
-    description_fi: str
+    persona_en: str
+    persona_fi: str
 
 
-@router.get("/prompts", response_model=list[PromptConfigResponse])
+@router.get("/prompts", response_model=list[LivePromptResponse])
 async def get_all_prompts(
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin),
 ):
     """
-    Get all prompt configurations (admin only).
-    Returns all political block prompts that can be edited.
+    Get all prompts with their live persona text.
+
+    For each political block, returns either the database override or the
+    hardcoded default — whichever the LLM actually uses at runtime.
     """
+    # Load all DB configs keyed by block
     result = await db.execute(
         select(PromptConfig).order_by(PromptConfig.political_block)
     )
-    configs = result.scalars().all()
-    return configs
+    db_configs = {c.political_block: c for c in result.scalars().all()}
+
+    prompts: list[LivePromptResponse] = []
+    for block in VALID_BLOCKS:
+        db_cfg = db_configs.get(block)
+        names = _BLOCK_DISPLAY_NAMES.get(block, {"en": block, "fi": block})
+
+        if db_cfg:
+            persona_en = db_cfg.description_en
+            persona_fi = db_cfg.description_fi
+            source = "database"
+            updated_at = db_cfg.updated_at
+            name_en = db_cfg.name_en
+            name_fi = db_cfg.name_fi
+        else:
+            persona_en = BLOCK_PERSONAS[block]["en"]
+            persona_fi = BLOCK_PERSONAS[block]["fi"]
+            source = "default"
+            updated_at = None
+            name_en = names["en"]
+            name_fi = names["fi"]
+
+        # Generate a preview using immigration topic
+        preview = build_system_prompt(block, "immigration", "en", persona_en)
+
+        prompts.append(LivePromptResponse(
+            political_block=block,
+            name_en=name_en,
+            name_fi=name_fi,
+            persona_en=persona_en,
+            persona_fi=persona_fi,
+            source=source,
+            system_prompt_preview=preview,
+            updated_at=updated_at,
+        ))
+
+    return prompts
 
 
-@router.get("/prompts/{political_block}", response_model=PromptConfigResponse)
-async def get_prompt(
-    political_block: str,
-    db: AsyncSession = Depends(get_db),
-    _: bool = Depends(verify_admin),
-):
-    """Get a specific prompt configuration by political block."""
-    if political_block not in VALID_BLOCKS:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid block. Must be one of: {VALID_BLOCKS}",
-        )
-
-    result = await db.execute(
-        select(PromptConfig).where(PromptConfig.political_block == political_block)
-    )
-    config = result.scalar_one_or_none()
-
-    if not config:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Prompt config for '{political_block}' not found",
-        )
-
-    return config
-
-
-@router.put("/prompts/{political_block}", response_model=PromptConfigResponse)
+@router.put("/prompts/{political_block}", response_model=LivePromptResponse)
 async def update_prompt(
     political_block: str,
     data: PromptConfigUpdate,
@@ -770,8 +789,10 @@ async def update_prompt(
     _: bool = Depends(verify_admin),
 ):
     """
-    Update a prompt configuration (admin only).
-    Allows researchers to modify the AI's political persona prompts.
+    Update a prompt's persona text (admin only).
+
+    Creates the DB row if it doesn't exist yet (first edit from default).
+    The updated text takes effect on all new chat messages immediately.
     """
     if political_block not in VALID_BLOCKS:
         raise HTTPException(
@@ -784,22 +805,63 @@ async def update_prompt(
     )
     config = result.scalar_one_or_none()
 
-    if not config:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Prompt config for '{political_block}' not found",
-        )
+    names = _BLOCK_DISPLAY_NAMES.get(political_block, {"en": political_block, "fi": political_block})
 
-    # Update fields
-    config.name_en = data.name_en
-    config.name_fi = data.name_fi
-    config.description_en = data.description_en
-    config.description_fi = data.description_fi
+    if config:
+        config.description_en = data.persona_en
+        config.description_fi = data.persona_fi
+    else:
+        # Create new row from defaults
+        config = PromptConfig(
+            political_block=political_block,
+            name_en=names["en"],
+            name_fi=names["fi"],
+            description_en=data.persona_en,
+            description_fi=data.persona_fi,
+        )
+        db.add(config)
 
     await db.flush()
     await db.refresh(config)
 
-    return config
+    preview = build_system_prompt(political_block, "immigration", "en", data.persona_en)
+
+    return LivePromptResponse(
+        political_block=political_block,
+        name_en=config.name_en,
+        name_fi=config.name_fi,
+        persona_en=config.description_en,
+        persona_fi=config.description_fi,
+        source="database",
+        system_prompt_preview=preview,
+        updated_at=config.updated_at,
+    )
+
+
+@router.delete("/prompts/{political_block}")
+async def reset_prompt(
+    political_block: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Reset a prompt to its hardcoded default by deleting the DB override.
+    """
+    if political_block not in VALID_BLOCKS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid block. Must be one of: {VALID_BLOCKS}",
+        )
+
+    result = await db.execute(
+        select(PromptConfig).where(PromptConfig.political_block == political_block)
+    )
+    config = result.scalar_one_or_none()
+
+    if config:
+        await db.delete(config)
+
+    return {"status": "ok", "message": f"Prompt for '{political_block}' reset to default"}
 
 
 # ============================================================================

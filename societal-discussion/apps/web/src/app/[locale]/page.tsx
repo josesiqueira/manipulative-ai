@@ -305,7 +305,7 @@ export default function ConsentPage() {
                   type="checkbox"
                   checked={consentGiven}
                   onChange={(e) => setConsentGiven(e.target.checked)}
-                  className="mt-1 h-5 w-5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  className="mt-1 h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-gray-700 font-medium">{t('consent.checkbox')}</span>
               </label>
@@ -324,7 +324,7 @@ export default function ConsentPage() {
                 <select
                   value={ageGroup}
                   onChange={(e) => setAgeGroup(e.target.value)}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 >
                   <option value="">-</option>
                   <option value="18-24">18-24</option>
@@ -343,7 +343,7 @@ export default function ConsentPage() {
                 <select
                   value={gender}
                   onChange={(e) => setGender(e.target.value)}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 >
                   <option value="">-</option>
                   <option value="male">Male</option>
@@ -379,7 +379,7 @@ export default function ConsentPage() {
                 <select
                   value={education}
                   onChange={(e) => setEducation(e.target.value)}
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 >
                   <option value="">-</option>
                   <option value="high_school">High School</option>
@@ -402,7 +402,7 @@ export default function ConsentPage() {
                       onClick={() => setPoliticalLeaning(n)}
                       className={`flex-1 py-2 rounded-md border ${
                         politicalLeaning === n
-                          ? 'bg-primary-600 text-white border-primary-600'
+                          ? 'bg-blue-600 text-white border-blue-600'
                           : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                       }`}
                     >
@@ -424,7 +424,7 @@ export default function ConsentPage() {
                       onClick={() => setPoliticalKnowledge(n)}
                       className={`flex-1 py-2 rounded-md border ${
                         politicalKnowledge === n
-                          ? 'bg-primary-600 text-white border-primary-600'
+                          ? 'bg-blue-600 text-white border-blue-600'
                           : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
                       }`}
                     >
@@ -443,7 +443,7 @@ export default function ConsentPage() {
               disabled={!consentGiven || isSubmitting}
               className={`px-8 py-3 rounded-lg font-semibold text-white transition-colors ${
                 consentGiven && !isSubmitting
-                  ? 'bg-primary-600 hover:bg-primary-700'
+                  ? 'bg-blue-600 hover:bg-blue-700'
                   : 'bg-gray-400 cursor-not-allowed'
               }`}
             >
