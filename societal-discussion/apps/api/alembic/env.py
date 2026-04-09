@@ -1,12 +1,18 @@
 import asyncio
 import os
 from logging.config import fileConfig
+from pathlib import Path
 
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
+
+# Load .env file from project root
+from dotenv import load_dotenv
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+load_dotenv(PROJECT_ROOT / ".env")
 
 # Import models so they're registered with Base.metadata
 from src.database import Base

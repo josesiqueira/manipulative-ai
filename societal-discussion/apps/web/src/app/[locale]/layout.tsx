@@ -1,6 +1,5 @@
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages } from 'next-intl/server';
-import { ThemeProvider } from '@/contexts/ThemeContext';
 
 export default async function LocaleLayout({
   children,
@@ -14,11 +13,9 @@ export default async function LocaleLayout({
 
   return (
     <NextIntlClientProvider messages={messages} locale={locale}>
-      <ThemeProvider>
-        <main className="min-h-screen bg-gray-50">
-          {children}
-        </main>
-      </ThemeProvider>
+      <main className="min-h-screen bg-gray-50">
+        {children}
+      </main>
     </NextIntlClientProvider>
   );
 }

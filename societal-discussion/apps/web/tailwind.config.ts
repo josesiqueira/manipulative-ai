@@ -1,4 +1,8 @@
 import type { Config } from 'tailwindcss';
+// Design system tokens — single source of truth for all visual values.
+// See apps/web/design-system/tokens.css for the CSS custom property equivalents.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const designTokens = require('./design-system/tailwind-tokens.js');
 
 const config: Config = {
   content: [
@@ -8,20 +12,7 @@ const config: Config = {
   ],
   theme: {
     extend: {
-      colors: {
-        primary: {
-          50: '#f0f9ff',
-          100: '#e0f2fe',
-          200: '#bae6fd',
-          300: '#7dd3fc',
-          400: '#38bdf8',
-          500: '#0ea5e9',
-          600: '#0284c7',
-          700: '#0369a1',
-          800: '#075985',
-          900: '#0c4a6e',
-        },
-      },
+      ...designTokens,
     },
   },
   plugins: [],

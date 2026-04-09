@@ -44,11 +44,11 @@ class Participant(Base):
 
     # Consent tracking
     consent_given: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    consent_timestamp: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    consent_timestamp: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
 
     # Relationships

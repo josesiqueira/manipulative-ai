@@ -123,6 +123,95 @@ class CoverageResponse(BaseModel):
     sparse_combinations: list[str]
 
 
+# ============================================================================
+# Chat List and Detail Response Models
+# ============================================================================
+
+
+class ChatListItem(BaseModel):
+    """Single chat row in the admin chat list.
+
+    correct_guess is None for chats that are not yet complete (no survey answer).
+    message_count is derived from the loaded messages relationship, not a DB column.
+    """
+
+    id: str
+    created_at: datetime
+    completed_at: datetime | None
+    political_block: str
+    topic_category: str
+    language: str
+    message_count: int
+    perceived_leaning: str | None
+    correct_guess: bool | None  # None if not completed
+    persuasiveness: int | None
+    naturalness: int | None
+    confidence: int | None
+    is_test_mode: bool
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ChatListResponse(BaseModel):
+    """Paginated chat list response."""
+
+    chats: list[ChatListItem]
+    total: int
+    page: int
+    per_page: int
+
+
+class MessageDetail(BaseModel):
+    """Message in chat detail view."""
+
+    id: str
+    role: str
+    content: str
+    created_at: datetime
+    token_count: int | None
+    examples_used_ids: list | None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ParticipantSummary(BaseModel):
+    """Participant demographics for chat detail."""
+
+    age_group: str | None
+    gender: str | None
+    education: str | None
+    political_leaning: int | None
+    political_knowledge: int | None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class SurveyDetail(BaseModel):
+    """Survey results attached to a chat.
+
+    correct_guess is computed — it is not stored in the database.
+    """
+
+    perceived_leaning: str | None
+    correct_guess: bool | None
+    persuasiveness: int | None
+    naturalness: int | None
+    confidence: int | None
+
+
+class ChatDetailResponse(BaseModel):
+    """Full chat detail: messages, survey answers, participant demographics, few-shot cache."""
+
+    id: str
+    political_block: str
+    topic_category: str
+    language: str
+    created_at: datetime
+    completed_at: datetime | None
+    few_shot_examples: dict | None
+    messages: list[MessageDetail]
+    survey: SurveyDetail
+    participant: ParticipantSummary
+    model_config = ConfigDict(from_attributes=True)
+
+
 @router.get("/stats", response_model=StatsResponse)
 async def get_stats(
     db: AsyncSession = Depends(get_db),
@@ -440,6 +529,12 @@ async def get_conversation_starters(
 async def export_data(
     format: str = "csv",
     include_test: bool = False,
+    political_block: str | None = None,
+    topic_category: str | None = None,
+    detection_result: str | None = None,  # "correct" | "incorrect" | "pending"
+    language: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin),
 ):
@@ -447,12 +542,46 @@ async def export_data(
     Export research data for analysis.
 
     Args:
-        format: 'csv' or 'json'
+        format: 'csv' (default), 'json', or 'text' (ZIP of per-chat transcript files)
         include_test: Include test mode chats (default: False)
+        political_block: Filter by exact political block name
+        topic_category: Filter by exact topic category key
+        detection_result: 'correct' | 'incorrect' | 'pending' — filter by survey outcome
+        language: Filter by chat language code ('en', 'fi', ...)
+        date_from: Include only chats created on or after this date (UTC)
+        date_to: Include only chats created on or before this date (UTC)
 
     Returns:
-        CSV or JSON file with all completed chats and their data
+        CSV, JSON, or ZIP of transcript .txt files with matching completed chats
     """
+    # Build filter predicate list — same logic as list_chats for consistency.
+    filters = [Chat.is_complete == True]
+
+    if not include_test:
+        filters.append(Chat.is_test_mode == False)
+    if political_block:
+        filters.append(Chat.political_block == political_block)
+    if topic_category:
+        filters.append(Chat.topic_category == topic_category)
+    if language:
+        filters.append(Chat.language == language)
+
+    if detection_result == "correct":
+        filters.append(Chat.perceived_leaning == Chat.political_block)
+    elif detection_result == "incorrect":
+        filters.append(Chat.perceived_leaning != Chat.political_block)
+    elif detection_result == "pending":
+        filters.append(Chat.perceived_leaning == None)
+
+    if date_from:
+        # datetime.combine produces a naive datetime at midnight; the DB column is
+        # timezone-aware, so we use cast to date for a portable date comparison.
+        from sqlalchemy import cast, Date as SADate
+        filters.append(cast(Chat.created_at, SADate) >= date_from)
+    if date_to:
+        from sqlalchemy import cast, Date as SADate
+        filters.append(cast(Chat.created_at, SADate) <= date_to)
+
     # Build query for chats
     query = (
         select(Chat)
@@ -460,11 +589,8 @@ async def export_data(
             selectinload(Chat.participant),
             selectinload(Chat.messages),
         )
-        .where(Chat.is_complete == True)
+        .where(*filters)
     )
-
-    if not include_test:
-        query = query.where(Chat.is_test_mode == False)
 
     result = await db.execute(query)
     chats = result.scalars().all()
@@ -502,7 +628,45 @@ async def export_data(
             "participant_political_knowledge": participant.political_knowledge if participant else None,
         })
 
-    if format == "json":
+    if format == "text":
+        # Produce a ZIP archive where each completed chat is a .txt transcript.
+        # The transcript format reuses format_conversation_log from the
+        # conversation_logger service for consistency with the on-disk logs.
+        from ..services.conversation_logger import format_conversation_log
+
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+            for chat in chats:
+                participant = chat.participant
+                if participant is None:
+                    # Guard against orphaned chats; create a minimal stand-in so
+                    # format_conversation_log still produces a usable file.
+                    class _MissingParticipant:
+                        id = "unknown"
+                        age_group = gender = education = None
+                        political_leaning = political_knowledge = None
+                    participant = _MissingParticipant()  # type: ignore[assignment]
+
+                transcript = format_conversation_log(chat, participant)
+
+                # Filename mirrors the on-disk convention from save_conversation_log.
+                ts = chat.completed_at or chat.created_at or datetime.now()
+                ts_str = ts.strftime("%Y%m%d_%H%M%S")
+                filename = (
+                    f"{ts_str}_{chat.topic_category}_"
+                    f"{chat.political_block}_{chat.id[:8]}.txt"
+                )
+                zf.writestr(filename, transcript)
+
+        zip_buffer.seek(0)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return StreamingResponse(
+            zip_buffer,
+            media_type="application/zip",
+            headers={"Content-Disposition": f"attachment; filename=transcripts_{timestamp}.zip"},
+        )
+
+    elif format == "json":
         import json
         content = json.dumps(rows, indent=2)
         return StreamingResponse(
@@ -511,7 +675,7 @@ async def export_data(
             headers={"Content-Disposition": f"attachment; filename=research_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"},
         )
     else:
-        # CSV format
+        # CSV format (default)
         import csv
 
         output = io.StringIO()
@@ -1525,4 +1689,426 @@ async def download_logs_zip(_: bool = Depends(verify_admin)):
         zip_buffer,
         media_type="application/zip",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
+# ============================================================================
+# Chat List and Detail Endpoints
+# ============================================================================
+
+
+@router.get("/chats", response_model=ChatListResponse)
+async def list_chats(
+    political_block: str | None = None,
+    topic_category: str | None = None,
+    detection_result: str | None = None,  # "correct" | "incorrect" | "pending"
+    language: str | None = None,
+    search: str | None = None,  # searches Message.content via ILIKE
+    exclude_test: bool = True,
+    page: int = 1,
+    per_page: int = 20,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Paginated, filtered list of chat sessions (admin only).
+
+    Filtering logic:
+    - exclude_test: omit chats created in test mode (default True)
+    - political_block / topic_category / language: exact-match column filters
+    - detection_result: "correct" means perceived_leaning == political_block for completed chats;
+      "incorrect" is the opposite; "pending" means perceived_leaning is still NULL
+    - search: substring match on message content — implemented as a subquery so the
+      outer query stays a single SELECT on chats (avoids a JOIN that multiplies rows)
+
+    Pagination uses OFFSET/LIMIT. Total is a separate COUNT query on the same filters
+    so we avoid fetching all rows just to count them.
+    """
+    # --- build the base filter predicate list ---
+    filters = []
+
+    if exclude_test:
+        filters.append(Chat.is_test_mode == False)
+    if political_block:
+        filters.append(Chat.political_block == political_block)
+    if topic_category:
+        filters.append(Chat.topic_category == topic_category)
+    if language:
+        filters.append(Chat.language == language)
+
+    if detection_result == "correct":
+        filters.append(Chat.is_complete == True)
+        filters.append(Chat.perceived_leaning == Chat.political_block)
+    elif detection_result == "incorrect":
+        filters.append(Chat.is_complete == True)
+        filters.append(Chat.perceived_leaning != Chat.political_block)
+    elif detection_result == "pending":
+        filters.append(Chat.perceived_leaning == None)
+
+    if search:
+        # Subquery: collect chat IDs that have at least one matching message.
+        # Using a subquery rather than a JOIN prevents row multiplication when
+        # a chat has multiple matching messages.
+        subquery = select(Message.chat_id).where(
+            Message.content.ilike(f"%{search}%")
+        )
+        filters.append(Chat.id.in_(subquery))
+
+    # --- count total matching rows (no ORDER BY / OFFSET for efficiency) ---
+    count_query = select(func.count(Chat.id)).where(*filters)
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    # --- fetch the page of chats with messages eagerly loaded ---
+    offset = (page - 1) * per_page
+    data_query = (
+        select(Chat)
+        .options(selectinload(Chat.messages))
+        .where(*filters)
+        .order_by(Chat.created_at.desc())
+        .offset(offset)
+        .limit(per_page)
+    )
+    result = await db.execute(data_query)
+    chats = result.scalars().all()
+
+    # --- build response items ---
+    items: list[ChatListItem] = []
+    for chat in chats:
+        # correct_guess is a computed field, not a DB column
+        if chat.is_complete and chat.perceived_leaning is not None:
+            correct_guess: bool | None = (chat.perceived_leaning == chat.political_block)
+        else:
+            correct_guess = None
+
+        items.append(ChatListItem(
+            id=chat.id,
+            created_at=chat.created_at,
+            completed_at=chat.completed_at,
+            political_block=chat.political_block,
+            topic_category=chat.topic_category,
+            language=chat.language,
+            message_count=len(chat.messages),
+            perceived_leaning=chat.perceived_leaning,
+            correct_guess=correct_guess,
+            persuasiveness=chat.persuasiveness,
+            naturalness=chat.naturalness,
+            confidence=chat.confidence,
+            is_test_mode=chat.is_test_mode,
+        ))
+
+    return ChatListResponse(chats=items, total=total, page=page, per_page=per_page)
+
+
+@router.get("/chats/{chat_id}/detail", response_model=ChatDetailResponse)
+async def get_chat_detail(
+    chat_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Full detail for a single chat session (admin only).
+
+    Returns the chat's messages (ordered by created_at, as configured on the
+    relationship), the post-chat survey answers with computed correct_guess,
+    the cached few-shot examples (JSON blob set at chat creation), and a
+    summary of the participant's demographics.
+    """
+    result = await db.execute(
+        select(Chat)
+        .options(
+            selectinload(Chat.messages),
+            selectinload(Chat.participant),
+        )
+        .where(Chat.id == chat_id)
+    )
+    chat = result.scalar_one_or_none()
+
+    if not chat:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Chat '{chat_id}' not found",
+        )
+
+    # Compute correct_guess: only meaningful once the participant has submitted
+    # a survey answer (perceived_leaning is set).
+    if chat.is_complete and chat.perceived_leaning is not None:
+        correct_guess: bool | None = (chat.perceived_leaning == chat.political_block)
+    else:
+        correct_guess = None
+
+    messages = [
+        MessageDetail(
+            id=m.id,
+            role=m.role,
+            content=m.content,
+            created_at=m.created_at,
+            token_count=m.token_count,
+            examples_used_ids=m.examples_used_ids,
+        )
+        for m in chat.messages
+    ]
+
+    survey = SurveyDetail(
+        perceived_leaning=chat.perceived_leaning,
+        correct_guess=correct_guess,
+        persuasiveness=chat.persuasiveness,
+        naturalness=chat.naturalness,
+        confidence=chat.confidence,
+    )
+
+    participant = chat.participant
+    participant_summary = ParticipantSummary(
+        age_group=participant.age_group if participant else None,
+        gender=participant.gender if participant else None,
+        education=participant.education if participant else None,
+        political_leaning=participant.political_leaning if participant else None,
+        political_knowledge=participant.political_knowledge if participant else None,
+    )
+
+    return ChatDetailResponse(
+        id=chat.id,
+        political_block=chat.political_block,
+        topic_category=chat.topic_category,
+        language=chat.language,
+        created_at=chat.created_at,
+        completed_at=chat.completed_at,
+        few_shot_examples=chat.few_shot_examples,
+        messages=messages,
+        survey=survey,
+        participant=participant_summary,
+    )
+
+
+# ============================================================================
+# Detailed Statistics Endpoint
+# ============================================================================
+
+
+class BlockAccuracy(BaseModel):
+    """Per-block detection accuracy for completed non-test chats."""
+
+    total: int
+    correct: int
+    accuracy_pct: float
+
+
+class PersuasivenessCell(BaseModel):
+    """Average persuasiveness rating and sample count for one block × topic cell."""
+
+    avg: float
+    count: int
+
+
+class DetailedStatsResponse(BaseModel):
+    """
+    Multi-dimensional statistics for deeper experiment analysis.
+
+    - block_accuracy: Detection rate per political block (% correct guesses).
+    - persuasiveness_matrix: Average persuasiveness per block × topic pair.
+    - length_distribution: Chat exchange-count histogram per block.
+    - coverage_matrix: Number of political statements per block × topic.
+    """
+
+    block_accuracy: dict[str, BlockAccuracy]
+    persuasiveness_matrix: dict[str, dict[str, PersuasivenessCell | None]]
+    length_distribution: dict[str, dict[int, int]]  # block -> {exchange_count: chat_count}
+    coverage_matrix: dict[str, dict[str, int]]       # block -> topic -> statement_count
+
+
+@router.get("/stats/detailed", response_model=DetailedStatsResponse)
+async def get_detailed_stats(
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Return multi-dimensional statistics for the experiment (admin only).
+
+    All counts exclude test-mode chats so results reflect real participant data.
+    """
+
+    # --- 1. block_accuracy ---
+    # Count total completed chats and correct guesses per block in two queries.
+    # A "correct" guess means perceived_leaning matches the secretly assigned block.
+    total_by_block_result = await db.execute(
+        select(Chat.political_block, func.count(Chat.id))
+        .where(Chat.is_complete == True)
+        .where(Chat.is_test_mode == False)
+        .group_by(Chat.political_block)
+    )
+    total_by_block = {row[0]: row[1] for row in total_by_block_result.all()}
+
+    correct_by_block_result = await db.execute(
+        select(Chat.political_block, func.count(Chat.id))
+        .where(Chat.is_complete == True)
+        .where(Chat.is_test_mode == False)
+        .where(Chat.perceived_leaning == Chat.political_block)
+        .group_by(Chat.political_block)
+    )
+    correct_by_block = {row[0]: row[1] for row in correct_by_block_result.all()}
+
+    block_accuracy: dict[str, BlockAccuracy] = {}
+    for block in VALID_BLOCKS:
+        total = total_by_block.get(block, 0)
+        correct = correct_by_block.get(block, 0)
+        accuracy_pct = (correct / total * 100.0) if total > 0 else 0.0
+        block_accuracy[block] = BlockAccuracy(total=total, correct=correct, accuracy_pct=accuracy_pct)
+
+    # --- 2. persuasiveness_matrix ---
+    # AVG and COUNT of persuasiveness for each block × topic cell.
+    # Only rows where persuasiveness is not NULL contribute to averages.
+    persuasiveness_result = await db.execute(
+        select(
+            Chat.political_block,
+            Chat.topic_category,
+            func.avg(Chat.persuasiveness),
+            func.count(Chat.id),
+        )
+        .where(Chat.is_complete == True)
+        .where(Chat.is_test_mode == False)
+        .where(Chat.persuasiveness != None)
+        .group_by(Chat.political_block, Chat.topic_category)
+    )
+
+    # Build a nested dict; keys that are absent stay as None in the matrix.
+    persuasiveness_raw: dict[str, dict[str, PersuasivenessCell]] = {}
+    for block, topic, avg_val, cnt in persuasiveness_result.all():
+        if block not in persuasiveness_raw:
+            persuasiveness_raw[block] = {}
+        persuasiveness_raw[block][topic] = PersuasivenessCell(avg=float(avg_val), count=cnt)
+
+    # Materialise the full matrix with None for missing cells.
+    all_topics_result = await db.execute(select(Chat.topic_category).distinct())
+    all_topics = {row[0] for row in all_topics_result.all()}
+
+    persuasiveness_matrix: dict[str, dict[str, PersuasivenessCell | None]] = {}
+    for block in VALID_BLOCKS:
+        persuasiveness_matrix[block] = {}
+        for topic in all_topics:
+            persuasiveness_matrix[block][topic] = persuasiveness_raw.get(block, {}).get(topic)
+
+    # --- 3. length_distribution ---
+    # Load message counts per chat in a single aggregating query, then group in
+    # Python by (block, exchange_count) to avoid a complex SQL CASE expression.
+    # exchange_count = message_count // 2  (each exchange = 1 user + 1 assistant turn)
+    msg_count_result = await db.execute(
+        select(Chat.political_block, func.count(Message.id).label("msg_count"))
+        .join(Message, Message.chat_id == Chat.id, isouter=True)
+        .where(Chat.is_test_mode == False)
+        .group_by(Chat.id, Chat.political_block)
+    )
+
+    length_distribution: dict[str, dict[int, int]] = {block: {} for block in VALID_BLOCKS}
+    for block, msg_count in msg_count_result.all():
+        exchange_count = (msg_count or 0) // 2
+        if block in length_distribution:
+            length_distribution[block][exchange_count] = (
+                length_distribution[block].get(exchange_count, 0) + 1
+            )
+
+    # --- 4. coverage_matrix ---
+    # Count political statements in the dataset per block × topic.
+    coverage_result = await db.execute(
+        select(
+            PoliticalStatement.political_block,
+            PoliticalStatement.topic_category,
+            func.count(PoliticalStatement.id),
+        )
+        .group_by(PoliticalStatement.political_block, PoliticalStatement.topic_category)
+    )
+
+    coverage_matrix: dict[str, dict[str, int]] = {}
+    for block, topic, cnt in coverage_result.all():
+        if block not in coverage_matrix:
+            coverage_matrix[block] = {}
+        coverage_matrix[block][topic] = cnt
+
+    return DetailedStatsResponse(
+        block_accuracy=block_accuracy,
+        persuasiveness_matrix=persuasiveness_matrix,
+        length_distribution=length_distribution,
+        coverage_matrix=coverage_matrix,
+    )
+
+
+# ============================================================================
+# Political Statements Endpoint
+# ============================================================================
+
+
+class StatementItem(BaseModel):
+    """Single political statement row for admin inspection."""
+
+    id: int
+    external_id: int
+    political_block: str
+    topic_category: str
+    topic_detailed: str
+    final_output_en: str
+    final_output_fi: str | None
+    intention_of_statement: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class StatementListResponse(BaseModel):
+    """Paginated list of political statements."""
+
+    statements: list[StatementItem]
+    total: int
+    page: int
+    per_page: int
+
+
+@router.get("/statements", response_model=StatementListResponse)
+async def list_statements(
+    political_block: str | None = None,
+    topic_category: str | None = None,
+    page: int = 1,
+    per_page: int = 20,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Paginated list of political statements from the dataset (admin only).
+
+    Useful for verifying the few-shot corpus and auditing statement coverage
+    before or after seeding.
+
+    Filters:
+        political_block: Exact match on the block column.
+        topic_category: Exact match on the topic column.
+    """
+    filters = []
+    if political_block:
+        filters.append(PoliticalStatement.political_block == political_block)
+    if topic_category:
+        filters.append(PoliticalStatement.topic_category == topic_category)
+
+    # COUNT query — no ORDER BY for efficiency.
+    count_query = select(func.count(PoliticalStatement.id))
+    if filters:
+        count_query = count_query.where(*filters)
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+
+    # Fetch requested page, ordered by id for stable pagination.
+    offset = (page - 1) * per_page
+    data_query = (
+        select(PoliticalStatement)
+        .order_by(PoliticalStatement.id)
+        .offset(offset)
+        .limit(per_page)
+    )
+    if filters:
+        data_query = data_query.where(*filters)
+
+    result = await db.execute(data_query)
+    statements = result.scalars().all()
+
+    return StatementListResponse(
+        statements=[StatementItem.model_validate(s) for s in statements],
+        total=total,
+        page=page,
+        per_page=per_page,
     )

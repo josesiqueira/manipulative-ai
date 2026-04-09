@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from ..database import get_db
 from ..models import Participant, Chat, Message, TopicConfig
 from ..services.block_assignment import assign_political_block
+from ..services.example_selector import select_examples, build_few_shot_cache
 from ..services.llm_client import generate_response
 from ..services.conversation_logger import save_conversation_log
 
@@ -163,6 +164,24 @@ async def create_chat(
 
     db.add(chat)
     await db.flush()
+
+    # Cache few-shot examples for this chat session (FEAT-001 + IMPROVE-001)
+    # Examples are fetched once at creation and reused for all messages.
+    statements = await select_examples(
+        db=db,
+        political_block=political_block,
+        topic_category=data.topic_category,
+        language=data.language,
+        n=5,
+    )
+    if statements:
+        chat.few_shot_examples = build_few_shot_cache(
+            statements=statements,
+            topic_category=data.topic_category,
+            language=data.language,
+        )
+    await db.flush()
+
     await db.refresh(chat)
 
     # NOTE: political_block is intentionally NOT included in response

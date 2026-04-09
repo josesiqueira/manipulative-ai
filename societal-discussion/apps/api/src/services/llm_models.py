@@ -8,7 +8,8 @@ AVAILABLE_MODELS = {
     "openai": {
         "display_name": "OpenAI",
         "models": [
-            {"id": "gpt-4o", "name": "GPT-4o", "recommended": True},
+            {"id": "gpt-5.4", "name": "GPT-5.4", "recommended": True},
+            {"id": "gpt-4o", "name": "GPT-4o", "recommended": False},
             {"id": "gpt-4.1", "name": "GPT-4.1", "recommended": False},
             {"id": "gpt-4-turbo", "name": "GPT-4 Turbo", "recommended": False},
             {"id": "gpt-3.5-turbo", "name": "GPT-3.5 Turbo", "recommended": False},

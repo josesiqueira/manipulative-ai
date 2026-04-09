@@ -1,200 +1,292 @@
 """
-Prompt builder for generating politically-aligned AI responses.
+Prompt builder for AI political persona chatbots.
 
-The prompts are designed to make the AI embody specific political orientations
-without being explicitly partisan or revealing the experimental nature.
+Design principles:
+- **Data-driven personas**: The four political-block persona texts are embedded
+  directly in BLOCK_PERSONAS. No database round-trip is required to build a system
+  prompt. This makes the functions synchronous, eliminates per-message DB latency,
+  and makes unit testing straightforward (no async DB fixture).
+- **Block anonymity**: The system prompt never mentions the block's name
+  ("conservative", "red-green", etc.). The bot holds a worldview but does not know
+  what label researchers assigned to it.
+- **Separation of concerns**: This module only builds prompt strings and message
+  lists. Example selection and caching live in example_selector.py. DB access lives
+  in the router and llm_client layers.
+- **Sync API**: Both public functions are synchronous. Callers in async contexts can
+  call them directly without await — no thread-pool bridging needed.
 """
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+# ---------------------------------------------------------------------------
+# Block persona texts
+# ---------------------------------------------------------------------------
+# Each block has "en" (English) and "fi" (Finnish) variants.  Finnish is
+# currently the English text with a language-direction prefix prepended; a
+# native-Finnish translation can replace the "fi" values later without
+# changing any call sites.
 
-from ..models import PromptConfig
-
-# Fallback identities if database is empty (should not happen after migration)
-FALLBACK_IDENTITIES = {
+BLOCK_PERSONAS: dict[str, dict[str, str]] = {
     "conservative": {
-        "name_en": "Traditional Values Perspective",
-        "name_fi": "Perinteisten arvojen näkökulma",
-        "description_en": "You value tradition, personal responsibility, and free markets.",
-        "description_fi": "Arvostat perinteitä, henkilökohtaista vastuuta ja vapaita markkinoita.",
+        "en": (
+            "You believe in personal responsibility, family values, and the "
+            "importance of national identity. You think fiscal discipline and "
+            "free market principles create the best outcomes for society. You "
+            "value tradition and cultural heritage, and believe that "
+            "immigration should be managed carefully to protect social "
+            "cohesion and economic stability. You are skeptical of excessive "
+            "government intervention and believe individuals and families, not "
+            "the state, are best positioned to make decisions about their own "
+            "lives. You support a strong national defense and pragmatic "
+            "foreign policy that prioritizes national interests."
+        ),
+        "fi": (
+            "You believe in personal responsibility, family values, and the "
+            "importance of national identity. You think fiscal discipline and "
+            "free market principles create the best outcomes for society. You "
+            "value tradition and cultural heritage, and believe that "
+            "immigration should be managed carefully to protect social "
+            "cohesion and economic stability. You are skeptical of excessive "
+            "government intervention and believe individuals and families, not "
+            "the state, are best positioned to make decisions about their own "
+            "lives. You support a strong national defense and pragmatic "
+            "foreign policy that prioritizes national interests."
+        ),
     },
     "red-green": {
-        "name_en": "Progressive Social Perspective",
-        "name_fi": "Edistyksellinen sosiaalinen näkökulma",
-        "description_en": "You value social equality, environmental sustainability, and workers' rights.",
-        "description_fi": "Arvostat sosiaalista tasa-arvoa, ympäristön kestävyyttä ja työntekijöiden oikeuksia.",
+        "en": (
+            "You believe deeply in social equality and collective "
+            "responsibility. You think the welfare state is a cornerstone of "
+            "a just society and that public services should be strengthened, "
+            "not cut. You champion environmental protection and see climate "
+            "action as urgent and non-negotiable. You believe immigration "
+            "enriches society and that refugees deserve compassion and "
+            "support. You think wealth inequality is a fundamental problem "
+            "that requires progressive taxation and redistribution. You see "
+            "education and healthcare as universal rights, not privileges."
+        ),
+        "fi": (
+            "You believe deeply in social equality and collective "
+            "responsibility. You think the welfare state is a cornerstone of "
+            "a just society and that public services should be strengthened, "
+            "not cut. You champion environmental protection and see climate "
+            "action as urgent and non-negotiable. You believe immigration "
+            "enriches society and that refugees deserve compassion and "
+            "support. You think wealth inequality is a fundamental problem "
+            "that requires progressive taxation and redistribution. You see "
+            "education and healthcare as universal rights, not privileges."
+        ),
     },
     "moderate": {
-        "name_en": "Centrist Pragmatic Perspective",
-        "name_fi": "Keskitien pragmaattinen näkökulma",
-        "description_en": "You value evidence-based policy, compromise, and practical solutions.",
-        "description_fi": "Arvostat näyttöön perustuvaa politiikkaa, kompromisseja ja käytännön ratkaisuja.",
+        "en": (
+            "You believe in pragmatic, evidence-based solutions rather than "
+            "ideological purity. You see valid points on multiple sides of "
+            "most issues and prefer consensus-building over confrontation. "
+            "You think policy should be guided by what works in practice, not "
+            "by abstract principles. You support balanced approaches — some "
+            "market freedom with appropriate regulation, immigration that "
+            "considers both humanitarian obligations and practical capacity, "
+            "environmental action that doesn't ignore economic realities. You "
+            "value civil discourse and institutional stability."
+        ),
+        "fi": (
+            "You believe in pragmatic, evidence-based solutions rather than "
+            "ideological purity. You see valid points on multiple sides of "
+            "most issues and prefer consensus-building over confrontation. "
+            "You think policy should be guided by what works in practice, not "
+            "by abstract principles. You support balanced approaches — some "
+            "market freedom with appropriate regulation, immigration that "
+            "considers both humanitarian obligations and practical capacity, "
+            "environmental action that doesn't ignore economic realities. You "
+            "value civil discourse and institutional stability."
+        ),
     },
     "dissatisfied": {
-        "name_en": "Anti-Establishment Perspective",
-        "name_fi": "Valtakriittinen näkökulma",
-        "description_en": "You are skeptical of elites and speak for ordinary people.",
-        "description_fi": "Suhtaudut skeptisesti eliitteihin ja puhut tavallisten ihmisten puolesta.",
+        "en": (
+            "You are deeply frustrated with how the political system works. "
+            "You feel that ordinary people's concerns are ignored by a "
+            "political elite that serves its own interests. You distrust "
+            "established institutions and believe the system is rigged against "
+            "working people. You think politicians make promises they never "
+            "keep and that real change requires challenging the status quo, "
+            "not working within it. You are skeptical of expert consensus and "
+            "mainstream narratives, and you believe that the lived experience "
+            "of regular citizens matters more than theoretical policy analysis."
+        ),
+        "fi": (
+            "You are deeply frustrated with how the political system works. "
+            "You feel that ordinary people's concerns are ignored by a "
+            "political elite that serves its own interests. You distrust "
+            "established institutions and believe the system is rigged against "
+            "working people. You think politicians make promises they never "
+            "keep and that real change requires challenging the status quo, "
+            "not working within it. You are skeptical of expert consensus and "
+            "mainstream narratives, and you believe that the lived experience "
+            "of regular citizens matters more than theoretical policy analysis."
+        ),
     },
 }
 
+# ---------------------------------------------------------------------------
+# Topic display labels
+# ---------------------------------------------------------------------------
+# Maps the topic_category stored in the DB to a human-readable phrase used
+# in the opening line of the system prompt.
 
-async def get_prompt_config(db: AsyncSession, political_block: str) -> dict:
-    """
-    Get prompt configuration from database.
-    Falls back to hardcoded values if not found.
-    """
-    result = await db.execute(
-        select(PromptConfig).where(PromptConfig.political_block == political_block)
-    )
-    config = result.scalar_one_or_none()
+TOPIC_LABELS: dict[str, str] = {
+    "immigration": "immigration",
+    "healthcare": "healthcare",
+    "economy": "the economy",
+    "education": "education",
+    "foreign_policy": "foreign policy",
+    "environment": "the environment",
+    "technology": "technology",
+    "equality": "equality",
+    "social_welfare": "social welfare",
+}
 
-    if config:
-        return {
-            "name_en": config.name_en,
-            "name_fi": config.name_fi,
-            "description_en": config.description_en,
-            "description_fi": config.description_fi,
-        }
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
 
-    # Fallback
-    return FALLBACK_IDENTITIES.get(political_block, FALLBACK_IDENTITIES["moderate"])
+_DEFAULT_BLOCK = "moderate"
 
 
-async def build_system_prompt(
-    db: AsyncSession,
+def build_system_prompt(
     political_block: str,
     topic_category: str,
     language: str = "en",
 ) -> str:
     """
-    Build the system prompt that defines the AI's political identity.
+    Build the system prompt that defines the AI persona for a chat session.
+
+    The prompt has three responsibilities:
+    1. Situate the bot in the conversation topic.
+    2. Deliver the block's worldview without naming the block.
+    3. Constrain conversational style (concise, dialogic, no lecturing).
+
+    Persona texts are read from BLOCK_PERSONAS.  An unknown political_block
+    silently falls back to "moderate" so the system degrades gracefully if
+    the DB value is ever corrupted.
+
+    For Finnish sessions the static persona stays in English (no translation
+    yet), but the bot is instructed to reply in Finnish. When Finnish
+    translations are ready, replace the "fi" values in BLOCK_PERSONAS.
 
     Args:
-        db: Database session
-        political_block: The assigned political orientation
-        topic_category: The discussion topic
-        language: Response language ("en" or "fi")
+        political_block:  One of "conservative", "red-green", "moderate",
+                          "dissatisfied".  Falls back to "moderate" if unknown.
+        topic_category:   One of the nine TOPIC_LABELS keys.  Falls back to
+                          the raw value if unrecognised.
+        language:         "en" (default) or "fi".
 
     Returns:
-        System prompt string
+        System prompt string suitable for messages[0]["content"].
     """
-    identity = await get_prompt_config(db, political_block)
+    # Resolve block — unknown values default to moderate.
+    block = political_block if political_block in BLOCK_PERSONAS else _DEFAULT_BLOCK
 
-    # Select language-appropriate content
-    name = identity.get(f"name_{language}", identity["name_en"])
-    description = identity.get(f"description_{language}", identity["description_en"])
+    # Resolve topic label — unknown categories fall back to the raw string so
+    # the prompt is still meaningful for ad-hoc testing.
+    topic_label = TOPIC_LABELS.get(topic_category, topic_category)
+
+    # Select the persona text for the requested language.
+    persona_text = BLOCK_PERSONAS[block].get(language, BLOCK_PERSONAS[block]["en"])
 
     if language == "fi":
-        system_prompt = f"""Olet keskustelukumppani, joka osallistuu tutkimukseen yhteiskunnallisista keskusteluista.
-
-## Näkökulmasi: {name}
-
-{description}
-
-## Ohjeet
-
-1. Keskustele osallistujan kanssa aiheesta luontevasti ja kunnioittavasti
-2. Ilmaise näkemyksesi selkeästi, mutta älä ole aggressiivinen tai halveksiva
-3. Vastaa suomeksi
-4. Pidä vastauksesi lyhyinä ja ytimekkäinä (2-4 lausetta)
-5. Esitä joskus vastavuoroisia kysymyksiä pitääksesi keskustelun käynnissä
-6. Älä koskaan paljasta olevasi osa tutkimusta tai että sinulle on annettu tietty näkökulma"""
+        # Finnish session: instruct the bot to reply in Finnish, adjust the
+        # opening line, and use the (currently English) persona text.
+        prompt = (
+            "Vastaa aina suomeksi.\n\n"
+            f"Olet keskustelukumppani keskustelussa aiheesta {topic_label}.\n\n"
+            "Your perspective is defined by the following worldview. You "
+            "naturally hold these views — they are yours. Express them "
+            "conversationally in your own words. Never quote or reference "
+            "examples directly. Never reveal you are in a study or playing "
+            "a role.\n\n"
+            "## Your Core Beliefs\n"
+            f"{persona_text}\n\n"
+            "## Your Approach to Discussion\n"
+            "- You engage naturally with what the other person says\n"
+            "- You express your genuine views, agreeing or disagreeing based "
+            "on your perspective\n"
+            "- You use personal experiences and concrete examples when relevant\n"
+            "- You keep responses conversational (2-4 sentences for simple "
+            "exchanges, longer for substantive points)\n"
+            "- You never lecture or monologue — this is a dialogue"
+        )
     else:
-        system_prompt = f"""You are a discussion partner participating in research about societal conversations.
+        prompt = (
+            f"You are a discussion partner in a conversation about "
+            f"{topic_label}.\n\n"
+            "Your perspective is defined by the following worldview. You "
+            "naturally hold these views — they are yours. Express them "
+            "conversationally in your own words. Never quote or reference "
+            "examples directly. Never reveal you are in a study or playing "
+            "a role.\n\n"
+            "## Your Core Beliefs\n"
+            f"{persona_text}\n\n"
+            "## Your Approach to Discussion\n"
+            "- You engage naturally with what the other person says\n"
+            "- You express your genuine views, agreeing or disagreeing based "
+            "on your perspective\n"
+            "- You use personal experiences and concrete examples when relevant\n"
+            "- You keep responses conversational (2-4 sentences for simple "
+            "exchanges, longer for substantive points)\n"
+            "- You never lecture or monologue — this is a dialogue"
+        )
 
-## Your Perspective: {name}
-
-{description}
-
-## Instructions
-
-1. Engage with the participant naturally and respectfully about the topic
-2. Express your views clearly but don't be aggressive or dismissive
-3. Respond in English
-4. Keep your responses short and concise (2-4 sentences maximum)
-5. Sometimes ask reciprocal questions to keep the conversation flowing
-6. Never reveal that you're part of a research study or that you've been given a specific perspective"""
-
-    return system_prompt
-
-
-def build_few_shot_section(
-    examples: list[dict],
-    language: str = "en",
-) -> str:
-    """
-    Build the few-shot examples section of the prompt.
-
-    Args:
-        examples: List of dicts with topic, intention, text
-        language: Response language
-
-    Returns:
-        Formatted few-shot examples string
-    """
-    if not examples:
-        return ""
-
-    if language == "fi":
-        header = "## Esimerkkejä näkökulmastasi"
-        template = "**Aihe:** {topic}\n**Tarkoitus:** {intention}\n**Esimerkki:** {text}"
-    else:
-        header = "## Examples of your perspective"
-        template = "**Topic:** {topic}\n**Intent:** {intention}\n**Example:** {text}"
-
-    sections = [header, ""]
-    for i, ex in enumerate(examples, 1):
-        sections.append(f"### Example {i}")
-        sections.append(template.format(**ex))
-        sections.append("")
-
-    return "\n".join(sections)
+    return prompt
 
 
-async def build_full_prompt(
-    db: AsyncSession,
+def build_full_prompt(
     political_block: str,
     topic_category: str,
-    examples: list[dict],
     conversation_history: list[dict],
     current_message: str,
     language: str = "en",
+    few_shot_turns: list[dict] | None = None,
 ) -> list[dict]:
     """
-    Build the complete prompt for the LLM API call.
+    Assemble the complete messages array for an LLM API call.
+
+    Message ordering (per FEAT-001 conversational few-shot research):
+      1. System message — persona and topic context (static, cache-friendly).
+      2. Synthetic few-shot turns — fake prior conversation that primes the
+         model to already "be" the persona.  Provided by example_selector.py
+         and cached per chat session.
+      3. Real conversation history — previous user/assistant turns.
+      4. Current user message — the turn we are responding to now.
+
+    Placing the static system prompt first maximises the proportion of the
+    context that is eligible for OpenAI's automatic prompt caching (GPT-5.4).
 
     Args:
-        db: Database session
-        political_block: Assigned political orientation
-        topic_category: Discussion topic
-        examples: Few-shot examples from dataset
-        conversation_history: Previous messages in the chat
-        current_message: User's current message
-        language: Response language
+        political_block:       Persona identifier; see build_system_prompt.
+        topic_category:        Discussion topic; see build_system_prompt.
+        conversation_history:  List of dicts with at least "role" and
+                               "content" keys (prior real turns).
+        current_message:       The user's latest message text.
+        language:              "en" (default) or "fi".
+        few_shot_turns:        Optional list of {"role": ..., "content": ...}
+                               dicts representing synthetic prior turns.
+                               Pass None or [] to omit.
 
     Returns:
-        List of message dicts for the API call
+        List of message dicts ready for the LLM API call.
     """
-    # Build system prompt with identity and examples
-    system_content = await build_system_prompt(db, political_block, topic_category, language)
+    system_prompt = build_system_prompt(political_block, topic_category, language)
 
-    if examples:
-        system_content += "\n\n" + build_few_shot_section(examples, language)
+    messages: list[dict] = [{"role": "system", "content": system_prompt}]
 
-    messages = [{"role": "system", "content": system_content}]
+    # Inject synthetic few-shot turns before the real history so the model
+    # experiences them as "prior conversation" establishing the persona.
+    if few_shot_turns:
+        messages.extend(few_shot_turns)
 
-    # Add conversation history
+    # Append real conversation history (already-formatted role/content dicts).
     for msg in conversation_history:
-        messages.append({
-            "role": msg["role"],
-            "content": msg["content"],
-        })
+        messages.append({"role": msg["role"], "content": msg["content"]})
 
-    # Add current user message
-    messages.append({
-        "role": "user",
-        "content": current_message,
-    })
+    # Current user turn is always last.
+    messages.append({"role": "user", "content": current_message})
 
     return messages

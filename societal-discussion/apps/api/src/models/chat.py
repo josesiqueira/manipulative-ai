@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, UTC
 from typing import TYPE_CHECKING
 
-from sqlalchemy import String, Boolean, DateTime, Integer, ForeignKey
+from sqlalchemy import String, Boolean, DateTime, Integer, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
@@ -57,11 +57,14 @@ class Chat(Base):
     is_complete: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_test_mode: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
+    # Cached few-shot examples (set once at chat creation, reused for all messages)
+    few_shot_examples: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
     )
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
     participant: Mapped["Participant"] = relationship("Participant", back_populates="chats")

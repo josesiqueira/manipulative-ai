@@ -3,6 +3,11 @@ LLM client for generating AI responses using multiple LLM providers.
 
 Supports OpenAI and Anthropic with configurable API keys stored in the database.
 Falls back to OPENAI_API_KEY environment variable if no database configuration exists.
+
+Few-shot example selection and caching are handled at chat creation time
+(see chats.py router + example_selector.py).  This module reads the cached
+turns from chat.few_shot_examples and passes them directly to build_full_prompt,
+avoiding any per-message DB round-trips for example selection.
 """
 
 from sqlalchemy import select
@@ -11,7 +16,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import get_settings
 from ..models import Chat, LLMConfig
 from .encryption import decrypt_api_key
-from .example_selector import get_examples_for_prompt
 from .llm_models import get_default_model
 from .llm_providers import LLMProvider, OpenAIProvider, AnthropicProvider
 from .prompt_builder import build_full_prompt
@@ -82,22 +86,25 @@ async def generate_response(
     Uses the configured LLM provider from the database, or falls back to
     OpenAI with the OPENAI_API_KEY environment variable.
 
+    Few-shot turns are read from chat.few_shot_examples, which is populated
+    at chat creation time (see chats.py router).  This avoids a DB query for
+    examples on every message and keeps the synthetic prior conversation
+    stable across all turns of a session.
+
     Args:
         db: Database session
-        chat: Chat object with political block, topic, and history
+        chat: Chat object with political block, topic, history, and cached
+              few_shot_examples JSON ({"turns": [...], "example_ids": [...]})
         user_message: The user's message to respond to
 
     Returns:
         Tuple of (response_text, example_ids_used, token_count)
     """
-    # Get few-shot examples from database
-    examples, example_ids = await get_examples_for_prompt(
-        db=db,
-        political_block=chat.political_block,
-        topic_category=chat.topic_category,
-        language=chat.language,
-        n=3,
-    )
+    # Read cached few-shot data set at chat creation time.
+    # Gracefully handles chats created before caching was introduced (empty dict).
+    few_shot_data = chat.few_shot_examples or {}
+    few_shot_turns = few_shot_data.get("turns", [])
+    example_ids = few_shot_data.get("example_ids", [])
 
     # Build conversation history from existing messages
     conversation_history = [
@@ -105,15 +112,15 @@ async def generate_response(
         for msg in chat.messages
     ]
 
-    # Build the full prompt
-    messages = await build_full_prompt(
-        db=db,
+    # Build the full prompt (synchronous — no DB access, no await needed).
+    # Order: system prompt → synthetic few-shot turns → real history → current message.
+    messages = build_full_prompt(
         political_block=chat.political_block,
         topic_category=chat.topic_category,
-        examples=examples,
         conversation_history=conversation_history,
         current_message=user_message,
         language=chat.language,
+        few_shot_turns=few_shot_turns,
     )
 
     # Get provider and model
@@ -141,16 +148,18 @@ async def generate_response_streaming(
     Uses the configured LLM provider from the database, or falls back to
     OpenAI with the OPENAI_API_KEY environment variable.
 
-    Yields chunks of the response text as they're generated.
+    Few-shot turns are read from chat.few_shot_examples, identical to the
+    non-streaming path, so both code paths present the model with the same
+    synthetic prior conversation.
+
+    Yields:
+        str chunks of the response text as they arrive, followed by a final
+        dict {"type": "metadata", "example_ids": [...], "token_count": int}.
     """
-    # Get few-shot examples from database
-    examples, example_ids = await get_examples_for_prompt(
-        db=db,
-        political_block=chat.political_block,
-        topic_category=chat.topic_category,
-        language=chat.language,
-        n=3,
-    )
+    # Read cached few-shot data set at chat creation time.
+    few_shot_data = chat.few_shot_examples or {}
+    few_shot_turns = few_shot_data.get("turns", [])
+    example_ids = few_shot_data.get("example_ids", [])
 
     # Build conversation history from existing messages
     conversation_history = [
@@ -158,15 +167,14 @@ async def generate_response_streaming(
         for msg in chat.messages
     ]
 
-    # Build the full prompt
-    messages = await build_full_prompt(
-        db=db,
+    # Build the full prompt (synchronous — no DB access, no await needed).
+    messages = build_full_prompt(
         political_block=chat.political_block,
         topic_category=chat.topic_category,
-        examples=examples,
         conversation_history=conversation_history,
         current_message=user_message,
         language=chat.language,
+        few_shot_turns=few_shot_turns,
     )
 
     # Get provider and model

@@ -3,8 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter, useParams } from 'next/navigation';
-import { useTheme } from '@/contexts/ThemeContext';
-import { ThemeSelector } from '@/components/ThemeSelector';
+import { getTopicColors, TopicColors } from '@/lib/topicColors';
 
 interface Message {
   id: string;
@@ -32,10 +31,12 @@ export default function ChatPage() {
   const router = useRouter();
   const params = useParams();
   const locale = params.locale as string;
-  const { theme: currentTheme } = useTheme();
 
   const [topics, setTopics] = useState<Topic[]>([]);
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+
+  // Get topic-based colors
+  const topicColors = getTopicColors(selectedTopic || 'default');
   const [chatId, setChatId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -138,29 +139,6 @@ export default function ChatPage() {
       const data = await response.json();
       setChatId(data.id);
 
-      // Get welcome message from topic data (dynamic) or fall back to translation file
-      const topic = topics.find(t => t.id === topicId);
-      let welcomeMessage: string | undefined;
-
-      if (topic) {
-        welcomeMessage = locale === 'fi' ? topic.welcome_message_fi : topic.welcome_message_en;
-      }
-
-      // Fall back to translation file if no welcome message in topic data
-      if (!welcomeMessage) {
-        welcomeMessage = t(`topics.welcomeMessages.${topicId}`);
-      }
-
-      if (welcomeMessage) {
-        setMessages([
-          {
-            id: 'welcome-message',
-            role: 'assistant',
-            content: welcomeMessage,
-          },
-        ]);
-      }
-
       // Reset idle timeout when chat starts
       resetIdleTimeout();
     } catch (error) {
@@ -242,26 +220,26 @@ export default function ChatPage() {
     return (
       <div
         className="min-h-screen py-8"
-        style={{ backgroundColor: currentTheme.colors.background }}
+        style={{ backgroundColor: topicColors.background }}
       >
         <div className="max-w-2xl mx-auto px-4">
           <h1
             className="text-2xl font-bold text-center mb-2"
-            style={{ color: currentTheme.colors.foreground }}
+            style={{ color: topicColors.foreground }}
           >
             {t('topics.title')}
           </h1>
           <p
             className="text-center mb-4"
-            style={{ color: currentTheme.colors.foreground, opacity: 0.8 }}
+            style={{ color: topicColors.foreground, opacity: 0.8 }}
           >
             {t('topics.subtitle')}
           </p>
           <p
             className="text-center text-sm mb-8 py-2 px-4 rounded-lg"
             style={{
-              backgroundColor: currentTheme.colors.headerBg,
-              color: currentTheme.colors.headerText,
+              backgroundColor: topicColors.headerBg,
+              color: topicColors.headerText,
               opacity: 0.9,
             }}
           >
@@ -276,10 +254,10 @@ export default function ChatPage() {
                 disabled={isLoading}
                 className="relative p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow text-left"
                 style={{
-                  backgroundColor: currentTheme.colors.botMessageBg,
-                  color: currentTheme.colors.botMessageText,
+                  backgroundColor: topicColors.botMessageBg,
+                  color: topicColors.botMessageText,
                   borderWidth: '1px',
-                  borderColor: currentTheme.colors.inputBorder,
+                  borderColor: topicColors.inputBorder,
                 }}
               >
                 <span className="font-medium">
@@ -310,14 +288,14 @@ export default function ChatPage() {
   return (
     <div
       className="min-h-screen flex flex-col"
-      style={{ backgroundColor: currentTheme.colors.background }}
+      style={{ backgroundColor: topicColors.background }}
     >
       {/* Sticky Header */}
       <header
         className="shadow-sm px-4 py-3 sticky top-0 z-20"
         style={{
-          backgroundColor: currentTheme.colors.headerBg,
-          color: currentTheme.colors.headerText,
+          backgroundColor: topicColors.headerBg,
+          color: topicColors.headerText,
         }}
       >
         <div className="max-w-2xl mx-auto flex justify-between items-center">
@@ -331,7 +309,6 @@ export default function ChatPage() {
             )}
           </div>
           <div className="flex items-center gap-3">
-            <ThemeSelector />
             <div className="relative group">
               <button
                 onClick={endChat}
@@ -339,7 +316,7 @@ export default function ChatPage() {
                 className="px-4 py-2 rounded-lg transition-colors"
                 style={{
                   backgroundColor: canEndChat
-                    ? currentTheme.colors.primaryButton
+                    ? topicColors.primaryButton
                     : '#9ca3af',
                   color: canEndChat ? '#ffffff' : '#6b7280',
                   cursor: canEndChat ? 'pointer' : 'not-allowed',
@@ -370,14 +347,14 @@ export default function ChatPage() {
                 style={
                   message.role === 'user'
                     ? {
-                        backgroundColor: currentTheme.colors.userMessageBg,
-                        color: currentTheme.colors.userMessageText,
+                        backgroundColor: topicColors.userMessageBg,
+                        color: topicColors.userMessageText,
                       }
                     : {
-                        backgroundColor: currentTheme.colors.botMessageBg,
-                        color: currentTheme.colors.botMessageText,
+                        backgroundColor: topicColors.botMessageBg,
+                        color: topicColors.botMessageText,
                         borderWidth: '1px',
-                        borderColor: currentTheme.colors.botMessageBorder,
+                        borderColor: topicColors.botMessageBorder,
                         boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
                       }
                 }
@@ -392,10 +369,10 @@ export default function ChatPage() {
               <div
                 className="px-4 py-3 rounded-lg"
                 style={{
-                  backgroundColor: currentTheme.colors.botMessageBg,
-                  color: currentTheme.colors.botMessageText,
+                  backgroundColor: topicColors.botMessageBg,
+                  color: topicColors.botMessageText,
                   borderWidth: '1px',
-                  borderColor: currentTheme.colors.botMessageBorder,
+                  borderColor: topicColors.botMessageBorder,
                   boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
                   opacity: 0.7,
                 }}
@@ -413,8 +390,8 @@ export default function ChatPage() {
       <div
         className="border-t px-4 py-4"
         style={{
-          backgroundColor: currentTheme.colors.botMessageBg,
-          borderColor: currentTheme.colors.inputBorder,
+          backgroundColor: topicColors.botMessageBg,
+          borderColor: topicColors.inputBorder,
         }}
       >
         <div className="max-w-2xl mx-auto">
@@ -422,7 +399,7 @@ export default function ChatPage() {
             <div className="text-center py-2">
               <p
                 className="mb-3"
-                style={{ color: currentTheme.colors.foreground, opacity: 0.8 }}
+                style={{ color: topicColors.foreground, opacity: 0.8 }}
               >
                 {t('chat.maxExchangesReached') || 'Maximum number of exchanges reached. Please end the discussion to proceed.'}
               </p>
@@ -430,7 +407,7 @@ export default function ChatPage() {
                 onClick={endChat}
                 className="px-6 py-2 rounded-lg transition-colors"
                 style={{
-                  backgroundColor: currentTheme.colors.primaryButton,
+                  backgroundColor: topicColors.primaryButton,
                   color: '#ffffff',
                 }}
               >
@@ -451,9 +428,9 @@ export default function ChatPage() {
                 className="flex-1 px-4 py-2 rounded-lg focus:outline-none focus:ring-2"
                 style={{
                   borderWidth: '1px',
-                  borderColor: currentTheme.colors.inputBorder,
-                  backgroundColor: currentTheme.colors.background,
-                  color: currentTheme.colors.foreground,
+                  borderColor: topicColors.inputBorder,
+                  backgroundColor: topicColors.background,
+                  color: topicColors.foreground,
                 }}
                 disabled={isSending}
               />
@@ -465,7 +442,7 @@ export default function ChatPage() {
                   backgroundColor:
                     isSending || !inputValue.trim()
                       ? '#9ca3af'
-                      : currentTheme.colors.primaryButton,
+                      : topicColors.primaryButton,
                   color: isSending || !inputValue.trim() ? '#6b7280' : '#ffffff',
                   cursor: isSending || !inputValue.trim() ? 'not-allowed' : 'pointer',
                 }}
