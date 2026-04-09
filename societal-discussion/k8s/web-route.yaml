@@ -1,0 +1,16 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: web
+  namespace: bilingual-chatbot-experiment
+spec:
+  host: web-bilingual-chatbot-experiment.2.rahtiapp.fi
+  to:
+    kind: Service
+    name: web
+    weight: 100
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
