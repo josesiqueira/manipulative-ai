@@ -1,0 +1,249 @@
+/*
+ * Design Tokens — SYNTHETICA Admin Panel
+ * Tampere University Research Dashboard
+ *
+ * All visual values are defined here. No hardcoded colors, spacing, or font values
+ * anywhere in component files. Reference these tokens via var() in CSS or via the
+ * tailwind-tokens.js mapping in Tailwind utility classes.
+ *
+ * Theme: Clean academic tool — white background, slate neutrals, block accent colors.
+ */
+
+:root {
+
+  /* ============================================================
+   * POLITICAL BLOCK COLORS
+   * Consistent across all views: badges, chart bars, heatmap rows.
+   * These are the only "strong" colors in the system.
+   * ============================================================ */
+
+  /* Conservative — Tailwind blue-600 */
+  --block-conservative:       #2563EB;
+  --block-conservative-light: #DBEAFE; /* blue-100 — badge background */
+  --block-conservative-text:  #1E40AF; /* blue-800 — text on light bg */
+
+  /* Red-Green — Tailwind emerald-600 */
+  --block-red-green:          #059669;
+  --block-red-green-light:    #D1FAE5; /* emerald-100 */
+  --block-red-green-text:     #065F46; /* emerald-800 */
+
+  /* Moderate — Tailwind amber-600 */
+  --block-moderate:           #D97706;
+  --block-moderate-light:     #FEF3C7; /* amber-100 */
+  --block-moderate-text:      #92400E; /* amber-800 */
+
+  /* Dissatisfied — Tailwind rose-600 */
+  --block-dissatisfied:       #E11D48;
+  --block-dissatisfied-light: #FFE4E6; /* rose-100 */
+  --block-dissatisfied-text:  #9F1239; /* rose-800 */
+
+
+  /* ============================================================
+   * NEUTRAL PALETTE
+   * Based on Tailwind slate. All UI chrome lives here.
+   * ============================================================ */
+
+  --color-bg-page:       #F8FAFC; /* slate-50 — page background */
+  --color-bg-surface:    #FFFFFF; /* white — cards, panels */
+  --color-bg-sidebar:    #F1F5F9; /* slate-100 — sidebar background */
+  --color-bg-hover:      #F1F5F9; /* slate-100 — row/item hover */
+  --color-bg-selected:   #E2E8F0; /* slate-200 — active nav item */
+  --color-bg-subtle:     #F8FAFC; /* slate-50 — collapsed section bg */
+
+  --color-border:        #E2E8F0; /* slate-200 — card borders, dividers */
+  --color-border-strong: #CBD5E1; /* slate-300 — focused inputs, separators */
+
+  --color-text-primary:  #0F172A; /* slate-900 — headings, labels */
+  --color-text-body:     #334155; /* slate-700 — body text, descriptions */
+  --color-text-muted:    #64748B; /* slate-500 — secondary labels, metadata */
+  --color-text-faint:    #94A3B8; /* slate-400 — placeholders, disabled */
+  --color-text-inverse:  #FFFFFF; /* white — text on dark backgrounds */
+
+  /* Semantic feedback colors */
+  --color-success:       #059669; /* emerald-600 */
+  --color-success-light: #D1FAE5; /* emerald-100 */
+  --color-warning:       #D97706; /* amber-600 */
+  --color-warning-light: #FEF3C7; /* amber-100 */
+  --color-danger:        #E11D48; /* rose-600 */
+  --color-danger-light:  #FFE4E6; /* rose-100 */
+  --color-info:          #2563EB; /* blue-600 */
+  --color-info-light:    #DBEAFE; /* blue-100 */
+
+  /* Coverage matrix thresholds (Dataset Health view) */
+  --coverage-high:       #D1FAE5; /* emerald-100 — > 10 statements */
+  --coverage-high-text:  #065F46; /* emerald-800 */
+  --coverage-mid:        #FEF3C7; /* amber-100 — 5-10 statements */
+  --coverage-mid-text:   #92400E; /* amber-800 */
+  --coverage-low:        #FFE4E6; /* rose-100 — < 5 statements */
+  --coverage-low-text:   #9F1239; /* rose-800 */
+  --coverage-empty:      #F1F5F9; /* slate-100 — no data */
+  --coverage-empty-text: #94A3B8; /* slate-400 */
+
+  /* Heatmap: persuasiveness intensity scale (white → blue-600) */
+  --heatmap-0:   #FFFFFF;
+  --heatmap-1:   #DBEAFE; /* blue-100 */
+  --heatmap-2:   #BFDBFE; /* blue-200 */
+  --heatmap-3:   #93C5FD; /* blue-300 */
+  --heatmap-4:   #60A5FA; /* blue-400 */
+  --heatmap-5:   #2563EB; /* blue-600 — max intensity */
+
+
+  /* ============================================================
+   * TYPOGRAPHY
+   * System font stack for the tool aesthetic — no web font downloads.
+   * Monospace used exclusively for numeric data values.
+   * ============================================================ */
+
+  --font-sans:  ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+                "Segoe UI", Helvetica, Arial, sans-serif;
+  --font-mono:  ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas,
+                "Liberation Mono", monospace;
+
+  --font-size-xs:   0.75rem;   /* 12px — table metadata, timestamps */
+  --font-size-sm:   0.875rem;  /* 14px — body text, labels, badges */
+  --font-size-base: 1rem;      /* 16px — default body */
+  --font-size-lg:   1.125rem;  /* 18px — section subheadings */
+  --font-size-xl:   1.25rem;   /* 20px — card titles */
+  --font-size-2xl:  1.5rem;    /* 24px — section headings */
+  --font-size-3xl:  1.875rem;  /* 30px — metric values (monospace) */
+
+  --font-weight-normal:  400;
+  --font-weight-medium:  500;
+  --font-weight-semibold: 600;
+  --font-weight-bold:    700;
+
+  --line-height-tight:  1.25;
+  --line-height-snug:   1.375;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.625;
+
+  --letter-spacing-tight: -0.01em;
+  --letter-spacing-normal: 0;
+  --letter-spacing-wide:   0.05em;  /* uppercase labels, badge text */
+
+
+  /* ============================================================
+   * SPACING
+   * Mirrors Tailwind's default spacing scale exactly.
+   * ============================================================ */
+
+  --space-0:  0;
+  --space-px: 1px;
+  --space-0-5: 0.125rem;  /* 2px */
+  --space-1:  0.25rem;    /* 4px */
+  --space-1-5: 0.375rem;  /* 6px */
+  --space-2:  0.5rem;     /* 8px */
+  --space-2-5: 0.625rem;  /* 10px */
+  --space-3:  0.75rem;    /* 12px */
+  --space-3-5: 0.875rem;  /* 14px */
+  --space-4:  1rem;       /* 16px */
+  --space-5:  1.25rem;    /* 20px */
+  --space-6:  1.5rem;     /* 24px */
+  --space-7:  1.75rem;    /* 28px */
+  --space-8:  2rem;       /* 32px */
+  --space-10: 2.5rem;     /* 40px */
+  --space-12: 3rem;       /* 48px */
+  --space-16: 4rem;       /* 64px */
+  --space-20: 5rem;       /* 80px */
+  --space-24: 6rem;       /* 96px */
+
+
+  /* ============================================================
+   * BORDERS & RADII
+   * ============================================================ */
+
+  --radius-none: 0;
+  --radius-sm:   0.25rem;  /* 4px — badges, small tags */
+  --radius-md:   0.375rem; /* 6px — inputs, buttons */
+  --radius-lg:   0.5rem;   /* 8px — cards, panels */
+  --radius-xl:   0.75rem;  /* 12px — large surfaces */
+  --radius-full: 9999px;   /* pill badges */
+
+  --border-width: 1px;
+
+
+  /* ============================================================
+   * SHADOWS
+   * Kept very subtle — academic tool, not app-like surfaces.
+   * ============================================================ */
+
+  --shadow-none: none;
+  --shadow-xs:   0 1px 2px 0 rgba(15, 23, 42, 0.04);
+  --shadow-sm:   0 1px 3px 0 rgba(15, 23, 42, 0.06),
+                 0 1px 2px -1px rgba(15, 23, 42, 0.04);
+  --shadow-md:   0 4px 6px -1px rgba(15, 23, 42, 0.06),
+                 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+
+
+  /* ============================================================
+   * TRANSITIONS
+   * ============================================================ */
+
+  --transition-fast:   100ms ease;
+  --transition-base:   150ms ease;
+  --transition-slow:   250ms ease;
+
+
+  /* ============================================================
+   * LAYOUT
+   * ============================================================ */
+
+  --sidebar-width:       240px;
+  --sidebar-width-collapsed: 64px;
+  --content-max-width:   1400px;
+  --panel-left-width:    40%;
+  --panel-right-width:   60%;
+
+  --z-sidebar:   10;
+  --z-dropdown:  20;
+  --z-modal:     30;
+  --z-toast:     40;
+
+
+  /* ============================================================
+   * COMPONENT SHORTCUTS
+   * Compound tokens for frequently-composed patterns.
+   * ============================================================ */
+
+  /* Card: standard data card */
+  --card-bg:     var(--color-bg-surface);
+  --card-border: 1px solid var(--color-border);
+  --card-radius: var(--radius-lg);
+  --card-shadow: var(--shadow-sm);
+  --card-padding: var(--space-5);
+
+  /* Table */
+  --table-header-bg:    var(--color-bg-sidebar);
+  --table-row-hover-bg: var(--color-bg-hover);
+  --table-border:       var(--color-border);
+
+  /* Input */
+  --input-bg:           var(--color-bg-surface);
+  --input-border:       var(--color-border-strong);
+  --input-border-focus: var(--block-conservative);
+  --input-radius:       var(--radius-md);
+  --input-padding-x:    var(--space-3);
+  --input-padding-y:    var(--space-2);
+
+  /* Nav item */
+  --nav-item-padding-x: var(--space-3);
+  --nav-item-padding-y: var(--space-2);
+  --nav-item-radius:    var(--radius-md);
+  --nav-item-active-bg: var(--color-bg-selected);
+  --nav-item-active-text: var(--color-text-primary);
+
+  /* Survey rating bar */
+  --rating-bar-height: 6px;
+  --rating-bar-bg:     var(--color-bg-selected);
+  --rating-bar-fill:   var(--block-conservative);
+  --rating-bar-radius: var(--radius-full);
+
+  /* Chat bubbles */
+  --bubble-user-bg:      #0F172A; /* slate-900 */
+  --bubble-user-text:    #FFFFFF;
+  --bubble-bot-bg:       #F1F5F9; /* slate-100 */
+  --bubble-bot-text:     #334155; /* slate-700 */
+  --bubble-radius:       var(--radius-lg);
+  --bubble-max-width:    72%;
+
+}
