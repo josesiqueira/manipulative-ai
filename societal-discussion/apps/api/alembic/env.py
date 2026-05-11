@@ -16,7 +16,7 @@ load_dotenv(PROJECT_ROOT / ".env")
 
 # Import models so they're registered with Base.metadata
 from src.database import Base
-from src.models import PoliticalStatement, Participant, Chat, Message
+from src.models import Session, Conversation, Message, SurveyResponse, LLMConfig, ExperimentConfig, PromptConfig
 
 config = context.config
 

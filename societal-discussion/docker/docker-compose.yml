@@ -4,7 +4,7 @@ services:
   db:
     image: postgres:15-alpine
     environment:
-      POSTGRES_DB: societal_discussion
+      POSTGRES_DB: vaalikeskustelu
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
@@ -22,8 +22,9 @@ services:
       context: ..
       dockerfile: docker/Dockerfile.api
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/societal_discussion
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/vaalikeskustelu
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ENCRYPTION_SECRET: ${ENCRYPTION_SECRET:-change-me}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
       CORS_ORIGINS: http://localhost:3000,http://web:3000
     ports:
@@ -32,8 +33,7 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ../apps/api/src:/app/src:ro  # For development hot reload
-      - ../data:/app/data:ro  # Dataset for import script
+      - ../apps/api/src:/app/src:ro
 
   web:
     build:

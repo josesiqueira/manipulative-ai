@@ -3,7 +3,10 @@ LLM configuration model - stores LLM provider settings and encrypted API keys.
 """
 
 import uuid
-from datetime import datetime, UTC
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+HELSINKI = ZoneInfo("Europe/Helsinki")
 
 from sqlalchemy import String, Text, DateTime, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
@@ -42,10 +45,10 @@ class LLMConfig(Base):
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(HELSINKI)
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(HELSINKI), onupdate=lambda: datetime.now(HELSINKI)
     )
 
     def __repr__(self) -> str:
