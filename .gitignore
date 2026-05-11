@@ -3,6 +3,7 @@ old_data/
 
 # Research artifacts kept locally only
 *.csv
+*.pdf
 MANIPULATIVE-AI2-SPEC.md
 System requirements - Persuasive chatbot project.docx
 
