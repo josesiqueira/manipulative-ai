@@ -1,9 +1,15 @@
 """
-Prompt configuration model - stores editable bot prompts.
+Prompt configuration model — stores editable system instruction per party.
+
+Researchers can customize how each party's bot behaves via the admin panel.
+If no config exists for a party, the hardcoded default from prompt_builder.py is used.
 """
 
 import uuid
-from datetime import datetime, UTC
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+HELSINKI = ZoneInfo("Europe/Helsinki")
 
 from sqlalchemy import String, Text, DateTime
 from sqlalchemy.orm import Mapped, mapped_column
@@ -12,37 +18,25 @@ from ..database import Base
 
 
 class PromptConfig(Base):
-    """
-    Stores editable prompt configurations for each political block.
-
-    Researchers can modify these through the admin panel without
-    changing code.
-    """
-
     __tablename__ = "prompt_configs"
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
 
-    # Political block this config is for
-    political_block: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
+    # Party identifier — one of services.party_grounding.ALL_PARTIES (9 Finnish parties)
+    party: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
 
-    # Display name
-    name_en: Mapped[str] = mapped_column(String(100), nullable=False)
-    name_fi: Mapped[str] = mapped_column(String(100), nullable=False)
-
-    # Full description/prompt for the AI
-    description_en: Mapped[str] = mapped_column(Text, nullable=False)
-    description_fi: Mapped[str] = mapped_column(Text, nullable=False)
+    # Editable system instruction text (the behavioral prompt, NOT the party program)
+    # This is the text that tells the bot how to behave. The party program is appended automatically.
+    system_instruction: Mapped[str] = mapped_column(Text, nullable=False)
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(HELSINKI)
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+        DateTime(timezone=True), nullable=False,
+        default=lambda: datetime.now(HELSINKI),
+        onupdate=lambda: datetime.now(HELSINKI),
     )
-
-    def __repr__(self) -> str:
-        return f"<PromptConfig {self.political_block}>"

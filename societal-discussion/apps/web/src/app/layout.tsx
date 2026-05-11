@@ -4,8 +4,11 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'Societal Discussion Research',
-  description: 'Participate in a research study about conversations on societal topics',
+  title: 'Vaalikeskustelu',
+  description: 'Keskustele politiikasta ja tulevista vaaleista chatbotin kanssa',
+  other: {
+    google: 'notranslate',
+  },
 };
 
 export default function RootLayout({
@@ -14,8 +17,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
+    <html lang="fi" translate="no" suppressHydrationWarning>
+      <body className={`${inter.className} notranslate`} translate="no" suppressHydrationWarning>
         {children}
       </body>
     </html>

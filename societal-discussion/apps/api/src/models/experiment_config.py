@@ -3,7 +3,10 @@ Experiment configuration model - stores experiment metadata and session rules.
 """
 
 import uuid
-from datetime import datetime, date, UTC
+from datetime import datetime, date
+from zoneinfo import ZoneInfo
+
+HELSINKI = ZoneInfo("Europe/Helsinki")
 
 from sqlalchemy import String, Text, DateTime, Date, Boolean, Integer
 from sqlalchemy.orm import Mapped, mapped_column
@@ -70,10 +73,10 @@ class ExperimentConfig(Base):
 
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(HELSINKI)
     )
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC)
+        DateTime(timezone=True), nullable=False, default=lambda: datetime.now(HELSINKI), onupdate=lambda: datetime.now(HELSINKI)
     )
 
     def __repr__(self) -> str:

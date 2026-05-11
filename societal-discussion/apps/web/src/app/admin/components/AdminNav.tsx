@@ -145,6 +145,24 @@ function IconSignOut(): ReactNode {
   );
 }
 
+function IconPlay(): ReactNode {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.75}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="w-4 h-4 shrink-0"
+      aria-hidden="true"
+    >
+      <polygon points="5 3 19 12 5 21 5 3" />
+    </svg>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Navigation item definitions
 // ---------------------------------------------------------------------------
@@ -169,6 +187,12 @@ const NAV_ITEMS: NavItem[] = [
     href: '/admin/prompts',
     label: 'Prompts',
     Icon: IconPrompt,
+    exactMatch: false,
+  },
+  {
+    href: '/admin/try-bot',
+    label: 'Try Bot',
+    Icon: IconPlay,
     exactMatch: false,
   },
   {

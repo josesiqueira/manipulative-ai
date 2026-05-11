@@ -8,19 +8,21 @@ AVAILABLE_MODELS = {
     "openai": {
         "display_name": "OpenAI",
         "models": [
-            {"id": "gpt-5.4", "name": "GPT-5.4", "recommended": True},
-            {"id": "gpt-4o", "name": "GPT-4o", "recommended": False},
-            {"id": "gpt-4.1", "name": "GPT-4.1", "recommended": False},
-            {"id": "gpt-4-turbo", "name": "GPT-4 Turbo", "recommended": False},
-            {"id": "gpt-3.5-turbo", "name": "GPT-3.5 Turbo", "recommended": False},
+            {"id": "gpt-5.4", "name": "GPT-5.4 (frontier, 1M context)", "recommended": True},
+            {"id": "gpt-5.5", "name": "GPT-5.5 (newest flagship)", "recommended": False},
+            {"id": "gpt-5.4-mini", "name": "GPT-5.4 Mini (cheap, 1M context)", "recommended": False},
+            {"id": "gpt-4.1", "name": "GPT-4.1 (1M context, no surcharge)", "recommended": False},
+            {"id": "gpt-4o", "name": "GPT-4o (128K — too small for largest party)", "recommended": False},
         ],
     },
+    # Anthropic kept as a placeholder for future use. No API key required unless
+    # a researcher activates the provider in the admin panel.
     "anthropic": {
         "display_name": "Anthropic",
         "models": [
-            {"id": "claude-sonnet-4-5-20250514", "name": "Claude Sonnet 4.5", "recommended": True},
-            {"id": "claude-opus-4-5-20250514", "name": "Claude Opus 4.5", "recommended": False},
-            {"id": "claude-haiku-3-5-20241022", "name": "Claude Haiku 3.5", "recommended": False},
+            {"id": "claude-sonnet-4-5", "name": "Claude Sonnet 4.5", "recommended": True},
+            {"id": "claude-opus-4-7", "name": "Claude Opus 4.7", "recommended": False},
+            {"id": "claude-haiku-4-5", "name": "Claude Haiku 4.5", "recommended": False},
         ],
     },
 }
