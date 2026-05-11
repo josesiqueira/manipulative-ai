@@ -1,0 +1,12 @@
+# Old manipulative-ai1 artifacts
+old_data/
+
+# Research artifacts kept locally only
+*.csv
+MANIPULATIVE-AI2-SPEC.md
+System requirements - Persuasive chatbot project.docx
+
+# OS / editor
+.DS_Store
+*.swp
+*.swo
