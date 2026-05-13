@@ -27,6 +27,9 @@ class Conversation(Base):
     assigned_party: Mapped[str] = mapped_column(
         String(50), nullable=False
     )  # one of services.party_grounding.ALL_PARTIES (9 Finnish parties)
+    language: Mapped[str] = mapped_column(
+        String(2), nullable=False, default="fi"
+    )  # 'fi' or 'en' — which language the bot should respond in
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(HELSINKI)
     )

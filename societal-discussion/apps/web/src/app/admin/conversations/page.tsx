@@ -52,8 +52,8 @@ export default function ConversationsPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Keskustelut</h1>
-        <p className="text-sm text-slate-500 mt-1">Selaa ja tarkastele keskusteluja</p>
+        <h1 className="text-xl font-semibold text-slate-900">Conversations</h1>
+        <p className="text-sm text-slate-500 mt-1">Browse and review conversations</p>
       </div>
 
       <FilterBar filters={filters} onFiltersChange={(f) => { setFilters(f); setPage(1); }} />
@@ -63,7 +63,7 @@ export default function ConversationsPage() {
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden max-h-[70vh] overflow-y-auto">
           {listLoading ? (
             <div className="flex items-center justify-center h-32">
-              <span className="text-slate-400 animate-pulse">Ladataan...</span>
+              <span className="text-slate-400 animate-pulse">Loading...</span>
             </div>
           ) : listData ? (
             <>
@@ -75,22 +75,22 @@ export default function ConversationsPage() {
               {/* Pagination */}
               {listData.total > 20 && (
                 <div className="flex items-center justify-between px-4 py-2 border-t border-slate-100 text-sm text-slate-500">
-                  <span>{listData.total} keskustelua</span>
+                  <span>{listData.total} conversations</span>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setPage((p) => Math.max(1, p - 1))}
                       disabled={page <= 1}
                       className="px-2 py-1 rounded border border-slate-300 disabled:opacity-30"
                     >
-                      Edellinen
+                      Previous
                     </button>
-                    <span className="px-2 py-1">Sivu {page}</span>
+                    <span className="px-2 py-1">Page {page}</span>
                     <button
                       onClick={() => setPage((p) => p + 1)}
                       disabled={listData.conversations.length < 20}
                       className="px-2 py-1 rounded border border-slate-300 disabled:opacity-30"
                     >
-                      Seuraava
+                      Next
                     </button>
                   </div>
                 </div>
@@ -103,13 +103,13 @@ export default function ConversationsPage() {
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 max-h-[70vh] overflow-y-auto">
           {detailLoading ? (
             <div className="flex items-center justify-center h-32">
-              <span className="text-slate-400 animate-pulse">Ladataan...</span>
+              <span className="text-slate-400 animate-pulse">Loading...</span>
             </div>
           ) : detail ? (
             <ConversationDetail conversation={detail} />
           ) : (
             <div className="flex items-center justify-center h-32 text-slate-400">
-              Valitse keskustelu listasta
+              Select a conversation from the list
             </div>
           )}
         </div>

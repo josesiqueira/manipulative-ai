@@ -73,21 +73,21 @@ export default function PromptsPage() {
         body: JSON.stringify({ system_instruction: editText }),
       });
       if (res.ok) {
-        setMessage({ type: 'success', text: 'Tallennettu!' });
+        setMessage({ type: 'success', text: 'Saved!' });
         setEditingParty(null);
         await fetchPrompts();
       } else {
-        setMessage({ type: 'error', text: 'Tallennus epäonnistui.' });
+        setMessage({ type: 'error', text: 'Save failed.' });
       }
     } catch {
-      setMessage({ type: 'error', text: 'Yhteysvirhe.' });
+      setMessage({ type: 'error', text: 'Connection error.' });
     } finally {
       setSaving(false);
     }
   };
 
   const resetPrompt = async (party: string) => {
-    if (!confirm('Palauta oletusprompt? Mukautettu teksti poistetaan.')) return;
+    if (!confirm('Restore the default prompt? The custom text will be deleted.')) return;
     setSaving(true);
     try {
       const res = await fetch(`${API_BASE}/api/admin/prompts/${party}`, {
@@ -95,12 +95,12 @@ export default function PromptsPage() {
         headers: { 'X-Admin-Password': password },
       });
       if (res.ok) {
-        setMessage({ type: 'success', text: 'Palautettu oletuksiin.' });
+        setMessage({ type: 'success', text: 'Restored to default.' });
         setEditingParty(null);
         await fetchPrompts();
       }
     } catch {
-      setMessage({ type: 'error', text: 'Palautus epäonnistui.' });
+      setMessage({ type: 'error', text: 'Restore failed.' });
     } finally {
       setSaving(false);
     }
@@ -109,7 +109,7 @@ export default function PromptsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <span className="text-slate-400 animate-pulse">Ladataan...</span>
+        <span className="text-slate-400 animate-pulse">Loading...</span>
       </div>
     );
   }
@@ -117,10 +117,10 @@ export default function PromptsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-slate-900">Promptit</h1>
+        <h1 className="text-xl font-semibold text-slate-900">Prompts</h1>
         <p className="text-sm text-slate-500 mt-1">
-          Muokkaa kunkin puolueen chatbotin käyttäytymisohjeita. Puolueohjelmateksti
-          liitetään automaattisesti ohjeiden perään.
+          Edit the chatbot&apos;s behavior instructions for each party. The party program text is
+          automatically appended after these instructions.
         </p>
       </div>
 
@@ -153,9 +153,9 @@ export default function PromptsPage() {
                   </span>
                   <span className="text-xs text-slate-400">
                     {prompt.source === 'database' ? (
-                      <>Mukautettu · {prompt.updated_at ? new Date(prompt.updated_at).toLocaleDateString('fi-FI') : ''}</>
+                      <>Custom · {prompt.updated_at ? new Date(prompt.updated_at).toLocaleDateString('en-US') : ''}</>
                     ) : (
-                      'Oletus'
+                      'Default'
                     )}
                   </span>
                 </div>
@@ -165,7 +165,7 @@ export default function PromptsPage() {
                       onClick={() => startEditing(prompt)}
                       className="px-3 py-1.5 text-sm rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors"
                     >
-                      Muokkaa
+                      Edit
                     </button>
                   ) : (
                     <>
@@ -174,21 +174,21 @@ export default function PromptsPage() {
                         disabled={saving || prompt.source === 'default'}
                         className="px-3 py-1.5 text-sm rounded-lg border border-red-300 text-red-600 hover:bg-red-50 transition-colors disabled:opacity-30"
                       >
-                        Palauta oletus
+                        Restore default
                       </button>
                       <button
                         onClick={cancelEditing}
                         disabled={saving}
                         className="px-3 py-1.5 text-sm rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors"
                       >
-                        Peruuta
+                        Cancel
                       </button>
                       <button
                         onClick={() => savePrompt(prompt.party)}
                         disabled={saving}
                         className="px-3 py-1.5 text-sm rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
                       >
-                        {saving ? 'Tallennetaan...' : 'Tallenna'}
+                        {saving ? 'Saving...' : 'Save'}
                       </button>
                     </>
                   )}
@@ -203,7 +203,7 @@ export default function PromptsPage() {
                     onChange={(e) => setEditText(e.target.value)}
                     rows={16}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-800 font-mono focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent"
-                    placeholder="Syötä järjestelmäohje..."
+                    placeholder="Enter the system instruction..."
                   />
                 ) : (
                   <pre className="text-sm text-slate-700 whitespace-pre-wrap font-mono bg-slate-50 rounded-lg p-4 max-h-48 overflow-y-auto">
@@ -211,7 +211,7 @@ export default function PromptsPage() {
                   </pre>
                 )}
                 <p className="text-xs text-slate-400 mt-3">
-                  Puolueohjelman teksti liitetään automaattisesti tämän ohjeen perään.
+                  The party program text is automatically appended after this instruction.
                 </p>
               </div>
             </div>

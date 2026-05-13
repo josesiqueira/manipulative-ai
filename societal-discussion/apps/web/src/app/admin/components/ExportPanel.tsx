@@ -105,13 +105,13 @@ export default function ExportPanel({ password }: ExportPanelProps) {
       {/* Filter row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Party */}
-        <Field label="Puolue">
+        <Field label="Party">
           <select
             value={filters.assigned_party ?? ''}
             onChange={(e) => setFilter('assigned_party', e.target.value)}
             className={SELECT_CLS}
           >
-            <option value="">Kaikki puolueet</option>
+            <option value="">All parties</option>
             {PARTIES.map((p) => (
               <option key={p} value={p}>
                 {PARTY_DISPLAY_NAMES[p]}
@@ -121,7 +121,7 @@ export default function ExportPanel({ password }: ExportPanelProps) {
         </Field>
 
         {/* Date from */}
-        <Field label="Alkaen">
+        <Field label="From">
           <input
             type="date"
             value={filters.date_from ?? ''}
@@ -131,7 +131,7 @@ export default function ExportPanel({ password }: ExportPanelProps) {
         </Field>
 
         {/* Date to */}
-        <Field label="Asti">
+        <Field label="To">
           <input
             type="date"
             value={filters.date_to ?? ''}
@@ -142,7 +142,7 @@ export default function ExportPanel({ password }: ExportPanelProps) {
       </div>
 
       {/* Format selector */}
-      <Field label="Formaatti">
+      <Field label="Format">
         <div className="flex gap-4">
           {(['csv', 'json', 'text'] as const).map((f) => (
             <label key={f} className="flex items-center gap-2 cursor-pointer">
@@ -155,7 +155,7 @@ export default function ExportPanel({ password }: ExportPanelProps) {
                 className="accent-blue-600"
               />
               <span className="text-sm text-slate-700">
-                {f === 'csv' ? 'CSV' : f === 'json' ? 'JSON' : 'Teksti (ZIP)'}
+                {f === 'csv' ? 'CSV' : f === 'json' ? 'JSON' : 'Text (ZIP)'}
               </span>
             </label>
           ))}
@@ -179,13 +179,13 @@ export default function ExportPanel({ password }: ExportPanelProps) {
                      text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed
                      focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
         >
-          {previewing ? 'Lasketaan...' : 'Esikatsele maara'}
+          {previewing ? 'Calculating...' : 'Preview count'}
         </button>
 
         {previewCount !== null && (
           <span className="text-sm text-slate-600">
             <span className="font-semibold text-slate-900">{previewCount}</span>
-            {' '}keskustelua vastaa suodattimia
+            {' '}conversations match the filters
           </span>
         )}
 
@@ -200,7 +200,7 @@ export default function ExportPanel({ password }: ExportPanelProps) {
                      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1
                      transition-colors"
         >
-          {exporting ? 'Ladataan...' : 'Lataa'}
+          {exporting ? 'Downloading...' : 'Download'}
         </button>
       </div>
     </div>

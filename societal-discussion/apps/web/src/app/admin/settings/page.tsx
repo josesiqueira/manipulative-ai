@@ -127,7 +127,7 @@ function ExperimentSection() {
     }
   }
 
-  if (loading) return <p className="text-sm text-slate-400">Ladataan...</p>;
+  if (loading) return <p className="text-sm text-slate-400">Loading...</p>;
   if (!config) return <p className="text-sm text-red-500">{error ?? 'Failed to load'}</p>;
 
   return (
@@ -135,7 +135,7 @@ function ExperimentSection() {
       {/* Bilingual names */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className={labelClass}>Kokeilun nimi (EN)</label>
+          <label className={labelClass}>Experiment name (EN)</label>
           <input
             type="text"
             className={inputClass}
@@ -144,7 +144,7 @@ function ExperimentSection() {
           />
         </div>
         <div>
-          <label className={labelClass}>Kokeilun nimi (FI)</label>
+          <label className={labelClass}>Experiment name (FI)</label>
           <input
             type="text"
             className={inputClass}
@@ -153,7 +153,7 @@ function ExperimentSection() {
           />
         </div>
         <div>
-          <label className={labelClass}>Instituutio (EN)</label>
+          <label className={labelClass}>Institution (EN)</label>
           <input
             type="text"
             className={inputClass}
@@ -162,7 +162,7 @@ function ExperimentSection() {
           />
         </div>
         <div>
-          <label className={labelClass}>Instituutio (FI)</label>
+          <label className={labelClass}>Institution (FI)</label>
           <input
             type="text"
             className={inputClass}
@@ -175,7 +175,7 @@ function ExperimentSection() {
       {/* Principal investigator */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className={labelClass}>Vastuullinen tutkija</label>
+          <label className={labelClass}>Principal investigator</label>
           <input
             type="text"
             className={inputClass}
@@ -184,7 +184,7 @@ function ExperimentSection() {
           />
         </div>
         <div>
-          <label className={labelClass}>Tutkijan sähköposti</label>
+          <label className={labelClass}>Researcher email</label>
           <input
             type="email"
             className={inputClass}
@@ -197,7 +197,7 @@ function ExperimentSection() {
       {/* Ethics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className={labelClass}>Eettinen toimikunta</label>
+          <label className={labelClass}>Ethics committee</label>
           <input
             type="text"
             className={inputClass}
@@ -206,7 +206,7 @@ function ExperimentSection() {
           />
         </div>
         <div>
-          <label className={labelClass}>Eettisen arvion viitenumero</label>
+          <label className={labelClass}>Ethics review reference number</label>
           <input
             type="text"
             className={inputClass}
@@ -219,7 +219,7 @@ function ExperimentSection() {
       {/* Dates */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className={labelClass}>Alkamispäivä</label>
+          <label className={labelClass}>Start date</label>
           <input
             type="date"
             className={inputClass}
@@ -228,7 +228,7 @@ function ExperimentSection() {
           />
         </div>
         <div>
-          <label className={labelClass}>Päättymispäivä</label>
+          <label className={labelClass}>End date</label>
           <input
             type="date"
             className={inputClass}
@@ -241,7 +241,7 @@ function ExperimentSection() {
       {/* Operational limits */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
-          <label className={labelClass}>Vähimmäisviestit ennen kyselyä</label>
+          <label className={labelClass}>Minimum messages before survey</label>
           <input
             type="number"
             min={0}
@@ -251,7 +251,7 @@ function ExperimentSection() {
           />
         </div>
         <div>
-          <label className={labelClass}>Enimmäisviestit per keskustelu</label>
+          <label className={labelClass}>Maximum messages per conversation</label>
           <input
             type="number"
             min={0}
@@ -263,7 +263,7 @@ function ExperimentSection() {
           />
         </div>
         <div>
-          <label className={labelClass}>Aikakatkaisu (minuuttia)</label>
+          <label className={labelClass}>Idle timeout (minutes)</label>
           <input
             type="number"
             min={0}
@@ -284,12 +284,12 @@ function ExperimentSection() {
           onChange={(e) => update('is_active', e.target.checked)}
           className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
         />
-        <span className="text-sm font-medium text-slate-700">Kokeilu aktiivinen</span>
+        <span className="text-sm font-medium text-slate-700">Experiment active</span>
       </label>
 
       <div className="flex items-center gap-3">
         <SaveButton isLoading={saving} onClick={save} />
-        {success && <span className="text-sm text-green-600">Tallennettu</span>}
+        {success && <span className="text-sm text-green-600">Saved</span>}
         {error && <span className="text-sm text-red-500">{error}</span>}
       </div>
     </div>
@@ -356,20 +356,20 @@ function LLMProviderRow({
             onChange={() => onSetActive(config.provider)}
             className="w-4 h-4 border-slate-300 text-blue-600 focus:ring-blue-500"
           />
-          <span className="text-sm text-slate-600">Aktiivinen</span>
+          <span className="text-sm text-slate-600">Active</span>
         </label>
       </div>
 
       {/* Model selector */}
       {providerModels.length > 0 && (
         <div>
-          <label className={labelClass}>Malli</label>
+          <label className={labelClass}>Model</label>
           <select
             className={inputClass}
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
           >
-            <option value="">— valitse malli —</option>
+            <option value="">— select a model —</option>
             {providerModels.map((m) => (
               <option key={m.id} value={m.id}>
                 {m.name}
@@ -382,17 +382,17 @@ function LLMProviderRow({
       {/* API key input */}
       <div>
         <label className={labelClass}>
-          API-avain{' '}
+          API key{' '}
           {config.has_key && (
             <span className="font-mono text-xs text-slate-400">
-              (nykyinen: {config.api_key_preview})
+              (current: {config.api_key_preview})
             </span>
           )}
         </label>
         <input
           type="password"
           className={inputClass}
-          placeholder={config.has_key ? 'Jätä tyhjäksi säilyttääksesi nykyisen' : 'Syötä API-avain'}
+          placeholder={config.has_key ? 'Leave blank to keep the current key' : 'Enter API key'}
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
           autoComplete="new-password"
@@ -401,7 +401,7 @@ function LLMProviderRow({
 
       <div className="flex items-center gap-3">
         <SaveButton isLoading={saving} onClick={save} />
-        {success && <span className="text-sm text-green-600">Tallennettu</span>}
+        {success && <span className="text-sm text-green-600">Saved</span>}
         {error && <span className="text-sm text-red-500">{error}</span>}
       </div>
     </div>
@@ -439,7 +439,7 @@ function LLMSection() {
     }
   }
 
-  if (loading) return <p className="text-sm text-slate-400">Ladataan...</p>;
+  if (loading) return <p className="text-sm text-slate-400">Loading...</p>;
   if (error) return <p className="text-sm text-red-500">{error}</p>;
 
   return (
@@ -466,16 +466,16 @@ function LLMSection() {
 export default function SettingsPage() {
   return (
     <div className="max-w-3xl">
-      <h1 className="text-xl font-semibold text-slate-900">Asetukset</h1>
+      <h1 className="text-xl font-semibold text-slate-900">Settings</h1>
       <p className="text-sm text-slate-500 mt-1 mb-8">
-        Kokeilun asetukset ja LLM-palvelimen konfigurointi.
+        Experiment settings and LLM provider configuration.
       </p>
 
       {/* Section 1 */}
       <section>
-        <h2 className="text-lg font-semibold text-slate-900">Kokeilun asetukset</h2>
+        <h2 className="text-lg font-semibold text-slate-900">Experiment settings</h2>
         <p className="text-sm text-slate-500 mt-0.5 mb-4">
-          Metatiedot, toiminnalliset rajat ja kokeilun aktiivisuus.
+          Metadata, operational limits, and experiment activity status.
         </p>
         <ExperimentSection />
       </section>
@@ -484,10 +484,10 @@ export default function SettingsPage() {
 
       {/* Section 2 */}
       <section>
-        <h2 className="text-lg font-semibold text-slate-900">LLM-palvelin</h2>
+        <h2 className="text-lg font-semibold text-slate-900">LLM provider</h2>
         <p className="text-sm text-slate-500 mt-0.5 mb-4">
-          Aseta API-avaimet, valitse mallit ja valitse aktiivinen palveluntarjoaja.
-          Vain yksi palveluntarjoaja voi olla aktiivinen kerrallaan.
+          Set API keys, select models, and choose the active provider.
+          Only one provider can be active at a time.
         </p>
         <LLMSection />
       </section>

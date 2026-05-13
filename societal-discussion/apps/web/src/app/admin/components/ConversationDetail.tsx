@@ -18,21 +18,21 @@ export default function ConversationDetail({ conversation }: ConversationDetailP
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm text-slate-600">
           <div>
-            <span className="font-medium">Aloitus:</span>{' '}
-            {new Date(conversation.started_at).toLocaleString('fi-FI')}
+            <span className="font-medium">Started:</span>{' '}
+            {new Date(conversation.started_at).toLocaleString('en-US')}
           </div>
           {conversation.ended_at && (
             <div>
-              <span className="font-medium">Lopetus:</span>{' '}
-              {new Date(conversation.ended_at).toLocaleString('fi-FI')}
+              <span className="font-medium">Ended:</span>{' '}
+              {new Date(conversation.ended_at).toLocaleString('en-US')}
             </div>
           )}
           <div>
-            <span className="font-medium">Aihe:</span>{' '}
-            {conversation.starter_topic || 'Vapaa keskustelu'}
+            <span className="font-medium">Topic:</span>{' '}
+            {conversation.starter_topic || 'Free conversation'}
           </div>
           <div>
-            <span className="font-medium">Viesteja:</span>{' '}
+            <span className="font-medium">Messages:</span>{' '}
             {conversation.messages.length}
           </div>
         </div>
@@ -51,10 +51,10 @@ export default function ConversationDetail({ conversation }: ConversationDetailP
           >
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-slate-500">
-                {msg.role === 'user' ? 'Kayttaja' : 'Chatbot'}
+                {msg.role === 'user' ? 'User' : 'Chatbot'}
               </span>
               <span className="text-xs text-slate-400">
-                {new Date(msg.created_at).toLocaleTimeString('fi-FI')}
+                {new Date(msg.created_at).toLocaleTimeString('en-US')}
                 {msg.token_count ? ` · ${msg.token_count} tokens` : ''}
               </span>
             </div>

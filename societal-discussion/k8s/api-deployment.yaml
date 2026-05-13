@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: api
-  namespace: bilingual-chatbot-experiment
+  namespace: manipulative-ai-2
   labels:
     app: api
 spec:
@@ -17,27 +17,21 @@ spec:
     spec:
       containers:
         - name: api
-          image: image-registry.apps.2.rahti.csc.fi/bilingual-chatbot-experiment/api:latest
+          image: image-registry.apps.2.rahti.csc.fi/manipulative-ai-2/api:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
               protocol: TCP
           env:
             - name: DATABASE_URL
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: DATABASE_URL
+              value: "sqlite+aiosqlite:////data/societal_discussion.db"
+            - name: CORS_ORIGINS
+              value: "https://vaalikeskustelu.2.rahtiapp.fi,https://api-vaalikeskustelu.2.rahtiapp.fi"
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: app-secrets
                   key: OPENAI_API_KEY
-            - name: ANTHROPIC_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: ANTHROPIC_API_KEY
             - name: ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -48,24 +42,29 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: ENCRYPTION_SECRET
-            - name: CORS_ORIGINS
-              value: "https://web-bilingual-chatbot-experiment.2.rahtiapp.fi,https://api-bilingual-chatbot-experiment.2.rahtiapp.fi"
+          volumeMounts:
+            - name: sqlite-data
+              mountPath: /data
           resources:
             requests:
-              memory: "256Mi"
-              cpu: "100m"
-            limits:
               memory: "512Mi"
-              cpu: "500m"
+              cpu: "200m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
           readinessProbe:
             httpGet:
               path: /api/health
               port: 8080
-            initialDelaySeconds: 10
+            initialDelaySeconds: 15
             periodSeconds: 5
           livenessProbe:
             httpGet:
               path: /api/health
               port: 8080
-            initialDelaySeconds: 15
+            initialDelaySeconds: 30
             periodSeconds: 10
+      volumes:
+        - name: sqlite-data
+          persistentVolumeClaim:
+            claimName: sqlite-data

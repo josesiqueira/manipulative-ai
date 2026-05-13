@@ -40,7 +40,7 @@ export default function DashboardPage() {
   if (loading || !stats) {
     return (
       <div className="flex items-center justify-center h-64">
-        <span className="text-slate-400 animate-pulse">Ladataan...</span>
+        <span className="text-slate-400 animate-pulse">Loading...</span>
       </div>
     );
   }
@@ -56,23 +56,23 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Dashboard</h1>
-        <p className="text-sm text-slate-500 mt-1">Kokeilu yleiskatsaus</p>
+        <p className="text-sm text-slate-500 mt-1">Experiment overview</p>
       </div>
 
       {/* Metric cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-        <MetricCard label="Sessiot" value={stats.total_sessions} />
-        <MetricCard label="Keskustelut" value={stats.total_conversations} />
-        <MetricCard label="Valmiit" value={stats.completed_conversations} />
-        <MetricCard label="Viestit" value={stats.total_messages} />
-        <MetricCard label="Kyselyt" value={stats.total_surveys} />
+        <MetricCard label="Sessions" value={stats.total_sessions} />
+        <MetricCard label="Conversations" value={stats.total_conversations} />
+        <MetricCard label="Completed" value={stats.completed_conversations} />
+        <MetricCard label="Messages" value={stats.total_messages} />
+        <MetricCard label="Surveys" value={stats.total_surveys} />
       </div>
 
       {/* Conversations by party chart */}
       {partyChartData.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
           <h2 className="text-base font-semibold text-slate-900 mb-4">
-            Keskustelut puolueittain
+            Conversations by party
           </h2>
           <AdminBarChart
             data={partyChartData}

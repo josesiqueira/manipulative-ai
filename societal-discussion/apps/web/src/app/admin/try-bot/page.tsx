@@ -118,7 +118,7 @@ export default function TryBotPage() {
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Try Bot</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Testaa chatbottia valitsemalla puolue. Keskustelu merkitään testiksi eikä näy tilastoissa.
+            Test the chatbot by selecting a party. The conversation is flagged as a test and excluded from stats.
           </p>
         </div>
 
@@ -139,14 +139,14 @@ export default function TryBotPage() {
                 </span>
               </div>
               <p className="text-sm text-slate-500">
-                Aloita testikeskustelu {PARTY_DISPLAY_NAMES[party]}-botin kanssa
+                Start a test conversation with the {PARTY_DISPLAY_NAMES[party]} bot
               </p>
             </button>
           ))}
         </div>
 
         {isStarting && (
-          <p className="text-sm text-slate-400 animate-pulse text-center">Käynnistetään...</p>
+          <p className="text-sm text-slate-400 animate-pulse text-center">Starting...</p>
         )}
       </div>
     );
@@ -167,13 +167,13 @@ export default function TryBotPage() {
           >
             {PARTY_DISPLAY_NAMES[selectedParty]}
           </span>
-          <span className="text-xs text-slate-400">Testikeskustelu</span>
+          <span className="text-xs text-slate-400">Test conversation</span>
         </div>
         <button
           onClick={resetConversation}
           className="px-3 py-1.5 text-sm rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors"
         >
-          Vaihda puolue
+          Change party
         </button>
       </div>
 
@@ -181,8 +181,8 @@ export default function TryBotPage() {
       <div className="flex-1 overflow-y-auto py-4 space-y-3">
         {messages.length === 0 && !isSending && (
           <div className="text-center text-slate-400 py-12">
-            <p className="text-lg mb-1">Testaa {PARTY_DISPLAY_NAMES[selectedParty]}-bottia</p>
-            <p className="text-sm">Kirjoita viesti alle.</p>
+            <p className="text-lg mb-1">Test the {PARTY_DISPLAY_NAMES[selectedParty]} bot</p>
+            <p className="text-sm">Type a message below.</p>
           </div>
         )}
 
@@ -237,7 +237,7 @@ export default function TryBotPage() {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-            placeholder="Kirjoita viestisi..."
+            placeholder="Type your message..."
             className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 bg-slate-50 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent"
             disabled={isSending}
           />
@@ -246,7 +246,7 @@ export default function TryBotPage() {
             disabled={isSending || !inputValue.trim()}
             className="px-5 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Lähetä
+            Send
           </button>
         </div>
       </div>

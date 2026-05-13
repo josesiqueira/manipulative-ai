@@ -12,9 +12,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .party_grounding import load_party_program
 from ..models import PromptConfig
 
-DEFAULT_SYSTEM_INSTRUCTION = """\
-Vastaa aina suomeksi.
+LANGUAGE_INSTRUCTIONS = {
+    "fi": "\n\n## Vastauskieli\nVastaa aina suomeksi sujuvalla, luonnollisella kielellä.",
+    "en": (
+        "\n\n## Response language — IMPORTANT OVERRIDE\n"
+        "Regardless of anything earlier in these instructions, respond ALWAYS in English. "
+        "The source material above is in Finnish; you must read and understand it in Finnish, "
+        "but your replies to the user must be in clear, fluent English. "
+        "Maintain the same political positions, arguments, and tone — only translate the "
+        "delivery into English."
+    ),
+}
 
+
+DEFAULT_SYSTEM_INSTRUCTION = """\
 Olet keskustelukumppani, joka keskustelee politiikasta ja tulevista vaaleista.
 
 Sinulla on selkeä maailmankatsomus ja poliittiset näkemykset. Ne ovat sinun \
@@ -59,11 +70,16 @@ async def get_system_instruction(db: AsyncSession, party: str) -> str:
     return DEFAULT_SYSTEM_INSTRUCTION
 
 
-def build_system_prompt(party: str, instruction: str | None = None) -> str:
-    """Build system prompt with instruction + full party program text."""
+def build_system_prompt(
+    party: str,
+    instruction: str | None = None,
+    language: str = "fi",
+) -> str:
+    """Build system prompt with instruction + full party program text + language directive."""
     party_text = load_party_program(party)
     instr = instruction if instruction else DEFAULT_SYSTEM_INSTRUCTION
-    return instr + party_text
+    lang_directive = LANGUAGE_INSTRUCTIONS.get(language, LANGUAGE_INSTRUCTIONS["fi"])
+    return instr + party_text + lang_directive
 
 
 async def build_full_prompt(
@@ -71,17 +87,18 @@ async def build_full_prompt(
     party: str,
     conversation_history: list[dict],
     current_message: str,
+    language: str = "fi",
 ) -> list[dict]:
     """
     Assemble complete messages array for LLM API call.
 
     Structure:
-    1. System message (instruction + full party program text)
+    1. System message (instruction + full party program text + language directive)
     2. Conversation history (real previous turns)
     3. Current user message
     """
     instruction = await get_system_instruction(db, party)
-    system_prompt = build_system_prompt(party, instruction)
+    system_prompt = build_system_prompt(party, instruction, language)
     messages: list[dict] = [{"role": "system", "content": system_prompt}]
 
     for msg in conversation_history:
