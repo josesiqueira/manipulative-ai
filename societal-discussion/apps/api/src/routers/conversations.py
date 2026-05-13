@@ -10,12 +10,13 @@ from zoneinfo import ZoneInfo
 
 HELSINKI = ZoneInfo("Europe/Helsinki")
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from ..config import get_settings
 from ..database import get_db
 from ..models import Session, Conversation, Message
 from ..services.party_assignment import assign_party
@@ -23,6 +24,37 @@ from ..services.llm_client import generate_response
 from ..services.conversation_logger import save_conversation_log
 
 router = APIRouter()
+
+
+def _expected_participant_password() -> str:
+    """Effective participant password: dedicated env var or fall back to admin_password."""
+    s = get_settings()
+    return s.participant_password or s.admin_password
+
+
+def verify_participant_password(
+    x_participant_password: str | None = Header(default=None, alias="X-Participant-Password"),
+) -> bool:
+    """Gate every new conversation behind an access code.
+
+    Without this check, anyone with the public URL could create conversations
+    and burn OpenAI budget. The code lives in PARTICIPANT_PASSWORD (or falls
+    back to ADMIN_PASSWORD) and is sent as the X-Participant-Password header
+    by the landing-page access modal.
+    """
+    expected = _expected_participant_password()
+    if not expected:
+        # Misconfigured deployment: fail closed.
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Participant access not configured",
+        )
+    if x_participant_password != expected:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid access code",
+        )
+    return True
 
 
 class ConversationCreate(BaseModel):
@@ -69,6 +101,7 @@ class MessageResponse(BaseModel):
 async def create_conversation(
     data: ConversationCreate,
     db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_participant_password),
 ):
     """
     Start a new conversation.

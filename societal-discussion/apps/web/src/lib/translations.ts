@@ -43,6 +43,15 @@ export interface UIStrings {
     title: string;
     description: string;
   };
+  accessGate: {
+    title: string;
+    hint: string;
+    placeholder: string;
+    continueBtn: string;
+    cancelBtn: string;
+    wrongCode: string;
+    networkError: string;
+  };
   survey: {
     pageTitle: string;
     pageSubtitle: string;
@@ -114,6 +123,15 @@ const fi: UIStrings = {
   thankYou: {
     title: 'Kiitos osallistumisesta!',
     description: 'Vastauksesi on tallennettu. Voit nyt sulkea tämän sivun.',
+  },
+  accessGate: {
+    title: 'Anna pääsykoodi',
+    hint: 'Tämä tutkimus on vain kutsuttaville. Anna tutkijalta saamasi koodi aloittaaksesi keskustelun.',
+    placeholder: 'Pääsykoodi',
+    continueBtn: 'Jatka',
+    cancelBtn: 'Peruuta',
+    wrongCode: 'Väärä pääsykoodi. Tarkista koodi ja yritä uudelleen.',
+    networkError: 'Yhteysvirhe. Yritä uudelleen.',
   },
   survey: {
     pageTitle: 'Kysely',
@@ -262,6 +280,15 @@ const en: UIStrings = {
   thankYou: {
     title: 'Thank you for participating!',
     description: 'Your responses have been recorded. You can now close this page.',
+  },
+  accessGate: {
+    title: 'Enter access code',
+    hint: 'This study is invitation-only. Please enter the code provided by the researcher to start a conversation.',
+    placeholder: 'Access code',
+    continueBtn: 'Continue',
+    cancelBtn: 'Cancel',
+    wrongCode: 'Wrong access code. Check the code and try again.',
+    networkError: 'Network error. Please try again.',
   },
   survey: {
     pageTitle: 'Survey',

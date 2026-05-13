@@ -180,7 +180,30 @@ export default function ConversationsPage() {
               <span className="text-slate-400 animate-pulse">Loading...</span>
             </div>
           ) : detail ? (
-            <ConversationDetail conversation={detail} />
+            <ConversationDetail
+              conversation={detail}
+              onFlagChange={(id, isFlagged, flagNotes) => {
+                // Update list + detail state in lockstep so the row badge
+                // disappears immediately when the flag is removed.
+                setListData((prev) =>
+                  prev
+                    ? {
+                        ...prev,
+                        conversations: prev.conversations.map((c) =>
+                          c.id === id
+                            ? { ...c, is_flagged: isFlagged, flag_notes: flagNotes }
+                            : c,
+                        ),
+                      }
+                    : prev,
+                );
+                setDetail((prev) =>
+                  prev && prev.id === id
+                    ? { ...prev, is_flagged: isFlagged, flag_notes: flagNotes }
+                    : prev,
+                );
+              }}
+            />
           ) : (
             <div className="flex items-center justify-center h-32 text-slate-400">
               Select a conversation from the list
