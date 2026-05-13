@@ -10,6 +10,7 @@ export interface ConversationListItem {
   message_count: number;
   is_complete: boolean;
   is_test_mode: boolean;
+  is_test_saved: boolean;
   is_flagged: boolean;
   flag_notes: string | null;
 }
@@ -40,6 +41,7 @@ export interface ConversationDetailResponse {
   ended_at: string | null;
   is_complete: boolean;
   is_test_mode: boolean;
+  is_test_saved: boolean;
   is_flagged: boolean;
   flag_notes: string | null;
   messages: MessageDetail[];
@@ -55,7 +57,11 @@ export interface StatsResponse {
   total_surveys: number;
   completion_rate: number;          // 0..1, multiply by 100 for display
   conversations_today: number;
+  conversations_yesterday: number;
   flagged_count: number;
+  conversations_fi: number;
+  conversations_en: number;
+  test_conversations_saved: number;
 }
 
 // Daily breakdown — GET /api/admin/stats/daily?days=7

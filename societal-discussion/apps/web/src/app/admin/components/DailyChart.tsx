@@ -1,16 +1,20 @@
 'use client';
 
 /**
- * DailyChart — HTML/Tailwind stacked-bar chart of the last 7 days of
- * conversation counts, split per party.
+ * DailyChart — horizontal-row layout for the daily breakdown of conversations.
  *
- * Intentionally no charting library: every "bar" is a vertical flex column
- * of coloured <div>s whose heights are proportional to the party's share of
- * that day's total, and the day's total share of the maximum-day total.
+ * Why horizontal rows instead of vertical stacked bars?
+ *   - Research data is sparse: most days will be empty for the first weeks.
+ *     Vertical stacked bars look "broken" when 6 of 7 days are zero.
+ *   - Horizontal rows give each day its own clearly labelled line, even when
+ *     empty. The eye sees days-of-week down the left, totals down the right.
+ *   - Party segments inside the bar get the horizontal width axis (more space)
+ *     rather than being squashed into tiny vertical slices.
+ *   - Empty days are obvious because the row still exists (with a 0 on the
+ *     right and a faint dashed track) rather than being invisible.
  *
- * The component is purely presentational — fetching and shape normalisation
- * happen upstream.  A sparse `by_party` map (parties with 0 omitted) is fine;
- * we iterate the canonical PARTIES list for stable ordering and colour.
+ * Summary stats at the top tell the researcher at a glance what they need:
+ *   total over the window, average per day, active days, and the busiest day.
  */
 
 import type { DailyStatsResponse } from '../lib/types';
@@ -20,11 +24,19 @@ interface DailyChartProps {
   data: DailyStatsResponse;
 }
 
-function formatDayLabel(iso: string): string {
-  // iso is YYYY-MM-DD; render as DD/MM without any locale dependency.
+function formatRowLabel(iso: string, todayIso: string, yesterdayIso: string): string {
+  if (iso === todayIso) return 'Today';
+  if (iso === yesterdayIso) return 'Yesterday';
   const parts = iso.split('-');
   if (parts.length !== 3) return iso;
-  return `${parts[2]}/${parts[1]}`;
+  // Render as "Mon 12/5" — short weekday + date.
+  const date = new Date(`${iso}T12:00:00`);
+  const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
+  return `${weekday} ${parts[2]}/${parts[1]}`;
+}
+
+function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
 }
 
 export default function DailyChart({ data }: DailyChartProps) {
@@ -38,47 +50,105 @@ export default function DailyChart({ data }: DailyChartProps) {
     );
   }
 
-  // Max total across the visible window controls the bar-height scale so the
-  // tallest day always reaches ~100% and the rest are proportional.
+  // Summary stats
+  const total = days.reduce((sum, d) => sum + d.total, 0);
+  const activeDays = days.filter((d) => d.total > 0).length;
+  const avg = days.length > 0 ? total / days.length : 0;
+  const busiest = days.reduce(
+    (best, d) => (d.total > best.total ? d : best),
+    days[0],
+  );
+
   const maxTotal = Math.max(1, ...days.map((d) => d.total));
 
-  // Parties that actually appear on any day, in canonical order — used for
-  // the legend so we don't show colours that never appear.
+  // "Today" and "Yesterday" labels based on the user's local time so they
+  // match the API's Helsinki definition closely enough for a tablet view.
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const todayIso = isoDate(today);
+  const yesterdayIso = isoDate(yesterday);
+
   const activeParties = PARTIES.filter((p) =>
     days.some((d) => (d.by_party?.[p] ?? 0) > 0),
   );
 
   return (
     <div>
-      {/* Bars row */}
-      <div
-        className="flex items-end gap-3 h-56"
-        role="img"
-        aria-label="Conversations per day for the last 7 days, stacked by party"
-      >
-        {days.map((day) => {
-          const heightPct = (day.total / maxTotal) * 100;
-          const safeHeight = Math.max(heightPct, day.total > 0 ? 4 : 1);
+      {/* Summary strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5 text-sm">
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-slate-500 font-medium">
+            Total in window
+          </p>
+          <p className="text-xl font-semibold text-slate-900 tabular-nums">
+            {total}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-slate-500 font-medium">
+            Average / day
+          </p>
+          <p className="text-xl font-semibold text-slate-900 tabular-nums">
+            {avg.toFixed(1)}
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-slate-500 font-medium">
+            Active days
+          </p>
+          <p className="text-xl font-semibold text-slate-900 tabular-nums">
+            {activeDays}
+            <span className="text-slate-400 text-sm font-normal ml-1">
+              of {days.length}
+            </span>
+          </p>
+        </div>
+        <div>
+          <p className="text-[10px] uppercase tracking-wide text-slate-500 font-medium">
+            Busiest day
+          </p>
+          <p className="text-sm font-medium text-slate-900 tabular-nums truncate">
+            {busiest.total > 0
+              ? `${formatRowLabel(busiest.date, todayIso, yesterdayIso)} (${busiest.total})`
+              : 'none yet'}
+          </p>
+        </div>
+      </div>
 
+      {/* Day rows */}
+      <div className="space-y-1.5">
+        {days.map((day) => {
+          const widthPct = (day.total / maxTotal) * 100;
+          const isToday = day.date === todayIso;
+          const rowLabel = formatRowLabel(day.date, todayIso, yesterdayIso);
           return (
             <div
               key={day.date}
-              className="flex-1 min-w-0 flex flex-col items-center"
+              className="grid grid-cols-[7rem_1fr_3rem] items-center gap-3"
             >
-              {/* Total label above bar */}
-              <div className="text-[10px] font-mono tabular-nums text-slate-600 mb-1 h-4">
-                {day.total > 0 ? day.total : ''}
-              </div>
+              <span
+                className={`text-sm tabular-nums truncate ${
+                  isToday
+                    ? 'text-slate-900 font-medium'
+                    : day.total > 0
+                    ? 'text-slate-700'
+                    : 'text-slate-400'
+                }`}
+              >
+                {rowLabel}
+              </span>
 
-              {/* Bar container — fixed height; inner stack grows from bottom */}
-              <div className="w-full flex-1 flex flex-col justify-end">
-                <div
-                  className="w-full rounded-t overflow-hidden flex flex-col-reverse bg-slate-50 border border-slate-200"
-                  style={{ height: `${safeHeight}%` }}
-                  title={`${formatDayLabel(day.date)} — ${day.total} conversations`}
-                >
-                  {day.total > 0 &&
-                    PARTIES.map((party) => {
+              {/* Bar */}
+              <div className="relative h-6">
+                {/* Faint background track so empty rows have a baseline */}
+                <div className="absolute inset-0 rounded border border-dashed border-slate-200 bg-slate-50/40" />
+                {day.total > 0 && (
+                  <div
+                    className="relative h-full rounded overflow-hidden flex"
+                    style={{ width: `${Math.max(2, widthPct)}%` }}
+                  >
+                    {PARTIES.map((party) => {
                       const count = day.by_party?.[party] ?? 0;
                       if (count <= 0) return null;
                       const segPct = (count / day.total) * 100;
@@ -86,20 +156,24 @@ export default function DailyChart({ data }: DailyChartProps) {
                         <div
                           key={party}
                           style={{
-                            height: `${segPct}%`,
+                            width: `${segPct}%`,
                             backgroundColor: PARTY_COLORS[party] ?? '#64748B',
                           }}
                           title={`${PARTY_DISPLAY_NAMES[party] ?? party}: ${count}`}
                         />
                       );
                     })}
-                </div>
+                  </div>
+                )}
               </div>
 
-              {/* Date label */}
-              <div className="text-[11px] text-slate-500 mt-2 font-mono tabular-nums">
-                {formatDayLabel(day.date)}
-              </div>
+              <span
+                className={`text-sm text-right tabular-nums ${
+                  day.total > 0 ? 'text-slate-900 font-medium' : 'text-slate-300'
+                }`}
+              >
+                {day.total}
+              </span>
             </div>
           );
         })}
@@ -107,7 +181,7 @@ export default function DailyChart({ data }: DailyChartProps) {
 
       {/* Legend */}
       {activeParties.length > 0 && (
-        <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+        <ul className="mt-5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
           {activeParties.map((party) => (
             <li key={party} className="inline-flex items-center gap-1.5">
               <span

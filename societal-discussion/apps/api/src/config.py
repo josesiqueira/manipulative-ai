@@ -23,6 +23,11 @@ class Settings(BaseSettings):
     # Admin
     admin_password: str = "admin"
 
+    # Participant access code — required to start a conversation. Defaults to
+    # the same value as the admin password so the deploy comes up working;
+    # researchers can later set a separate PARTICIPANT_PASSWORD env var.
+    participant_password: str = ""
+
     # CORS
     cors_origins: str = "http://localhost:3000"
 

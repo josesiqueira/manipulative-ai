@@ -137,6 +137,17 @@ export default function PromptsPage() {
         </p>
       </div>
 
+      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+        <p className="font-medium mb-1">Write prompts in Finnish.</p>
+        <p>
+          The bot reads the Finnish party programs and uses the prompts you write here as
+          behavior rules. When a participant chooses English on the landing page, the runtime
+          automatically appends an &quot;always respond in English&quot; override at the end of
+          the prompt — you do <span className="font-medium">not</span> need to write or
+          maintain an English translation. One Finnish prompt covers both languages.
+        </p>
+      </div>
+
       {message && (
         <div className={`px-4 py-2 rounded-lg text-sm ${
           message.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'

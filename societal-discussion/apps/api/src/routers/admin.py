@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from fastapi.responses import StreamingResponse, JSONResponse, Response
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select, func, cast, Date as SADate
+from sqlalchemy import select, func, cast, or_, Date as SADate
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -64,7 +64,11 @@ class StatsResponse(BaseModel):
     total_surveys: int
     completion_rate: float
     conversations_today: int
+    conversations_yesterday: int
     flagged_count: int
+    conversations_fi: int
+    conversations_en: int
+    test_conversations_saved: int
 
 
 @router.get("/stats", response_model=StatsResponse)
@@ -105,15 +109,31 @@ async def get_stats(
     surveys_result = await db.execute(select(func.count(SurveyResponse.id)))
     total_surveys = surveys_result.scalar() or 0
 
-    # Conversations started today in Europe/Helsinki
+    # Conversations started today and yesterday (Europe/Helsinki). We use range
+    # comparisons because SQLite's CAST(text AS DATE) is a no-op — it returns
+    # the original string, so equality against a date value never matches.
     today_helsinki = datetime.now(HELSINKI).date()
+    today_start = datetime.combine(today_helsinki, datetime.min.time(), tzinfo=HELSINKI)
+    tomorrow_start = today_start + timedelta(days=1)
+    yesterday_start = today_start - timedelta(days=1)
+
     today_result = await db.execute(
         select(func.count(Conversation.id)).where(
             non_test_filter,
-            cast(Conversation.started_at, SADate) == today_helsinki,
+            Conversation.started_at >= today_start,
+            Conversation.started_at < tomorrow_start,
         )
     )
     conversations_today = today_result.scalar() or 0
+
+    yesterday_result = await db.execute(
+        select(func.count(Conversation.id)).where(
+            non_test_filter,
+            Conversation.started_at >= yesterday_start,
+            Conversation.started_at < today_start,
+        )
+    )
+    conversations_yesterday = yesterday_result.scalar() or 0
 
     flagged_result = await db.execute(
         select(func.count(Conversation.id)).where(
@@ -121,6 +141,31 @@ async def get_stats(
         )
     )
     flagged_count = flagged_result.scalar() or 0
+
+    # Language split (non-test only)
+    fi_result = await db.execute(
+        select(func.count(Conversation.id)).where(
+            non_test_filter, Conversation.language == "fi"
+        )
+    )
+    conversations_fi = fi_result.scalar() or 0
+
+    en_result = await db.execute(
+        select(func.count(Conversation.id)).where(
+            non_test_filter, Conversation.language == "en"
+        )
+    )
+    conversations_en = en_result.scalar() or 0
+
+    # Saved test conversations: test runs the researcher explicitly clicked
+    # "Save" on. Separate metric from the real-participant count.
+    saved_tests_result = await db.execute(
+        select(func.count(Conversation.id)).where(
+            Conversation.is_test_mode == True,  # noqa: E712
+            Conversation.is_test_saved == True,  # noqa: E712
+        )
+    )
+    test_conversations_saved = saved_tests_result.scalar() or 0
 
     completion_rate = (
         completed_conversations / total_conversations
@@ -137,7 +182,11 @@ async def get_stats(
         total_surveys=total_surveys,
         completion_rate=completion_rate,
         conversations_today=conversations_today,
+        conversations_yesterday=conversations_yesterday,
         flagged_count=flagged_count,
+        conversations_fi=conversations_fi,
+        conversations_en=conversations_en,
+        test_conversations_saved=test_conversations_saved,
     )
 
 
@@ -178,7 +227,9 @@ async def get_daily_stats(
     today_helsinki = datetime.now(HELSINKI).date()
     start_date = today_helsinki - timedelta(days=days - 1)
 
-    day_expr = cast(Conversation.started_at, SADate)
+    # Use func.date() which SQLite implements as DATE(col) and correctly
+    # extracts the date portion. CAST(col AS DATE) is a no-op in SQLite.
+    day_expr = func.date(Conversation.started_at)
     result = await db.execute(
         select(
             day_expr.label("day"),
@@ -187,8 +238,8 @@ async def get_daily_stats(
         )
         .where(
             Conversation.is_test_mode == False,
-            day_expr >= start_date,
-            day_expr <= today_helsinki,
+            day_expr >= start_date.isoformat(),
+            day_expr <= today_helsinki.isoformat(),
         )
         .group_by(day_expr, Conversation.assigned_party)
     )
@@ -257,6 +308,7 @@ class AdminConversationCreate(BaseModel):
     session_id: str
     assigned_party: str
     starter_topic: str | None = None
+    language: str = "fi"
 
 
 class AdminConversationResponse(BaseModel):
@@ -298,9 +350,12 @@ async def admin_create_conversation(
             detail="Session not found",
         )
 
+    language = data.language if data.language in ("fi", "en") else "fi"
+
     conversation = Conversation(
         session_id=session.id,
         assigned_party=data.assigned_party,
+        language=language,
         starter_topic=data.starter_topic,
         is_test_mode=True,
     )
@@ -332,12 +387,14 @@ class ConversationListItem(BaseModel):
     id: str
     session_id: str
     assigned_party: str
+    language: str = "fi"
     starter_topic: str | None
     started_at: datetime
     ended_at: datetime | None
     message_count: int
     is_complete: bool
     is_test_mode: bool
+    is_test_saved: bool = False
     is_flagged: bool = False
     flag_notes: str | None = None
 
@@ -371,11 +428,13 @@ class ConversationDetailResponse(BaseModel):
     id: str
     session_id: str
     assigned_party: str
+    language: str = "fi"
     starter_topic: str | None
     started_at: datetime
     ended_at: datetime | None
     is_complete: bool
     is_test_mode: bool
+    is_test_saved: bool = False
     is_flagged: bool = False
     flag_notes: str | None = None
     messages: list[MessageDetail]
@@ -393,11 +452,21 @@ async def list_conversations(
     db: AsyncSession = Depends(get_db),
     _: bool = Depends(verify_admin),
 ):
-    """Paginated, filtered list of conversations (admin only)."""
+    """Paginated, filtered list of conversations (admin only).
+
+    With exclude_test=True (default), unsaved test conversations are hidden
+    but saved test conversations remain visible — so the researcher can
+    review the test runs they explicitly chose to keep.
+    """
     filters = []
 
     if exclude_test:
-        filters.append(Conversation.is_test_mode == False)
+        filters.append(
+            or_(
+                Conversation.is_test_mode == False,  # noqa: E712
+                Conversation.is_test_saved == True,  # noqa: E712
+            )
+        )
     if assigned_party:
         filters.append(Conversation.assigned_party == assigned_party)
 
@@ -430,12 +499,14 @@ async def list_conversations(
             id=conv.id,
             session_id=conv.session_id,
             assigned_party=conv.assigned_party,
+            language=conv.language,
             starter_topic=conv.starter_topic,
             started_at=conv.started_at,
             ended_at=conv.ended_at,
             message_count=len(conv.messages),
             is_complete=conv.is_complete,
             is_test_mode=conv.is_test_mode,
+            is_test_saved=conv.is_test_saved,
             is_flagged=conv.is_flagged,
             flag_notes=conv.flag_notes,
         )
@@ -485,11 +556,13 @@ async def get_conversation_detail(
         id=conversation.id,
         session_id=conversation.session_id,
         assigned_party=conversation.assigned_party,
+        language=conversation.language,
         starter_topic=conversation.starter_topic,
         started_at=conversation.started_at,
         ended_at=conversation.ended_at,
         is_complete=conversation.is_complete,
         is_test_mode=conversation.is_test_mode,
+        is_test_saved=conversation.is_test_saved,
         is_flagged=conversation.is_flagged,
         flag_notes=conversation.flag_notes,
         messages=messages,
@@ -539,14 +612,106 @@ async def flag_conversation(
         id=conversation.id,
         session_id=conversation.session_id,
         assigned_party=conversation.assigned_party,
+        language=conversation.language,
         starter_topic=conversation.starter_topic,
         started_at=conversation.started_at,
         ended_at=conversation.ended_at,
         message_count=len(conversation.messages),
         is_complete=conversation.is_complete,
         is_test_mode=conversation.is_test_mode,
+        is_test_saved=conversation.is_test_saved,
         is_flagged=conversation.is_flagged,
         flag_notes=conversation.flag_notes,
+    )
+
+
+# ============================================================================
+# Try-bot: save / discard test conversations
+# ============================================================================
+
+
+@router.post("/conversations/{conversation_id}/save-test", response_model=ConversationListItem)
+async def save_test_conversation(
+    conversation_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """Promote a test conversation from ephemeral to saved.
+
+    Only meaningful for conversations created via try-bot (is_test_mode=True).
+    """
+    result = await db.execute(
+        select(Conversation)
+        .options(selectinload(Conversation.messages))
+        .where(Conversation.id == conversation_id)
+    )
+    conversation = result.scalar_one_or_none()
+
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Conversation '{conversation_id}' not found",
+        )
+    if not conversation.is_test_mode:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only test conversations can be saved via this endpoint",
+        )
+
+    conversation.is_test_saved = True
+    await db.flush()
+    await db.refresh(conversation)
+
+    return ConversationListItem(
+        id=conversation.id,
+        session_id=conversation.session_id,
+        assigned_party=conversation.assigned_party,
+        language=conversation.language,
+        starter_topic=conversation.starter_topic,
+        started_at=conversation.started_at,
+        ended_at=conversation.ended_at,
+        message_count=len(conversation.messages),
+        is_complete=conversation.is_complete,
+        is_test_mode=conversation.is_test_mode,
+        is_test_saved=conversation.is_test_saved,
+        is_flagged=conversation.is_flagged,
+        flag_notes=conversation.flag_notes,
+    )
+
+
+@router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_test_conversation(
+    conversation_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """Permanently delete a conversation and its messages.
+
+    Restricted to test conversations as a guardrail — real participant data
+    should be removed via the 'reset all data' endpoint, not by accident.
+    """
+    result = await db.execute(
+        select(Conversation).where(Conversation.id == conversation_id)
+    )
+    conversation = result.scalar_one_or_none()
+
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Conversation '{conversation_id}' not found",
+        )
+    if not conversation.is_test_mode:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only test conversations can be deleted via this endpoint",
+        )
+
+    # Delete messages first to respect FK
+    await db.execute(
+        Message.__table__.delete().where(Message.conversation_id == conversation_id)
+    )
+    await db.execute(
+        Conversation.__table__.delete().where(Conversation.id == conversation_id)
     )
 
 

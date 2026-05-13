@@ -36,6 +36,11 @@ class Conversation(Base):
     flag_notes: Mapped[str | None] = mapped_column(
         Text, nullable=True
     )  # optional admin notes about why the conversation is flagged
+    is_test_saved: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )  # only meaningful when is_test_mode=True; True means the researcher
+    # clicked "Save" in try-bot. Unsaved test conversations are hidden from
+    # the main list/dashboard and discarded when the user changes party.
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(HELSINKI)
     )

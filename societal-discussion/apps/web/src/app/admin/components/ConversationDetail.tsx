@@ -8,6 +8,7 @@ import Badge from './Badge';
 
 interface ConversationDetailProps {
   conversation: ConversationDetailResponse;
+  onFlagChange?: (id: string, isFlagged: boolean, flagNotes: string | null) => void;
 }
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -42,7 +43,7 @@ function buildTranscript(conv: ConversationDetailResponse): string {
   return lines.join('\n');
 }
 
-export default function ConversationDetail({ conversation }: ConversationDetailProps) {
+export default function ConversationDetail({ conversation, onFlagChange }: ConversationDetailProps) {
   // Local mirror of flag state so the panel feels instant.  Reset whenever the
   // parent passes a fresh conversation.
   const [isFlagged, setIsFlagged] = useState<boolean>(conversation.is_flagged);
@@ -87,6 +88,10 @@ export default function ConversationDetail({ conversation }: ConversationDetailP
       );
       if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
       setSaveStatus('saved');
+      // Bubble the change up so the parent list state stays in sync — without
+      // this, the row badge in ConversationList keeps showing the stale value.
+      const persistedNotes = nextFlagged ? nextNotes : null;
+      onFlagChange?.(conversationId, nextFlagged, persistedNotes);
       if (toastTimer.current) clearTimeout(toastTimer.current);
       toastTimer.current = setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (err) {
