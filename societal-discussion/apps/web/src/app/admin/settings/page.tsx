@@ -9,8 +9,9 @@
  *   2. LLM Provider       — API keys, model selection, active provider
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import SaveButton from '../components/SaveButton';
+import { useUnsavedChanges } from '@/lib/useUnsavedChanges';
 
 // ---------------------------------------------------------------------------
 // API plumbing
@@ -98,12 +99,22 @@ function ExperimentSection() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  // Snapshot of the last persisted state — set after initial fetch and after
+  // each successful save.  Dirty = current JSON differs from this snapshot.
+  const initialValuesRef = useRef<string>('');
+
   useEffect(() => {
     adminFetch<ExperimentConfig>('/api/admin/experiment')
-      .then(setConfig)
+      .then((c) => {
+        setConfig(c);
+        initialValuesRef.current = JSON.stringify(c);
+      })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  const isDirty = config !== null && JSON.stringify(config) !== initialValuesRef.current;
+  useUnsavedChanges(isDirty);
 
   function update(field: keyof ExperimentConfig, value: string | boolean | number | null) {
     setConfig((prev) => (prev ? { ...prev, [field]: value } : prev));
@@ -119,6 +130,8 @@ function ExperimentSection() {
         method: 'PUT',
         body: JSON.stringify(config),
       });
+      // Reset dirty baseline so the beforeunload warning stops firing.
+      initialValuesRef.current = JSON.stringify(config);
       setSuccess(true);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Save failed');
@@ -319,6 +332,11 @@ function LLMProviderRow({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+
+  // Row is dirty if the user typed a new API key or changed the model away
+  // from the currently persisted value.  Warn on tab close while that's true.
+  const isDirty = apiKey !== '' || selectedModel !== (config.selected_model ?? '');
+  useUnsavedChanges(isDirty);
 
   async function save() {
     setSaving(true);

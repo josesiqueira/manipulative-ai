@@ -30,6 +30,12 @@ class Conversation(Base):
     language: Mapped[str] = mapped_column(
         String(2), nullable=False, default="fi"
     )  # 'fi' or 'en' — which language the bot should respond in
+    is_flagged: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )  # admin-set flag for follow-up review
+    flag_notes: Mapped[str | None] = mapped_column(
+        Text, nullable=True
+    )  # optional admin notes about why the conversation is flagged
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(HELSINKI)
     )
