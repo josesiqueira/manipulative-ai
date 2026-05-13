@@ -126,21 +126,14 @@ Vaalikone is used **only as a topic source**, not as few-shot examples
 for the bot. (A 3-shot Vaalikone calibration scheme was considered and
 deliberately deferred — see §11.)
 
-## 8. Model selection
+## 8. Language model
 
-- **Default**: OpenAI **GPT-5.4** (March 2026 frontier release).
+- **Model**: OpenAI **GPT-5.4** (March 2026 frontier release).
 - **Context window**: ~1.05M tokens (922 K input + 128 K output).
   Vihreät's 220 K-token corpus + system prompt (~2 K) + history (~5–10 K)
   + output budget (~4 K) → ~240 K total per request, comfortably under
   the 272 K input threshold where OpenAI applies a 2× surcharge.
 - **Temperature**: 0.1 — favors response consistency.
-- **Alternatives wired in the registry**: GPT-5.5 (newer flagship, more
-  expensive), GPT-5.4-mini (~6× cheaper), GPT-4.1 (1M context, no
-  surcharge, predictable budget), GPT-4o (short-conversation testing
-  only — its 128 K context is too small for Vihreät). Switchable via the
-  admin LLM Settings.
-- Anthropic provider is wired as a placeholder for future work; no API
-  key is required unless a researcher activates it in the admin panel.
 
 ## 9. Participant access gate
 
