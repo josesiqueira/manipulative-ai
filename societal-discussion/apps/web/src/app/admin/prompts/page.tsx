@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { PARTY_COLORS } from '../lib/types';
+import { useUnsavedChanges } from '@/lib/useUnsavedChanges';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -47,6 +48,18 @@ export default function PromptsPage() {
   useEffect(() => {
     fetchPrompts();
   }, [password]);
+
+  // Dirty while the user has the editor open and the textarea content differs
+  // from the prompt's persisted value.  After a successful save, savePrompt
+  // sets editingParty back to null so this naturally flips false.
+  const editingPrompt = editingParty
+    ? prompts.find((p) => p.party === editingParty)
+    : null;
+  const isDirty =
+    editingParty !== null &&
+    editingPrompt !== undefined &&
+    editText !== editingPrompt?.system_instruction;
+  useUnsavedChanges(isDirty);
 
   const startEditing = (prompt: PromptConfig) => {
     setEditingParty(prompt.party);

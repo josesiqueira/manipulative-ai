@@ -1,17 +1,77 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import FilterBar from '../components/FilterBar';
 import ConversationList from '../components/ConversationList';
 import ConversationDetail from '../components/ConversationDetail';
 import { getConversationList, getConversationDetail } from '../lib/api';
-import type { ConversationListResponse, ConversationDetailResponse, ConversationFilters } from '../lib/types';
+import type {
+  ConversationListResponse,
+  ConversationListItem,
+  ConversationDetailResponse,
+  ConversationFilters,
+} from '../lib/types';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+// Hits /api/admin/conversations directly so we can pass date_from / date_to,
+// which the shared `getConversationList` helper does not forward yet.  If the
+// backend rejects the params (older deploy), we fall back to the helper and
+// filter client-side.
+async function fetchConversationsWithDates(
+  password: string,
+  filters: ConversationFilters,
+  page: number,
+  perPage = 20,
+): Promise<{ data: ConversationListResponse; serverFilteredDates: boolean }> {
+  const params = new URLSearchParams();
+  if (filters.assigned_party) params.set('assigned_party', filters.assigned_party);
+  if (filters.search) params.set('search', filters.search);
+  if (filters.date_from) params.set('date_from', filters.date_from);
+  if (filters.date_to) params.set('date_to', filters.date_to);
+  params.set('page', String(page));
+  params.set('per_page', String(perPage));
+
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/admin/conversations?${params.toString()}`,
+      { headers: { 'X-Admin-Password': password } },
+    );
+    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    const data = (await res.json()) as ConversationListResponse;
+    return { data, serverFilteredDates: true };
+  } catch (err) {
+    // Fallback: shared helper (no date params) + client-side date filter
+    console.warn('Falling back to client-side date filtering', err);
+    const data = await getConversationList(password, filters, page, perPage);
+    return { data, serverFilteredDates: false };
+  }
+}
+
+function withinDateRange(
+  conv: ConversationListItem,
+  dateFrom?: string,
+  dateTo?: string,
+): boolean {
+  if (!dateFrom && !dateTo) return true;
+  const ts = new Date(conv.started_at).getTime();
+  if (dateFrom) {
+    const fromTs = new Date(`${dateFrom}T00:00:00`).getTime();
+    if (ts < fromTs) return false;
+  }
+  if (dateTo) {
+    const toTs = new Date(`${dateTo}T23:59:59.999`).getTime();
+    if (ts > toTs) return false;
+  }
+  return true;
+}
 
 export default function ConversationsPage() {
   const [password, setPassword] = useState('');
   const [filters, setFilters] = useState<ConversationFilters>({});
   const [page, setPage] = useState(1);
   const [listData, setListData] = useState<ConversationListResponse | null>(null);
+  const [serverFilteredDates, setServerFilteredDates] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ConversationDetailResponse | null>(null);
   const [listLoading, setListLoading] = useState(false);
@@ -27,8 +87,13 @@ export default function ConversationsPage() {
     let cancelled = false;
     setListLoading(true);
 
-    getConversationList(password, filters, page)
-      .then((data) => { if (!cancelled) setListData(data); })
+    fetchConversationsWithDates(password, filters, page)
+      .then(({ data, serverFilteredDates: sf }) => {
+        if (!cancelled) {
+          setListData(data);
+          setServerFilteredDates(sf);
+        }
+      })
       .catch(console.error)
       .finally(() => { if (!cancelled) setListLoading(false); });
 
@@ -49,6 +114,15 @@ export default function ConversationsPage() {
     return () => { cancelled = true; };
   }, [password, selectedId]);
 
+  // If the server didn't honour the date params, apply them client-side.
+  const visibleConversations = useMemo(() => {
+    if (!listData) return [];
+    if (serverFilteredDates) return listData.conversations;
+    return listData.conversations.filter((c) =>
+      withinDateRange(c, filters.date_from, filters.date_to),
+    );
+  }, [listData, serverFilteredDates, filters.date_from, filters.date_to]);
+
   return (
     <div className="space-y-4">
       <div>
@@ -68,7 +142,7 @@ export default function ConversationsPage() {
           ) : listData ? (
             <>
               <ConversationList
-                conversations={listData.conversations}
+                conversations={visibleConversations}
                 selectedId={selectedId}
                 onSelect={setSelectedId}
               />

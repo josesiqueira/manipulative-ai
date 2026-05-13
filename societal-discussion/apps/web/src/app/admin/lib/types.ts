@@ -3,12 +3,15 @@ export interface ConversationListItem {
   id: string;
   session_id: string;
   assigned_party: string;
+  language: string;
   starter_topic: string | null;
   started_at: string;
   ended_at: string | null;
   message_count: number;
   is_complete: boolean;
   is_test_mode: boolean;
+  is_flagged: boolean;
+  flag_notes: string | null;
 }
 
 export interface ConversationListResponse {
@@ -31,11 +34,14 @@ export interface ConversationDetailResponse {
   id: string;
   session_id: string;
   assigned_party: string;
+  language: string;
   starter_topic: string | null;
   started_at: string;
   ended_at: string | null;
   is_complete: boolean;
   is_test_mode: boolean;
+  is_flagged: boolean;
+  flag_notes: string | null;
   messages: MessageDetail[];
 }
 
@@ -47,6 +53,20 @@ export interface StatsResponse {
   total_messages: number;
   conversations_by_party: Record<string, number>;
   total_surveys: number;
+  completion_rate: number;          // 0..1, multiply by 100 for display
+  conversations_today: number;
+  flagged_count: number;
+}
+
+// Daily breakdown — GET /api/admin/stats/daily?days=7
+export interface DailyStatsDay {
+  date: string;                     // ISO YYYY-MM-DD (Europe/Helsinki)
+  by_party: Record<string, number>; // sparse — parties with 0 may be omitted
+  total: number;
+}
+
+export interface DailyStatsResponse {
+  days: DailyStatsDay[];
 }
 
 // Session list
@@ -61,6 +81,14 @@ export interface SessionListItem {
 export interface ConversationFilters {
   assigned_party?: string;
   search?: string;
+  date_from?: string;               // ISO date (YYYY-MM-DD)
+  date_to?: string;                 // ISO date (YYYY-MM-DD)
+}
+
+// Flag toggle — PATCH /api/admin/conversations/{id}/flag
+export interface FlagConversationRequest {
+  is_flagged: boolean;
+  flag_notes?: string;
 }
 
 // Domain constants — keep in sync with apps/api/src/services/party_grounding.py

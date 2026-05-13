@@ -11,15 +11,18 @@ import io
 import csv
 import json
 import zipfile
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, status, Header
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse, Response
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select, func
+from sqlalchemy import select, func, cast, Date as SADate
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+
+HELSINKI = ZoneInfo("Europe/Helsinki")
 
 from ..config import get_settings
 from ..database import get_db
@@ -59,6 +62,9 @@ class StatsResponse(BaseModel):
     total_messages: int
     conversations_by_party: dict[str, int]
     total_surveys: int
+    completion_rate: float
+    conversations_today: int
+    flagged_count: int
 
 
 @router.get("/stats", response_model=StatsResponse)
@@ -70,26 +76,57 @@ async def get_stats(
     sessions_result = await db.execute(select(func.count(Session.id)))
     total_sessions = sessions_result.scalar() or 0
 
-    convs_result = await db.execute(select(func.count(Conversation.id)))
+    # All non-test counts (the dashboard cares about real participants)
+    non_test_filter = Conversation.is_test_mode == False
+
+    convs_result = await db.execute(
+        select(func.count(Conversation.id)).where(non_test_filter)
+    )
     total_conversations = convs_result.scalar() or 0
 
     completed = await db.execute(
-        select(func.count(Conversation.id)).where(Conversation.is_complete == True)
+        select(func.count(Conversation.id)).where(
+            non_test_filter, Conversation.is_complete == True
+        )
     )
     completed_conversations = completed.scalar() or 0
 
     messages_result = await db.execute(select(func.count(Message.id)))
     total_messages = messages_result.scalar() or 0
 
-    # Conversations by party
+    # Conversations by party (non-test)
     party_result = await db.execute(
         select(Conversation.assigned_party, func.count(Conversation.id))
+        .where(non_test_filter)
         .group_by(Conversation.assigned_party)
     )
     conversations_by_party = {row[0]: row[1] for row in party_result.all()}
 
     surveys_result = await db.execute(select(func.count(SurveyResponse.id)))
     total_surveys = surveys_result.scalar() or 0
+
+    # Conversations started today in Europe/Helsinki
+    today_helsinki = datetime.now(HELSINKI).date()
+    today_result = await db.execute(
+        select(func.count(Conversation.id)).where(
+            non_test_filter,
+            cast(Conversation.started_at, SADate) == today_helsinki,
+        )
+    )
+    conversations_today = today_result.scalar() or 0
+
+    flagged_result = await db.execute(
+        select(func.count(Conversation.id)).where(
+            non_test_filter, Conversation.is_flagged == True
+        )
+    )
+    flagged_count = flagged_result.scalar() or 0
+
+    completion_rate = (
+        completed_conversations / total_conversations
+        if total_conversations > 0
+        else 0.0
+    )
 
     return StatsResponse(
         total_sessions=total_sessions,
@@ -98,7 +135,88 @@ async def get_stats(
         total_messages=total_messages,
         conversations_by_party=conversations_by_party,
         total_surveys=total_surveys,
+        completion_rate=completion_rate,
+        conversations_today=conversations_today,
+        flagged_count=flagged_count,
     )
+
+
+# ============================================================================
+# Daily Stats Breakdown
+# ============================================================================
+
+
+class DailyStatsEntry(BaseModel):
+    """A single day in the daily stats breakdown."""
+
+    date: str  # ISO date string YYYY-MM-DD
+    by_party: dict[str, int]
+    total: int
+
+
+class DailyStatsResponse(BaseModel):
+    """Daily stats breakdown response."""
+
+    days: list[DailyStatsEntry]
+
+
+@router.get("/stats/daily", response_model=DailyStatsResponse)
+async def get_daily_stats(
+    days: int = 7,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Daily breakdown of conversations by party for the last N days
+    (inclusive of today, in Europe/Helsinki timezone). Non-test only.
+    """
+    if days < 1:
+        days = 1
+    if days > 365:
+        days = 365
+
+    today_helsinki = datetime.now(HELSINKI).date()
+    start_date = today_helsinki - timedelta(days=days - 1)
+
+    day_expr = cast(Conversation.started_at, SADate)
+    result = await db.execute(
+        select(
+            day_expr.label("day"),
+            Conversation.assigned_party,
+            func.count(Conversation.id),
+        )
+        .where(
+            Conversation.is_test_mode == False,
+            day_expr >= start_date,
+            day_expr <= today_helsinki,
+        )
+        .group_by(day_expr, Conversation.assigned_party)
+    )
+
+    # Build {date_iso: {party: count}}
+    counts: dict[str, dict[str, int]] = {}
+    for day_val, party, count in result.all():
+        # day_val may be a date or string depending on backend
+        if isinstance(day_val, date):
+            day_key = day_val.isoformat()
+        else:
+            day_key = str(day_val)
+        counts.setdefault(day_key, {})[party] = count
+
+    entries: list[DailyStatsEntry] = []
+    for i in range(days):
+        day = start_date + timedelta(days=i)
+        day_key = day.isoformat()
+        by_party = counts.get(day_key, {})
+        entries.append(
+            DailyStatsEntry(
+                date=day_key,
+                by_party=by_party,
+                total=sum(by_party.values()),
+            )
+        )
+
+    return DailyStatsResponse(days=entries)
 
 
 # ============================================================================
@@ -150,6 +268,8 @@ class AdminConversationResponse(BaseModel):
     starter_topic: str | None
     is_complete: bool
     is_test_mode: bool
+    is_flagged: bool = False
+    flag_notes: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -196,6 +316,8 @@ async def admin_create_conversation(
         starter_topic=conversation.starter_topic,
         is_complete=conversation.is_complete,
         is_test_mode=conversation.is_test_mode,
+        is_flagged=conversation.is_flagged,
+        flag_notes=conversation.flag_notes,
     )
 
 
@@ -216,6 +338,8 @@ class ConversationListItem(BaseModel):
     message_count: int
     is_complete: bool
     is_test_mode: bool
+    is_flagged: bool = False
+    flag_notes: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -252,6 +376,8 @@ class ConversationDetailResponse(BaseModel):
     ended_at: datetime | None
     is_complete: bool
     is_test_mode: bool
+    is_flagged: bool = False
+    flag_notes: str | None = None
     messages: list[MessageDetail]
 
     model_config = ConfigDict(from_attributes=True)
@@ -310,6 +436,8 @@ async def list_conversations(
             message_count=len(conv.messages),
             is_complete=conv.is_complete,
             is_test_mode=conv.is_test_mode,
+            is_flagged=conv.is_flagged,
+            flag_notes=conv.flag_notes,
         )
         for conv in conversations
     ]
@@ -362,7 +490,63 @@ async def get_conversation_detail(
         ended_at=conversation.ended_at,
         is_complete=conversation.is_complete,
         is_test_mode=conversation.is_test_mode,
+        is_flagged=conversation.is_flagged,
+        flag_notes=conversation.flag_notes,
         messages=messages,
+    )
+
+
+# ============================================================================
+# Conversation Flag
+# ============================================================================
+
+
+class ConversationFlagUpdate(BaseModel):
+    """Request body for flagging a conversation."""
+
+    is_flagged: bool
+    flag_notes: str | None = None
+
+
+@router.patch("/conversations/{conversation_id}/flag", response_model=ConversationListItem)
+async def flag_conversation(
+    conversation_id: str,
+    data: ConversationFlagUpdate,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """Set or clear the admin flag on a conversation."""
+    result = await db.execute(
+        select(Conversation)
+        .options(selectinload(Conversation.messages))
+        .where(Conversation.id == conversation_id)
+    )
+    conversation = result.scalar_one_or_none()
+
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Conversation '{conversation_id}' not found",
+        )
+
+    conversation.is_flagged = data.is_flagged
+    conversation.flag_notes = data.flag_notes if data.is_flagged else None
+
+    await db.flush()
+    await db.refresh(conversation)
+
+    return ConversationListItem(
+        id=conversation.id,
+        session_id=conversation.session_id,
+        assigned_party=conversation.assigned_party,
+        starter_topic=conversation.starter_topic,
+        started_at=conversation.started_at,
+        ended_at=conversation.ended_at,
+        message_count=len(conversation.messages),
+        is_complete=conversation.is_complete,
+        is_test_mode=conversation.is_test_mode,
+        is_flagged=conversation.is_flagged,
+        flag_notes=conversation.flag_notes,
     )
 
 
@@ -424,7 +608,17 @@ async def export_data(
     """
     Export research data for analysis.
 
-    Formats: 'csv' (default), 'json', or 'text' (ZIP of per-conversation transcripts)
+    Formats:
+    - 'csv' (default): one row per conversation
+    - 'json': one record per conversation
+    - 'text': ZIP of per-conversation transcripts
+    - 'messages-csv': one row per message
+    - 'messages-json': one record per message
+
+    Query parameters:
+    - include_test (bool, default false): include Try-bot test-mode conversations
+    - assigned_party (str): filter to a single party
+    - date_from / date_to (YYYY-MM-DD): filter by started_at date (inclusive)
     """
     filters = []
 
@@ -433,19 +627,70 @@ async def export_data(
     if assigned_party:
         filters.append(Conversation.assigned_party == assigned_party)
     if date_from:
-        from sqlalchemy import cast, Date as SADate
         filters.append(cast(Conversation.started_at, SADate) >= date_from)
     if date_to:
-        from sqlalchemy import cast, Date as SADate
         filters.append(cast(Conversation.started_at, SADate) <= date_to)
 
-    query = select(Conversation).options(selectinload(Conversation.messages))
+    query = (
+        select(Conversation)
+        .options(selectinload(Conversation.messages))
+        .order_by(Conversation.started_at.asc())
+    )
     if filters:
         query = query.where(*filters)
 
     result = await db.execute(query)
     conversations = result.scalars().all()
 
+    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # --- Message-level exports -----------------------------------------------
+    if format in ("messages-csv", "messages-json"):
+        message_rows: list[dict] = []
+        for conv in conversations:
+            for m in conv.messages:
+                message_rows.append({
+                    "session_id": conv.session_id,
+                    "conversation_id": conv.id,
+                    "message_id": m.id,
+                    "role": m.role,
+                    "content": m.content,
+                    "token_count": m.token_count,
+                    "language": conv.language,
+                    "created_at": m.created_at.isoformat() if m.created_at else None,
+                })
+
+        if format == "messages-json":
+            content = json.dumps(message_rows, indent=2)
+            return StreamingResponse(
+                io.BytesIO(content.encode()),
+                media_type="application/json",
+                headers={
+                    "Content-Disposition": f"attachment; filename=messages_{timestamp_str}.json"
+                },
+            )
+
+        # messages-csv
+        output = io.StringIO()
+        fieldnames = [
+            "session_id", "conversation_id", "message_id",
+            "role", "content", "token_count", "language", "created_at",
+        ]
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in message_rows:
+            writer.writerow(row)
+
+        content = output.getvalue()
+        return StreamingResponse(
+            io.BytesIO(content.encode()),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f"attachment; filename=messages_{timestamp_str}.csv"
+            },
+        )
+
+    # --- Conversation-level exports -----------------------------------------
     rows = []
     for conv in conversations:
         message_count = len(conv.messages)
@@ -463,12 +708,15 @@ async def export_data(
             "conversation_id": conv.id,
             "session_id": conv.session_id,
             "assigned_party": conv.assigned_party,
+            "language": conv.language,
             "starter_topic": conv.starter_topic or "",
             "is_complete": conv.is_complete,
             "message_count": message_count,
             "user_message_count": len(user_messages),
             "assistant_message_count": len(assistant_messages),
             "is_test_mode": conv.is_test_mode,
+            "is_flagged": conv.is_flagged,
+            "flag_notes": conv.flag_notes or "",
             "started_at": conv.started_at.isoformat() if conv.started_at else None,
             "ended_at": conv.ended_at.isoformat() if conv.ended_at else None,
             "full_transcript": full_transcript,
@@ -487,11 +735,10 @@ async def export_data(
                 zf.writestr(filename, transcript)
 
         zip_buffer.seek(0)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         return StreamingResponse(
             zip_buffer,
             media_type="application/zip",
-            headers={"Content-Disposition": f"attachment; filename=transcripts_{timestamp}.zip"},
+            headers={"Content-Disposition": f"attachment; filename=transcripts_{timestamp_str}.zip"},
         )
 
     elif format == "json":
@@ -499,21 +746,122 @@ async def export_data(
         return StreamingResponse(
             io.BytesIO(content.encode()),
             media_type="application/json",
-            headers={"Content-Disposition": f"attachment; filename=export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"},
+            headers={"Content-Disposition": f"attachment; filename=export_{timestamp_str}.json"},
         )
     else:
+        # Default CSV — ensure stable header even when there are no rows
+        fieldnames = [
+            "conversation_id", "session_id", "assigned_party", "language",
+            "starter_topic", "is_complete", "message_count",
+            "user_message_count", "assistant_message_count",
+            "is_test_mode", "is_flagged", "flag_notes",
+            "started_at", "ended_at", "full_transcript",
+        ]
         output = io.StringIO()
-        if rows:
-            writer = csv.DictWriter(output, fieldnames=rows[0].keys())
-            writer.writeheader()
-            writer.writerows(rows)
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
 
         content = output.getvalue()
         return StreamingResponse(
             io.BytesIO(content.encode()),
             media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename=export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"},
+            headers={"Content-Disposition": f"attachment; filename=export_{timestamp_str}.csv"},
         )
+
+
+# ============================================================================
+# Survey Export
+# ============================================================================
+
+SURVEY_RESPONSE_KEYS = [
+    "chatbot_usage",
+    "chatbot_which",
+    "political_chatbot",
+    "chatbot_perception",
+    "conversation_reflection",
+    "response_speed",
+    "topic_variety",
+    "detected_bias",
+    "detected_terminology",
+    "detected_persuasion",
+    "notice_anything",
+]
+
+
+@router.get("/export/surveys")
+async def export_surveys(
+    format: str = "csv",
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """
+    Export post-conversation survey responses.
+
+    Returns one row per SurveyResponse with session_id, submitted_at, and a
+    flattened column for each documented response key. Missing keys become "".
+    """
+    result = await db.execute(
+        select(SurveyResponse).order_by(SurveyResponse.submitted_at.asc())
+    )
+    surveys = result.scalars().all()
+
+    def flatten(value) -> str:
+        """Coerce a JSON value into a CSV-safe string."""
+        if value is None:
+            return ""
+        if isinstance(value, (str, int, float, bool)):
+            return str(value)
+        # lists/dicts → JSON string
+        return json.dumps(value, ensure_ascii=False)
+
+    rows = []
+    for s in surveys:
+        responses = s.responses if isinstance(s.responses, dict) else {}
+        row = {
+            "session_id": s.session_id,
+            "submitted_at": s.submitted_at.isoformat() if s.submitted_at else "",
+        }
+        for key in SURVEY_RESPONSE_KEYS:
+            row[key] = flatten(responses.get(key))
+        rows.append(row)
+
+    timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    if format == "json":
+        # Re-build with raw values for JSON (preserve types where possible)
+        json_rows = []
+        for s in surveys:
+            responses = s.responses if isinstance(s.responses, dict) else {}
+            record = {
+                "session_id": s.session_id,
+                "submitted_at": s.submitted_at.isoformat() if s.submitted_at else None,
+            }
+            for key in SURVEY_RESPONSE_KEYS:
+                record[key] = responses.get(key, "")
+            json_rows.append(record)
+
+        return JSONResponse(
+            content=json_rows,
+            headers={
+                "Content-Disposition": f"attachment; filename=surveys_{timestamp_str}.json"
+            },
+        )
+
+    # CSV
+    fieldnames = ["session_id", "submitted_at"] + SURVEY_RESPONSE_KEYS
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=surveys_{timestamp_str}.csv"
+        },
+    )
 
 
 # ============================================================================
