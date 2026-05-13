@@ -61,6 +61,7 @@ async def generate_response(
         party=conversation.assigned_party,
         conversation_history=conversation_history,
         current_message=user_message,
+        language=getattr(conversation, "language", "fi"),
     )
 
     provider, model = await get_llm_provider(db)

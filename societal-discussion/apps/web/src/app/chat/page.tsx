@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { TRANSLATIONS, getStoredLanguage } from '@/lib/translations';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -18,9 +19,12 @@ export default function ChatPage() {
   const [inputValue, setInputValue] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [t, setT] = useState(TRANSLATIONS.fi);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setT(TRANSLATIONS[getStoredLanguage()]);
+
     const convId = localStorage.getItem('conversationId');
     const sessionId = localStorage.getItem('sessionId');
     if (!convId || !sessionId) {
@@ -29,7 +33,6 @@ export default function ChatPage() {
     }
     setConversationId(convId);
 
-    // If there's a starter topic, send it as the first message
     const starterTopic = localStorage.getItem('starterTopic');
     if (starterTopic) {
       localStorage.removeItem('starterTopic');
@@ -60,7 +63,7 @@ export default function ChatPage() {
       ]);
     } catch (err) {
       console.error('Error:', err);
-      setError('Viestin lähetys epäonnistui. Yritä uudelleen.');
+      setError(t.chat.sendError);
       setMessages([]);
     } finally {
       setIsSending(false);
@@ -93,7 +96,7 @@ export default function ChatPage() {
       ]);
     } catch (err) {
       console.error('Error:', err);
-      setError('Viestin lähetys epäonnistui. Yritä uudelleen.');
+      setError(t.chat.sendError);
       setMessages((prev) => prev.filter((m) => m.id !== tempMsg.id));
       setInputValue(userMessage);
     } finally {
@@ -102,9 +105,10 @@ export default function ChatPage() {
   };
 
   const handleBackToStart = () => {
-    // Save conversation as ended, go back to landing for new conversation
     if (conversationId) {
-      fetch(`${API_URL}/api/conversations/${conversationId}/end`, { method: 'PUT' }).catch(console.error);
+      fetch(`${API_URL}/api/conversations/${conversationId}/end`, { method: 'PUT' }).catch(
+        console.error,
+      );
     }
     localStorage.removeItem('conversationId');
     localStorage.removeItem('starterTopic');
@@ -113,7 +117,9 @@ export default function ChatPage() {
 
   const handleEndConversation = () => {
     if (conversationId) {
-      fetch(`${API_URL}/api/conversations/${conversationId}/end`, { method: 'PUT' }).catch(console.error);
+      fetch(`${API_URL}/api/conversations/${conversationId}/end`, { method: 'PUT' }).catch(
+        console.error,
+      );
     }
     router.push('/survey-entry');
   };
@@ -123,19 +129,19 @@ export default function ChatPage() {
       {/* Header */}
       <header className="bg-white shadow-sm px-4 py-3 sticky top-0 z-20 border-b border-slate-200">
         <div className="max-w-2xl mx-auto flex justify-between items-center">
-          <h1 className="font-semibold text-slate-900">Vaalikeskustelu</h1>
+          <h1 className="font-semibold text-slate-900">{t.chat.header}</h1>
           <div className="flex items-center gap-2">
             <button
               onClick={handleBackToStart}
               className="px-3 py-1.5 text-sm rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 transition-colors"
             >
-              Takaisin alkuun
+              {t.chat.backToStart}
             </button>
             <button
               onClick={handleEndConversation}
               className="px-3 py-1.5 text-sm rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-colors"
             >
-              Lopeta keskustelu
+              {t.chat.endConversation}
             </button>
           </div>
         </div>
@@ -146,8 +152,8 @@ export default function ChatPage() {
         <div className="max-w-2xl mx-auto space-y-4">
           {messages.length === 0 && !isSending && (
             <div className="text-center text-slate-400 py-12">
-              <p className="text-lg mb-2">Aloita keskustelu</p>
-              <p className="text-sm">Kirjoita viestisi alle ja paina Lähetä.</p>
+              <p className="text-lg mb-2">{t.chat.emptyTitle}</p>
+              <p className="text-sm">{t.chat.emptyHint}</p>
             </div>
           )}
 
@@ -189,7 +195,9 @@ export default function ChatPage() {
         <div className="bg-red-50 border-t border-red-200 px-4 py-2">
           <div className="max-w-2xl mx-auto flex items-center justify-between">
             <span className="text-sm text-red-700">{error}</span>
-            <button onClick={() => setError(null)} className="text-red-500 text-sm font-medium">Sulje</button>
+            <button onClick={() => setError(null)} className="text-red-500 text-sm font-medium">
+              {t.chat.close}
+            </button>
           </div>
         </div>
       )}
@@ -202,7 +210,7 @@ export default function ChatPage() {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-            placeholder="Kirjoita viestisi..."
+            placeholder={t.chat.placeholder}
             className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 bg-slate-50 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:border-transparent"
             disabled={isSending}
           />
@@ -211,7 +219,7 @@ export default function ChatPage() {
             disabled={isSending || !inputValue.trim()}
             className="px-6 py-2.5 rounded-xl bg-slate-900 text-white font-medium hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Lähetä
+            {t.chat.send}
           </button>
         </div>
       </div>

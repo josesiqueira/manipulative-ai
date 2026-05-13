@@ -30,6 +30,7 @@ class ConversationCreate(BaseModel):
 
     session_id: str
     starter_topic: str | None = None
+    language: str = "fi"  # 'fi' or 'en'
 
 
 class ConversationResponse(BaseModel):
@@ -90,9 +91,12 @@ async def create_conversation(
     # Assign party (no-repeat within session)
     assigned_party = await assign_party(db, session.id)
 
+    language = data.language if data.language in ("fi", "en") else "fi"
+
     conversation = Conversation(
         session_id=session.id,
         assigned_party=assigned_party,
+        language=language,
         starter_topic=data.starter_topic,
         is_test_mode=session.is_test_mode,
     )

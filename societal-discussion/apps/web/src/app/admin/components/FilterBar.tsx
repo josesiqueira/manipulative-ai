@@ -17,7 +17,7 @@ export default function FilterBar({ filters, onFiltersChange }: FilterBarProps) 
         onChange={(e) => onFiltersChange({ ...filters, assigned_party: e.target.value || undefined })}
         className="px-3 py-1.5 rounded-lg border border-slate-300 text-sm text-slate-700 bg-white"
       >
-        <option value="">Kaikki puolueet</option>
+        <option value="">All parties</option>
         {PARTIES.map((p) => (
           <option key={p} value={p}>{PARTY_DISPLAY_NAMES[p]}</option>
         ))}
@@ -28,7 +28,7 @@ export default function FilterBar({ filters, onFiltersChange }: FilterBarProps) 
         type="text"
         value={filters.search || ''}
         onChange={(e) => onFiltersChange({ ...filters, search: e.target.value || undefined })}
-        placeholder="Hae viesteistä..."
+        placeholder="Search in messages..."
         className="px-3 py-1.5 rounded-lg border border-slate-300 text-sm text-slate-700 bg-white w-48"
       />
     </div>

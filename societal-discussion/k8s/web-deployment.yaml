@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web
-  namespace: bilingual-chatbot-experiment
+  namespace: manipulative-ai-2
   labels:
     app: web
 spec:
@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: web
-          image: image-registry.apps.2.rahti.csc.fi/bilingual-chatbot-experiment/web:latest
+          image: image-registry.apps.2.rahti.csc.fi/manipulative-ai-2/web:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8080
@@ -29,11 +29,11 @@ spec:
               value: "0.0.0.0"
           resources:
             requests:
-              memory: "128Mi"
-              cpu: "50m"
-            limits:
               memory: "256Mi"
-              cpu: "250m"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
           readinessProbe:
             httpGet:
               path: /

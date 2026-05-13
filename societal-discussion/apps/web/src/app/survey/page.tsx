@@ -1,28 +1,30 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { TRANSLATIONS, getStoredLanguage } from '@/lib/translations';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export default function SurveyPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [t, setT] = useState(TRANSLATIONS.fi);
 
-  // Survey state
+  useEffect(() => {
+    setT(TRANSLATIONS[getStoredLanguage()]);
+  }, []);
+
   const [chatbotUsage, setChatbotUsage] = useState('');
   const [chatbotWhich, setChatbotWhich] = useState('');
   const [politicalChatbot, setPoliticalChatbot] = useState('');
   const [chatbotPerception, setChatbotPerception] = useState<number | null>(null);
   const [conversationReflection, setConversationReflection] = useState('');
-  // Decoy questions
   const [responseSpeed, setResponseSpeed] = useState<number | null>(null);
   const [topicVariety, setTopicVariety] = useState<number | null>(null);
-  // Detection (masked among decoys)
   const [detectedBias, setDetectedBias] = useState<number | null>(null);
   const [detectedTerminology, setDetectedTerminology] = useState<number | null>(null);
   const [detectedPersuasion, setDetectedPersuasion] = useState<number | null>(null);
-  // Open-ended
   const [noticeAnything, setNoticeAnything] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,7 +58,7 @@ export default function SurveyPage() {
       router.push('/thank-you');
     } catch (error) {
       console.error('Error:', error);
-      alert('Kyselyn lähetys epäonnistui. Yritä uudelleen.');
+      alert(t.survey.submitError);
     } finally {
       setIsSubmitting(false);
     }
@@ -100,48 +102,46 @@ export default function SurveyPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white py-8">
       <div className="max-w-2xl mx-auto px-4">
-        <h1 className="text-2xl font-bold text-center text-slate-900 mb-2">Kysely</h1>
-        <p className="text-center text-slate-500 mb-8">
-          Vastaa seuraaviin kysymyksiin keskustelukokemuksesi perusteella.
-        </p>
+        <h1 className="text-2xl font-bold text-center text-slate-900 mb-2">{t.survey.pageTitle}</h1>
+        <p className="text-center text-slate-500 mb-8">{t.survey.pageSubtitle}</p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Section 1: Chatbot usage habits */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-5">
-            <h2 className="font-semibold text-slate-900">Chatbottien käyttö</h2>
+            <h2 className="font-semibold text-slate-900">{t.survey.section1Title}</h2>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Käytätkö chatbotteja (esim. ChatGPT, Copilot, Gemini)? Miten?
+                {t.survey.chatbotUsageLabel}
               </label>
               <textarea
                 value={chatbotUsage}
                 onChange={(e) => setChatbotUsage(e.target.value)}
                 rows={2}
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400"
-                placeholder="Kerro lyhyesti..."
+                placeholder={t.survey.chatbotUsagePlaceholder}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Mitä chatbotteja käytät? (voit listata useita)
+                {t.survey.chatbotWhichLabel}
               </label>
               <input
                 type="text"
                 value={chatbotWhich}
                 onChange={(e) => setChatbotWhich(e.target.value)}
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400"
-                placeholder="Esim. ChatGPT, Copilot..."
+                placeholder={t.survey.chatbotWhichPlaceholder}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Oletko keskustellut poliittisista aiheista chatbotin kanssa aiemmin?
+                {t.survey.politicalChatbotLabel}
               </label>
               <div className="flex gap-3">
-                {['Kyllä', 'Ei', 'En osaa sanoa'].map((opt) => (
+                {t.survey.yesNoUnsure.map((opt) => (
                   <button
                     key={opt}
                     type="button"
@@ -161,106 +161,106 @@ export default function SurveyPage() {
 
           {/* Section 2: Chatbot perception */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-5">
-            <h2 className="font-semibold text-slate-900">Suhtautuminen chatbotteihin</h2>
+            <h2 className="font-semibold text-slate-900">{t.survey.section2Title}</h2>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Miten suhtaudut chatbotteihin yleisesti? (1 = hyvin kielteisesti, 5 = hyvin myönteisesti)
+                {t.survey.chatbotPerceptionLabel}
               </label>
               <LikertScale
                 value={chatbotPerception}
                 onChange={setChatbotPerception}
-                labels={{ low: 'Kielteisesti', high: 'Myönteisesti' }}
+                labels={t.survey.negPos}
               />
             </div>
           </div>
 
           {/* Section 3: Conversation reflection + decoys + detection */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-5">
-            <h2 className="font-semibold text-slate-900">Keskustelukokemuksesi</h2>
+            <h2 className="font-semibold text-slate-900">{t.survey.section3Title}</h2>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Mitä pidit käymistäsi keskusteluista?
+                {t.survey.conversationReflectionLabel}
               </label>
               <textarea
                 value={conversationReflection}
                 onChange={(e) => setConversationReflection(e.target.value)}
                 rows={2}
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400"
-                placeholder="Kerro vapaasti..."
+                placeholder={t.survey.conversationReflectionPlaceholder}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Miten arvioit chatbotin vastausnopeutta? (1 = liian hidas, 5 = erittäin nopea)
+                {t.survey.responseSpeedLabel}
               </label>
               <LikertScale
                 value={responseSpeed}
                 onChange={setResponseSpeed}
-                labels={{ low: 'Hidas', high: 'Nopea' }}
+                labels={t.survey.slowFast}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Miten monipuolisesti chatbot käsitteli aiheita? (1 = yksipuolisesti, 5 = monipuolisesti)
+                {t.survey.topicVarietyLabel}
               </label>
               <LikertScale
                 value={topicVariety}
                 onChange={setTopicVariety}
-                labels={{ low: 'Yksipuolisesti', high: 'Monipuolisesti' }}
+                labels={t.survey.onesidedVaried}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Havaitko chatbotin vastauksissa puolueellisuutta? (1 = en lainkaan, 5 = selvästi)
+                {t.survey.detectedBiasLabel}
               </label>
               <LikertScale
                 value={detectedBias}
                 onChange={setDetectedBias}
-                labels={{ low: 'En lainkaan', high: 'Selvästi' }}
+                labels={t.survey.notAtAllClearly}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Käyttikö chatbot tietynlaista sanastoa tai termejä? (1 = en huomannut, 5 = selvästi)
+                {t.survey.detectedTerminologyLabel}
               </label>
               <LikertScale
                 value={detectedTerminology}
                 onChange={setDetectedTerminology}
-                labels={{ low: 'En huomannut', high: 'Selvästi' }}
+                labels={t.survey.notNoticedClearly}
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Yrittikö chatbot mielestäsi vaikuttaa mielipiteeseesi? (1 = ei lainkaan, 5 = selvästi)
+                {t.survey.detectedPersuasionLabel}
               </label>
               <LikertScale
                 value={detectedPersuasion}
                 onChange={setDetectedPersuasion}
-                labels={{ low: 'Ei lainkaan', high: 'Selvästi' }}
+                labels={t.survey.notAtAllClearly}
               />
             </div>
           </div>
 
           {/* Section 4: Open-ended */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-            <h2 className="font-semibold text-slate-900 mb-4">Vapaa palaute</h2>
+            <h2 className="font-semibold text-slate-900 mb-4">{t.survey.section4Title}</h2>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Huomasitko chatbotin vastauksissa jotain erityistä? Kerro vapaasti.
+                {t.survey.noticeAnythingLabel}
               </label>
               <textarea
                 value={noticeAnything}
                 onChange={(e) => setNoticeAnything(e.target.value)}
                 rows={3}
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-400"
-                placeholder="Vapaamuotoinen vastaus..."
+                placeholder={t.survey.noticeAnythingPlaceholder}
               />
             </div>
           </div>
@@ -272,7 +272,7 @@ export default function SurveyPage() {
               disabled={isSubmitting}
               className="px-8 py-3 rounded-xl bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isSubmitting ? 'Lähetetään...' : 'Lähetä vastaukset'}
+              {isSubmitting ? t.survey.submitting : t.survey.submit}
             </button>
           </div>
         </form>

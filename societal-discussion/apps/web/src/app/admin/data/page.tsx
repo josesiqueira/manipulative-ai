@@ -72,13 +72,13 @@ export default function DataPage() {
 
   const handleDeleteAllData = async () => {
     const confirmed = window.confirm(
-      'Haluatko varmasti poistaa KAIKKI keskusteludata?\n\n' +
-      'Tämä poistaa:\n' +
-      '- Kaikki sessiot\n' +
-      '- Kaikki keskustelut ja viestit\n' +
-      '- Kaikki kyselyvastaukset\n\n' +
-      'Promptit ja puolueohjelmat säilyvät.\n\n' +
-      'Tätä toimintoa EI voi peruuttaa.'
+      'Are you sure you want to delete ALL conversation data?\n\n' +
+      'This will delete:\n' +
+      '- All sessions\n' +
+      '- All conversations and messages\n' +
+      '- All survey responses\n\n' +
+      'Prompts and party programs will be preserved.\n\n' +
+      'This action CANNOT be undone.'
     );
     if (!confirmed) return;
 
@@ -90,12 +90,12 @@ export default function DataPage() {
         headers: { 'X-Admin-Password': password },
       });
       if (res.ok) {
-        setDeleteMessage({ type: 'success', text: 'Kaikki keskusteludata poistettu.' });
+        setDeleteMessage({ type: 'success', text: 'All conversation data deleted.' });
       } else {
-        setDeleteMessage({ type: 'error', text: 'Poisto epäonnistui.' });
+        setDeleteMessage({ type: 'error', text: 'Deletion failed.' });
       }
     } catch {
-      setDeleteMessage({ type: 'error', text: 'Yhteysvirhe.' });
+      setDeleteMessage({ type: 'error', text: 'Connection error.' });
     } finally {
       setDeleting(false);
     }
@@ -105,14 +105,14 @@ export default function DataPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-semibold text-slate-900">Data & Export</h1>
-        <p className="text-sm text-slate-500 mt-1">Vie keskusteludata ja tarkista järjestelmän tila.</p>
+        <p className="text-sm text-slate-500 mt-1">Export conversation data and check system status.</p>
       </div>
 
-      <Section title="Export" description="Lataa keskusteludata CSV-, JSON- tai ZIP-muodossa.">
+      <Section title="Export" description="Download conversation data in CSV, JSON, or ZIP format.">
         <ExportPanel password={password} />
       </Section>
 
-      <Section title="Järjestelmän tila" description="Automaattiset tarkistukset ennen kokeilun aloittamista.">
+      <Section title="System status" description="Automated checks before starting the experiment.">
         {loading ? (
           <div className="space-y-3">
             {[1, 2].map((i) => (
@@ -126,25 +126,25 @@ export default function DataPage() {
           <div className="divide-y divide-slate-100">
             <CheckItem
               ok={llmConfigs === null ? null : activeLlm !== null}
-              label="LLM-palvelin konfiguroitu"
+              label="LLM provider configured"
               detail={
                 llmConfigs === null
-                  ? 'Ei voitu ladata LLM-konfiguraatiota'
+                  ? 'Could not load LLM configuration'
                   : activeLlm
-                  ? `${activeLlm.display_name}${activeLlm.selected_model ? ` — ${activeLlm.selected_model}` : ''} (aktiivinen)`
-                  : 'Ei aktiivista LLM-palvelinta API-avaimella'
+                  ? `${activeLlm.display_name}${activeLlm.selected_model ? ` — ${activeLlm.selected_model}` : ''} (active)`
+                  : 'No active LLM provider with an API key'
               }
             />
             <CheckItem
               ok={true}
-              label="Puolueohjelmat ladattu"
-              detail="9 puolueohjelmaa (SDP, Vasemmistoliitto, Vihreät, RKP, Keskusta, Kokoomus, Perussuomalaiset, Kristillisdemokraatit, Liike Nyt)"
+              label="Party programs loaded"
+              detail="9 party programs (SDP, Vasemmistoliitto, Vihreät, RKP, Keskusta, Kokoomus, Perussuomalaiset, Kristillisdemokraatit, Liike Nyt)"
             />
           </div>
         )}
       </Section>
 
-      <Section title="Tietojen poisto" description="Poista kaikki keskusteludata. Promptit ja puolueohjelmat säilyvät.">
+      <Section title="Data deletion" description="Delete all conversation data. Prompts and party programs are preserved.">
         {deleteMessage && (
           <div className={`mb-4 px-4 py-2 rounded-lg text-sm ${
             deleteMessage.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
@@ -155,10 +155,10 @@ export default function DataPage() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-slate-600">
-              Poistaa kaikki sessiot, keskustelut, viestit ja kyselyvastaukset.
+              Deletes all sessions, conversations, messages, and survey responses.
             </p>
             <p className="text-xs text-slate-400 mt-1">
-              Tätä toimintoa ei voi peruuttaa. Vie data ensin jos tarvitset sen.
+              This action cannot be undone. Export the data first if you need it.
             </p>
           </div>
           <button
@@ -166,7 +166,7 @@ export default function DataPage() {
             disabled={deleting}
             className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors disabled:opacity-50 flex-shrink-0"
           >
-            {deleting ? 'Poistetaan...' : 'Poista kaikki data'}
+            {deleting ? 'Deleting...' : 'Delete all data'}
           </button>
         </div>
       </Section>

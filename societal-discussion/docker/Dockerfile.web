@@ -2,33 +2,33 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
 COPY apps/web/package*.json ./
-
-# Install dependencies
 RUN npm install
 
-# Copy application code
 COPY apps/web .
 
-# Build the application
+# Public env vars need to be present at build time — Next.js bakes them
+# into the client bundle.
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
 RUN npm run build
 
-# Production stage
 FROM node:20-alpine AS runner
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Copy built application
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-EXPOSE 3000
+RUN chgrp -R 0 /app && chmod -R g+rwX /app
 
-ENV PORT=3000
+EXPOSE 8080
+
+ENV PORT=8080
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "server.js"]

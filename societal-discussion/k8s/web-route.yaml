@@ -2,9 +2,9 @@ apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: web
-  namespace: bilingual-chatbot-experiment
+  namespace: manipulative-ai-2
 spec:
-  host: web-bilingual-chatbot-experiment.2.rahtiapp.fi
+  host: vaalikeskustelu.2.rahtiapp.fi
   to:
     kind: Service
     name: web

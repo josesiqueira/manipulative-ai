@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: web
-  namespace: bilingual-chatbot-experiment
+  namespace: manipulative-ai-2
   labels:
     app: web
 spec:
