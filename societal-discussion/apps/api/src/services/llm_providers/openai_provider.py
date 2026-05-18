@@ -7,6 +7,18 @@ from openai import OpenAI
 from .base import LLMProvider
 
 
+# GPT-5.5 reasoning-family models reject any temperature other than the
+# default (1.0) with HTTP 400. Older GPT-5.x (5.4 family) and the GPT-4.x
+# family accept arbitrary temperatures. We block-list the known-restrictive
+# prefixes so everything else (including GPT-5.4, GPT-4.x, o-series) keeps
+# receiving the configured temperature.
+_TEMPERATURE_INCOMPATIBLE_PREFIXES = ("gpt-5.5",)
+
+
+def _supports_custom_temperature(model: str) -> bool:
+    return not model.startswith(_TEMPERATURE_INCOMPATIBLE_PREFIXES)
+
+
 class OpenAIProvider(LLMProvider):
     def __init__(self, api_key: str):
         super().__init__(api_key)
@@ -23,12 +35,17 @@ class OpenAIProvider(LLMProvider):
             {"role": msg["role"], "content": msg["content"]} for msg in messages
         ]
 
+        kwargs: dict = {
+            "model": model,
+            "max_completion_tokens": max_tokens,
+            "messages": openai_messages,
+        }
+        if _supports_custom_temperature(model):
+            kwargs["temperature"] = temperature
+
         response = await asyncio.to_thread(
             self.client.chat.completions.create,
-            model=model,
-            max_completion_tokens=max_tokens,
-            temperature=temperature,
-            messages=openai_messages,
+            **kwargs,
         )
 
         response_text = response.choices[0].message.content
@@ -46,13 +63,16 @@ class OpenAIProvider(LLMProvider):
             {"role": msg["role"], "content": msg["content"]} for msg in messages
         ]
 
-        stream = self.client.chat.completions.create(
-            model=model,
-            max_completion_tokens=max_tokens,
-            temperature=temperature,
-            messages=openai_messages,
-            stream=True,
-        )
+        kwargs: dict = {
+            "model": model,
+            "max_completion_tokens": max_tokens,
+            "messages": openai_messages,
+            "stream": True,
+        }
+        if _supports_custom_temperature(model):
+            kwargs["temperature"] = temperature
+
+        stream = self.client.chat.completions.create(**kwargs)
 
         for chunk in stream:
             if chunk.choices[0].delta.content:

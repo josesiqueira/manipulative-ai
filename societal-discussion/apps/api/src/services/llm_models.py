@@ -8,8 +8,8 @@ AVAILABLE_MODELS = {
     "openai": {
         "display_name": "OpenAI",
         "models": [
-            {"id": "gpt-5.5", "name": "GPT-5.5 (flagship, 1M context)", "recommended": True},
-            {"id": "gpt-5.5-pro", "name": "GPT-5.5 Pro (highest accuracy)", "recommended": False},
+            {"id": "gpt-5.4", "name": "GPT-5.4 (frontier, 1M context)", "recommended": True},
+            {"id": "gpt-5.4-mini", "name": "GPT-5.4 Mini (cheap, 1M context)", "recommended": False},
             {"id": "gpt-4.1", "name": "GPT-4.1 (1M context, no surcharge)", "recommended": False},
             {"id": "gpt-4o", "name": "GPT-4o (128K — too small for largest party)", "recommended": False},
         ],

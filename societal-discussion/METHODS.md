@@ -128,12 +128,15 @@ deliberately deferred — see §11.)
 
 ## 8. Language model
 
-- **Model**: OpenAI **GPT-5.5** (April 2026 flagship release).
-- **Context window**: 1M tokens via the API. Vihreät's 220 K-token corpus
-  + system prompt (~2 K) + history (~5–10 K) + output budget (~4 K) →
-  ~240 K total per request, comfortably under the 272 K input threshold
-  where OpenAI applies a 2× input / 1.5× output surcharge.
-- **Temperature**: 0.1 — favors response consistency.
+- **Model**: OpenAI **GPT-5.4** (March 2026 frontier release).
+- **Context window**: ~1.05M tokens (922 K input + 128 K output).
+  Vihreät's 220 K-token corpus + system prompt (~2 K) + history (~5–10 K)
+  + output budget (~4 K) → ~240 K total per request, comfortably under
+  the 272 K input threshold where OpenAI applies a 2× input / 1.5× output
+  surcharge.
+- **Temperature**: 0.1 — favors response consistency. (The newer GPT-5.5
+  flagship rejects non-default temperatures, which is why we stayed on
+  GPT-5.4.)
 
 ## 9. Participant access gate
 
@@ -185,7 +188,7 @@ bias-detection intent isn't telegraphed to the participant.
 - **Persona drift** (degradation of voice consistency after ~8–12 turns)
   is documented in the recent literature. The 3–5 minute target
   conversation length (typically 5–10 turns) sits *before* the drift
-  cliff. GPT-5.5's 1M context window further mitigates this versus older
+  cliff. GPT-5.4's 1M context window further mitigates this versus older
   models.
 - **CAG vs RAG**: corpus is static and bounded — textbook CAG use case;
   no need for retrieval infrastructure.
