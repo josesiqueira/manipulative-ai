@@ -12,23 +12,12 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-// A signal value distinguishing "free conversation" from "no pending start".
-const FREE_CONVERSATION = '__free__';
-
 export default function LandingPage() {
   const router = useRouter();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
   const [lang, setLang] = useState<Language>('fi');
-
-  // Access-code gate state. `pendingTopic` is set when the user clicks any
-  // start-conversation button without yet having verified an access code.
-  // Once verified for the session, the code is stored in sessionStorage and
-  // future starts skip the modal.
-  const [pendingTopic, setPendingTopic] = useState<string | null>(null);
-  const [codeInput, setCodeInput] = useState('');
-  const [codeError, setCodeError] = useState<string | null>(null);
-  const [codeSubmitting, setCodeSubmitting] = useState(false);
 
   useEffect(() => {
     setLang(getStoredLanguage());
@@ -73,95 +62,35 @@ export default function LandingPage() {
     setStoredLanguage(newLang);
   };
 
-  // Actually create a conversation against the API, using a known-good code.
-  const createConversation = useCallback(
-    async (starterTopic: string | null, accessCode: string): Promise<'ok' | 'unauthorized' | 'error'> => {
-      if (!sessionId) return 'error';
-      try {
-        const response = await fetch(`${API_URL}/api/conversations`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Participant-Password': accessCode,
-          },
-          body: JSON.stringify({
-            session_id: sessionId,
-            starter_topic: starterTopic,
-            language: lang,
-          }),
-        });
-        if (response.status === 401) return 'unauthorized';
-        if (response.status === 404) {
-          localStorage.removeItem('sessionId');
-          window.location.reload();
-          return 'error';
-        }
-        if (!response.ok) return 'error';
-        const data = await response.json();
-        localStorage.setItem('conversationId', data.id);
-        if (starterTopic) localStorage.setItem('starterTopic', starterTopic);
-        else localStorage.removeItem('starterTopic');
-        router.push('/chat');
-        return 'ok';
-      } catch (err) {
-        console.error('Error starting chat:', err);
-        return 'error';
+  const startConversation = useCallback(async () => {
+    if (!sessionId || isStarting) return;
+    setIsStarting(true);
+    try {
+      const response = await fetch(`${API_URL}/api/conversations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: sessionId,
+          starter_topic: null,
+          language: lang,
+        }),
+      });
+      if (response.status === 404) {
+        localStorage.removeItem('sessionId');
+        window.location.reload();
+        return;
       }
-    },
-    [sessionId, router, lang],
-  );
-
-  // Entry point for every "start conversation" button.  Either short-circuits
-  // (we already have a verified code in sessionStorage) or opens the modal.
-  const startChat = useCallback(
-    async (starterTopic?: string) => {
-      if (!sessionId) return;
-      const topicKey = starterTopic ?? FREE_CONVERSATION;
-
-      const cached = sessionStorage.getItem('participantPassword');
-      if (cached) {
-        const result = await createConversation(starterTopic ?? null, cached);
-        if (result === 'unauthorized') {
-          // Cached code was rejected (server-side password changed?). Fall
-          // through to the modal flow.
-          sessionStorage.removeItem('participantPassword');
-        } else {
-          return;
-        }
-      }
-
-      // No verified code yet — open the gate.
-      setPendingTopic(topicKey);
-      setCodeError(null);
-      setCodeInput('');
-    },
-    [sessionId, createConversation],
-  );
-
-  const submitCode = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!codeInput.trim() || codeSubmitting || pendingTopic === null) return;
-    setCodeSubmitting(true);
-    setCodeError(null);
-    const starterTopic = pendingTopic === FREE_CONVERSATION ? null : pendingTopic;
-    const result = await createConversation(starterTopic, codeInput);
-    if (result === 'ok') {
-      sessionStorage.setItem('participantPassword', codeInput);
-      // The router push has been triggered — clear local state.
-      setPendingTopic(null);
-    } else if (result === 'unauthorized') {
-      setCodeError(t.accessGate.wrongCode);
-    } else {
-      setCodeError(t.accessGate.networkError);
+      if (!response.ok) throw new Error('Failed to create conversation');
+      const data = await response.json();
+      localStorage.setItem('conversationId', data.id);
+      localStorage.removeItem('starterTopic');
+      router.push('/chat');
+    } catch (err) {
+      console.error('Error starting chat:', err);
+    } finally {
+      setIsStarting(false);
     }
-    setCodeSubmitting(false);
-  };
-
-  const cancelCode = () => {
-    setPendingTopic(null);
-    setCodeError(null);
-    setCodeInput('');
-  };
+  }, [sessionId, isStarting, lang, router]);
 
   const t = TRANSLATIONS[lang];
 
@@ -206,16 +135,16 @@ export default function LandingPage() {
           </p>
         </div>
 
-        {/* Free conversation button */}
+        {/* Single start-conversation button */}
         <button
-          onClick={() => startChat()}
-          disabled={!sessionId || isCreatingSession}
+          onClick={startConversation}
+          disabled={!sessionId || isCreatingSession || isStarting}
           className="w-full mb-8 py-4 px-6 bg-slate-900 text-white rounded-xl font-semibold text-lg hover:bg-slate-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {t.landing.freeConvButton}
         </button>
 
-        {/* Topic categories */}
+        {/* Topic suggestions — read-only text */}
         <h2 className="text-lg font-semibold text-slate-700 mb-4">
           {t.landing.orPickTopic}
         </h2>
@@ -226,81 +155,20 @@ export default function LandingPage() {
               <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-2">
                 {category.title}
               </h3>
-              <div className="grid grid-cols-1 gap-2">
+              <ul className="space-y-1.5">
                 {category.topics.map((topic) => (
-                  <button
+                  <li
                     key={topic}
-                    onClick={() => startChat(topic)}
-                    disabled={!sessionId || isCreatingSession}
-                    className="text-left p-4 bg-white rounded-lg border border-slate-200 hover:border-blue-300 hover:bg-blue-50 transition-colors text-slate-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="text-slate-700 text-sm leading-relaxed pl-4 relative before:content-['•'] before:absolute before:left-0 before:text-slate-400"
                   >
                     {topic}
-                  </button>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           ))}
         </div>
       </div>
-
-      {/* Access-code modal */}
-      {pendingTopic !== null && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4"
-          role="dialog"
-          aria-modal="true"
-        >
-          <form
-            onSubmit={submitCode}
-            className="bg-white rounded-xl shadow-lg p-6 w-full max-w-sm"
-          >
-            <h2 className="text-lg font-semibold text-slate-900 mb-2">
-              {t.accessGate.title}
-            </h2>
-            <p className="text-sm text-slate-500 mb-4">{t.accessGate.hint}</p>
-
-            {codeError && (
-              <div
-                role="alert"
-                className="mb-3 px-3 py-2 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm"
-              >
-                {codeError}
-              </div>
-            )}
-
-            <input
-              type="password"
-              value={codeInput}
-              onChange={(e) => {
-                setCodeInput(e.target.value);
-                if (codeError) setCodeError(null);
-              }}
-              placeholder={t.accessGate.placeholder}
-              autoFocus
-              disabled={codeSubmitting}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-blue-600 disabled:opacity-60"
-            />
-
-            <div className="mt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={cancelCode}
-                disabled={codeSubmitting}
-                className="flex-1 py-2 rounded-md border border-slate-300 text-slate-600 text-sm font-medium hover:bg-slate-100 disabled:opacity-60"
-              >
-                {t.accessGate.cancelBtn}
-              </button>
-              <button
-                type="submit"
-                disabled={codeSubmitting || !codeInput.trim()}
-                className="flex-1 py-2 rounded-md bg-slate-900 text-white text-sm font-medium hover:bg-slate-800 disabled:opacity-60"
-              >
-                {codeSubmitting ? '…' : t.accessGate.continueBtn}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
     </div>
   );
 }

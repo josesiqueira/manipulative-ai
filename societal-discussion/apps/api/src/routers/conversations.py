@@ -10,7 +10,7 @@ from zoneinfo import ZoneInfo
 
 HELSINKI = ZoneInfo("Europe/Helsinki")
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,41 +20,11 @@ from ..config import get_settings
 from ..database import get_db
 from ..models import Session, Conversation, Message
 from ..services.party_assignment import assign_party
+from ..services.party_grounding import ALL_PARTIES
 from ..services.llm_client import generate_response
 from ..services.conversation_logger import save_conversation_log
 
 router = APIRouter()
-
-
-def _expected_participant_password() -> str:
-    """Effective participant password: dedicated env var or fall back to admin_password."""
-    s = get_settings()
-    return s.participant_password or s.admin_password
-
-
-def verify_participant_password(
-    x_participant_password: str | None = Header(default=None, alias="X-Participant-Password"),
-) -> bool:
-    """Gate every new conversation behind an access code.
-
-    Without this check, anyone with the public URL could create conversations
-    and burn OpenAI budget. The code lives in PARTICIPANT_PASSWORD (or falls
-    back to ADMIN_PASSWORD) and is sent as the X-Participant-Password header
-    by the landing-page access modal.
-    """
-    expected = _expected_participant_password()
-    if not expected:
-        # Misconfigured deployment: fail closed.
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Participant access not configured",
-        )
-    if x_participant_password != expected:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid access code",
-        )
-    return True
 
 
 class ConversationCreate(BaseModel):
@@ -101,7 +71,6 @@ class MessageResponse(BaseModel):
 async def create_conversation(
     data: ConversationCreate,
     db: AsyncSession = Depends(get_db),
-    _: bool = Depends(verify_participant_password),
 ):
     """
     Start a new conversation.
@@ -121,8 +90,15 @@ async def create_conversation(
             detail="Session not found",
         )
 
-    # Assign party (no-repeat within session)
-    assigned_party = await assign_party(db, session.id)
+    # Assign party. If FORCED_PARTY is set in the env, every conversation
+    # goes to that party (used during the HEPP demo to point all traffic
+    # at a single party). Otherwise fall back to the normal no-repeat
+    # weighted-random assignment.
+    settings = get_settings()
+    if settings.forced_party and settings.forced_party in ALL_PARTIES:
+        assigned_party = settings.forced_party
+    else:
+        assigned_party = await assign_party(db, session.id)
 
     language = data.language if data.language in ("fi", "en") else "fi"
 

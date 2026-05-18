@@ -42,6 +42,11 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: ENCRYPTION_SECRET
+            # HEPP demo: pin every participant conversation to a single party.
+            # Set to empty to restore normal no-repeat random assignment
+            # across all 9 parties.
+            - name: FORCED_PARTY
+              value: "perussuomalaiset"
           volumeMounts:
             - name: sqlite-data
               mountPath: /data

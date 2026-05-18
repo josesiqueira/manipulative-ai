@@ -99,8 +99,8 @@ const fi: UIStrings = {
     goalLabel: 'Tavoite:',
     goalText:
       'Keskustele chatbotin kanssa 3–5 minuuttia ennen kyselyyn vastaamista. Käy 2–3 eri keskustelua chatbotin kanssa.',
-    freeConvButton: 'Vapaa keskustelu',
-    orPickTopic: 'Tai valitse aihe keskustelulle:',
+    freeConvButton: 'Aloita keskustelu',
+    orPickTopic: 'Pohdittavaksi näitä aiheita keskustelua varten:',
   },
   chat: {
     header: 'Vaalikeskustelu',
@@ -256,8 +256,8 @@ const en: UIStrings = {
     goalLabel: 'Goal:',
     goalText:
       'Chat with the bot for 3–5 minutes before answering the survey. Have 2–3 separate conversations with the chatbot.',
-    freeConvButton: 'Free conversation',
-    orPickTopic: 'Or pick a topic to discuss:',
+    freeConvButton: 'Start conversation',
+    orPickTopic: 'Consider these topics to discuss:',
   },
   chat: {
     header: 'Vaalikeskustelu',
