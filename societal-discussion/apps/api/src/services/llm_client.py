@@ -1,7 +1,7 @@
 """
 LLM client for generating AI responses.
 
-Uses OpenAI API with GPT-5.4 by default. Party program grounding is handled
+Uses OpenAI API with GPT-5.5 by default. Party program grounding is handled
 by prompt_builder.py which injects the full party text into the system prompt.
 """
 from sqlalchemy import select
