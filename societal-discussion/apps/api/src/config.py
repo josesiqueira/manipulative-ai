@@ -23,10 +23,16 @@ class Settings(BaseSettings):
     # Admin
     admin_password: str = "admin"
 
-    # Participant access code — required to start a conversation. Defaults to
-    # the same value as the admin password so the deploy comes up working;
-    # researchers can later set a separate PARTICIPANT_PASSWORD env var.
+    # Participant access code — used to be required to start a conversation,
+    # currently unused while the participant URL is open to the public for
+    # HEPP demo. Kept here so re-enabling the gate is a one-line change.
     participant_password: str = ""
+
+    # When set, every participant conversation is forced to this party
+    # (overrides the normal no-repeat random assignment). Used during the
+    # HEPP demo to point all traffic at a single party. Empty = normal
+    # weighted-random assignment across all 9 parties.
+    forced_party: str = ""
 
     # CORS
     cors_origins: str = "http://localhost:3000"
