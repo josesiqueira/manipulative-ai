@@ -1401,7 +1401,11 @@ async def download_logs_zip(_: bool = Depends(verify_admin)):
 # Prompt Configuration Endpoints
 # ============================================================================
 
-from ..services.prompt_builder import DEFAULT_SYSTEM_INSTRUCTION, build_system_prompt
+from ..services.prompt_builder import (
+    DEFAULT_SYSTEM_INSTRUCTION,
+    _default_instruction_for,
+    build_system_prompt,
+)
 
 
 class PromptConfigResponse(BaseModel):
@@ -1443,7 +1447,10 @@ async def get_all_prompts(
             source = "database"
             updated_at = db_cfg.updated_at
         else:
-            instruction = DEFAULT_SYSTEM_INSTRUCTION
+            # Use the per-party resolver so the admin Prompts page shows the
+            # same default that the bot would actually use (e.g. populism
+            # markers for perussuomalaiset_populist).
+            instruction = _default_instruction_for(party)
             source = "default"
             updated_at = None
 

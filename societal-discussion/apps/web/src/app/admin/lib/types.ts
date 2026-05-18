@@ -108,6 +108,7 @@ export const PARTIES = [
   'perussuomalaiset',
   'kristillisdemokraatit',
   'liikenyt',
+  'perussuomalaiset_populist',
 ] as const;
 
 export const PARTY_DISPLAY_NAMES: Record<string, string> = {
@@ -120,18 +121,21 @@ export const PARTY_DISPLAY_NAMES: Record<string, string> = {
   perussuomalaiset: 'Perussuomalaiset',
   kristillisdemokraatit: 'Kristillisdemokraatit',
   liikenyt: 'Liike Nyt',
+  perussuomalaiset_populist: 'Perussuomalaiset Populist',
 };
 
 // Colors loosely match each party's brand identity while staying visually
-// distinct in charts and badges.
+// distinct in charts and badges. The "populist" variant of Perussuomalaiset
+// shares the brand navy but darkened to mark it as a separate condition.
 export const PARTY_COLORS: Record<string, string> = {
-  sdp: '#DC2626',                  // red
-  vasemmistoliitto: '#9333EA',     // purple (brand red would clash with SDP)
-  vihreat: '#16A34A',              // emerald green
-  rkp: '#FACC15',                  // yellow
-  keskusta: '#65A30D',             // olive green
-  kokoomus: '#2563EB',             // royal blue
-  perussuomalaiset: '#1E3A8A',     // navy blue
-  kristillisdemokraatit: '#F59E0B',// amber
-  liikenyt: '#0D9488',             // teal
+  sdp: '#DC2626',                       // red
+  vasemmistoliitto: '#9333EA',          // purple (brand red would clash with SDP)
+  vihreat: '#16A34A',                   // emerald green
+  rkp: '#FACC15',                       // yellow
+  keskusta: '#65A30D',                  // olive green
+  kokoomus: '#2563EB',                  // royal blue
+  perussuomalaiset: '#1E3A8A',          // navy blue
+  kristillisdemokraatit: '#F59E0B',     // amber
+  liikenyt: '#0D9488',                  // teal
+  perussuomalaiset_populist: '#0C1E55', // very dark navy (perussuomalaiset, darker)
 };

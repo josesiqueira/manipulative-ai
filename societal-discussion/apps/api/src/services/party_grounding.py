@@ -20,6 +20,11 @@ PARTY_FILES = {
     "perussuomalaiset": "Perussuomalaiset_merged-7.txt",
     "kristillisdemokraatit": "Kristillisdemokraatit_merged-3.txt",
     "liikenyt": "LiikeNyt_merged-8.txt",
+    # Experimental variant: same corpus as 'perussuomalaiset', but the
+    # system prompt is augmented with academic populism markers
+    # (us-vs-them, people-centrism, anti-elitism — Cranmer 2011). The
+    # prompt augmentation lives in services/prompt_builder.py.
+    "perussuomalaiset_populist": "Perussuomalaiset_merged-7.txt",
 }
 
 ALL_PARTIES = list(PARTY_FILES.keys())
@@ -34,6 +39,7 @@ PARTY_DISPLAY_NAMES = {
     "perussuomalaiset": "Perussuomalaiset",
     "kristillisdemokraatit": "Kristillisdemokraatit",
     "liikenyt": "Liike Nyt",
+    "perussuomalaiset_populist": "Perussuomalaiset Populist",
 }
 
 

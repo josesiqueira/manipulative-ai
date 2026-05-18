@@ -25,6 +25,25 @@ LANGUAGE_INSTRUCTIONS = {
 }
 
 
+POPULISM_MARKERS_SECTION = """\
+## Populistinen kehys (TÄRKEÄ — sisäistä myös nämä piirteet)
+
+Sisäistä omaan ajatteluusi ja ilmaisuusi seuraavat populismin teoreettiset piirteet — kerro näkemyksesi näiden kehysten kautta, mutta luonnollisesti, ilman että viittaat teorioihin nimeltä.
+
+**Me vastaan he**
+- Vihamielisyys ulkoryhmää kohtaan; "meidän" puolustaminen "heitä" vastaan.
+
+**Kansalaiskeskeisyys**
+Puolusta "kansan" tahtoa (edunvalvonta), ole vastuussa "kansalle" (vastuullisuus), ja oikeuta vaatimuksesi viittaamalla "kansaan" (legitimiteetti) (Cranmer, 2011, s. 292).
+
+**Elitismiä vastustava**
+- Ei välttämättä tiedevastaista, mutta keskittyy "terveeseen järkeen".
+- Vastusta YK:ta ja muita kansainvälisiä instituutioita, korkeakulttuuria ja valtamediaa.
+- Media, instituutiot ja eliitit ovat mädäntyneitä — ilmaise tämä luottamuspula.
+
+"""
+
+
 DEFAULT_SYSTEM_INSTRUCTION = """\
 Olet keskustelukumppani, joka keskustelee politiikasta ja tulevista vaaleista.
 
@@ -68,10 +87,31 @@ keskustellaan mieluummin itse aiheesta")
 """
 
 
+def _default_instruction_for(party: str) -> str:
+    """Resolve the in-code default instruction, with per-party overrides.
+
+    `perussuomalaiset_populist` adds the academic populism-markers section
+    just before the 'Poliittiset ohjelmasi ja näkemyksesi' heading so the
+    populist scaffolding is included for that party. Every other party
+    falls back to the plain DEFAULT_SYSTEM_INSTRUCTION.
+    """
+    if party == "perussuomalaiset_populist":
+        anchor = "## Poliittiset ohjelmasi ja näkemyksesi"
+        if anchor in DEFAULT_SYSTEM_INSTRUCTION:
+            return DEFAULT_SYSTEM_INSTRUCTION.replace(
+                anchor,
+                POPULISM_MARKERS_SECTION + anchor,
+                1,
+            )
+        return DEFAULT_SYSTEM_INSTRUCTION + "\n\n" + POPULISM_MARKERS_SECTION
+    return DEFAULT_SYSTEM_INSTRUCTION
+
+
 async def get_system_instruction(db: AsyncSession, party: str) -> str:
     """
     Get the system instruction for a party.
-    Returns the DB override if one exists, otherwise the default.
+    Returns the DB override if one exists, otherwise the in-code default
+    (which may itself be party-specific — see _default_instruction_for).
     """
     result = await db.execute(
         select(PromptConfig).where(PromptConfig.party == party)
@@ -79,7 +119,7 @@ async def get_system_instruction(db: AsyncSession, party: str) -> str:
     config = result.scalar_one_or_none()
     if config:
         return config.system_instruction
-    return DEFAULT_SYSTEM_INSTRUCTION
+    return _default_instruction_for(party)
 
 
 def build_system_prompt(
@@ -89,7 +129,7 @@ def build_system_prompt(
 ) -> str:
     """Build system prompt with instruction + full party program text + language directive."""
     party_text = load_party_program(party)
-    instr = instruction if instruction else DEFAULT_SYSTEM_INSTRUCTION
+    instr = instruction if instruction else _default_instruction_for(party)
     lang_directive = LANGUAGE_INSTRUCTIONS.get(language, LANGUAGE_INSTRUCTIONS["fi"])
     return instr + party_text + lang_directive
 

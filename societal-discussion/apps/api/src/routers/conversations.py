@@ -5,6 +5,7 @@ Handles creating conversations (with party assignment), sending messages,
 and ending conversations.
 """
 
+import random
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -90,13 +91,20 @@ async def create_conversation(
             detail="Session not found",
         )
 
-    # Assign party. If FORCED_PARTY is set in the env, every conversation
-    # goes to that party (used during the HEPP demo to point all traffic
-    # at a single party). Otherwise fall back to the normal no-repeat
-    # weighted-random assignment.
+    # Assign party. FORCED_PARTY can be:
+    #   - empty                               → normal no-repeat weighted random
+    #   - "perussuomalaiset"                  → every conversation goes there
+    #   - "perussuomalaiset,perussuomalaiset_populist"
+    #                                         → random pick between the listed
+    #                                           parties (uniform; ignores
+    #                                           per-session no-repeat)
     settings = get_settings()
-    if settings.forced_party and settings.forced_party in ALL_PARTIES:
-        assigned_party = settings.forced_party
+    candidates = [
+        p.strip() for p in (settings.forced_party or "").split(",") if p.strip()
+    ]
+    candidates = [p for p in candidates if p in ALL_PARTIES]
+    if candidates:
+        assigned_party = random.choice(candidates)
     else:
         assigned_party = await assign_party(db, session.id)
 
