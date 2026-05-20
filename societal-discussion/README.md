@@ -2,141 +2,152 @@
 
 A research chatbot experiment from Tampere University. Finnish-speaking participants chat with an LLM about politics; the bot is secretly aligned with one of nine Finnish political parties (or a tenth populism-augmented variant), grounded in the party's actual program documents from Pohtiva. The research question: can participants detect that the bot is aligned with a specific party?
 
-Bilingual Finnish/English. See [`METHODS.md`](METHODS.md) for the methodology.
+Bilingual Finnish/English. See [`METHODS.md`](METHODS.md) for the full methodology, and the [repo-root README](../README.md) for project overview + release notes.
 
-## Tech Stack
+## Tech stack
 
-- **Backend**: FastAPI + SQLAlchemy + PostgreSQL
-- **Frontend**: Next.js 14 + TypeScript + Tailwind CSS
-- **AI**: Claude API (Anthropic) with few-shot prompting
-- **Internationalization**: next-intl (English/Finnish)
+- **Backend** — FastAPI + SQLAlchemy 2.0 (async) + Alembic, Python 3.12
+- **Database** — SQLite on a Persistent Volume in production; same file locally
+- **Frontend** — Next.js 14 (App Router) + TypeScript + Tailwind CSS
+- **LLM** — OpenAI GPT-5.4 (temperature 0.1, ~1M context window for full-corpus injection). Anthropic provider wired in but unused.
+- **Internationalization** — custom `apps/web/src/lib/translations.ts` (Finnish + English), no i18n routing library
+- **Deployment** — CSC Rahti (OpenShift); Docker images + manifests in `docker/` and `k8s/`
 
-## Quick Start
+The bot is grounded by **injecting the entire party-program text** into the system prompt at every request — Cache-Augmented Generation (CAG), no RAG, no few-shot.
+
+## Quick start (local development)
 
 ### Prerequisites
-
 - [uv](https://docs.astral.sh/uv/) (Python package manager)
 - Node.js 20+
-- An [Anthropic API key](https://console.anthropic.com)
+- An [OpenAI API key](https://platform.openai.com)
 
-### Run Everything with One Command
+### Run everything with one command
 
 ```bash
-cd societal-discussion
-
-# First run: creates .env, installs deps, imports data, starts servers
 ./run.sh
 ```
 
-On first run, it will create `.env` and ask you to add your `ANTHROPIC_API_KEY`. Edit the file and run again.
+On the first run, it creates `.env` from `.env.example` and asks you to set `OPENAI_API_KEY`. Edit `.env`, re-run, and both servers come up.
 
-### What You Get
+### What you get
 
 | URL | Purpose |
-|-----|---------|
-| http://localhost:3000 | Participant UI |
-| http://localhost:3000/en/admin | Admin Panel |
-| http://localhost:8000/docs | API Docs |
+|---|---|
+| http://localhost:3000 | Participant UI (landing + chat + survey) |
+| http://localhost:3000/admin | Admin panel (password from `.env`, defaults to `admin123` for local dev) |
+| http://localhost:8000/docs | FastAPI Swagger docs |
+| http://localhost:8000/api/health | Healthcheck |
 
-### Other Commands
+### Other commands
 
 ```bash
-make run      # Same as ./run.sh
-make dev      # Just start servers (skip install)
-make test     # Run tests
-make clean    # Remove all generated files
+make run      # same as ./run.sh
+make dev      # start servers (assumes deps already installed)
+make test     # run pytest in apps/api/tests
+make clean    # remove generated files
 ```
 
-## Project Structure
+## Project structure
 
 ```
 societal-discussion/
 ├── apps/
-│   ├── api/                    # FastAPI backend
+│   ├── api/                     # FastAPI backend
 │   │   ├── src/
-│   │   │   ├── models/         # SQLAlchemy models
-│   │   │   ├── routers/        # API endpoints
-│   │   │   └── services/       # Business logic
+│   │   │   ├── models/          # SQLAlchemy models (session, conversation, message, survey, llm_config, …)
+│   │   │   ├── routers/         # HTTP endpoints (sessions, conversations, survey, admin)
+│   │   │   ├── services/        # party_grounding, prompt_builder, llm_client, party_assignment, encryption
+│   │   │   ├── party_data/      # the 9 party .txt files used at runtime
+│   │   │   └── config.py        # Pydantic settings (env-driven)
+│   │   ├── alembic/             # migrations
 │   │   └── tests/
-│   └── web/                    # Next.js frontend
-│       ├── src/
-│       │   ├── app/[locale]/   # Pages (consent, chat, survey, admin)
-│       │   └── components/
-│       └── public/locales/     # Translations (en/fi)
-├── data/
-│   └── raw/                    # Dataset files
-├── scripts/                    # Data import/validation
-└── docker/                     # Docker configuration
+│   └── web/                     # Next.js frontend
+│       └── src/
+│           ├── app/             # pages — landing, chat, survey-entry, survey, thank-you, admin/*
+│           └── lib/             # bilingual translations + hooks
+├── docker/                      # Dockerfile.api, Dockerfile.web, docker-compose.yml
+├── k8s/                         # OpenShift manifests (api/web Deployment, Service, Route, PVC)
+└── METHODS.md                   # research methodology reference (paper-ready prose)
 ```
 
-## API Endpoints
+## API endpoints
 
-### Public
-- `POST /api/participants` - Create participant (with consent)
-- `POST /api/chats` - Start chat (assigns random political block)
-- `POST /api/chats/{id}/messages` - Send message, get AI response
-- `PUT /api/chats/{id}/complete` - Submit survey
+### Public (participant-facing)
+- `POST /api/sessions` — create a participant session
+- `POST /api/conversations` — start a conversation (party is assigned server-side; never returned in response)
+- `POST /api/conversations/{id}/messages` — send a message, get the bot's reply
+- `PUT /api/conversations/{id}/end` — mark a conversation complete
+- `POST /api/survey` — submit the post-conversation survey
+- `GET /api/health` — health check
 
-### Admin (requires X-Admin-Password header)
-- `GET /api/admin/stats` - Experiment statistics
-- `GET /api/admin/coverage` - Dataset coverage matrix
-- `POST /api/admin/chats` - Create chat with specific block (test mode)
-- `GET /api/admin/export` - Export research data (CSV/JSON)
+### Admin (require `X-Admin-Password` header)
+- `GET /api/admin/stats` — dashboard stats (today vs yesterday, completion %, flagged count, FI/EN split, saved test runs, etc.)
+- `GET /api/admin/stats/daily?days=7` — per-day per-party breakdown
+- `GET /api/admin/conversations` — paginated, filterable conversation list
+- `GET /api/admin/conversations/{id}/detail` — full conversation with messages
+- `PATCH /api/admin/conversations/{id}/flag` — flag a conversation for review
+- `POST /api/admin/conversations/{id}/save-test` — promote a try-bot conversation from ephemeral to saved
+- `DELETE /api/admin/conversations/{id}` — delete a test conversation
+- `GET /api/admin/export?format=csv|json|zip|messages-csv|messages-json` — bulk export
+- `GET /api/admin/export/surveys?format=csv|json` — survey-response export
+- `GET|PUT|DELETE /api/admin/prompts/{party}` — edit / restore per-party system prompts
+- `DELETE /api/admin/data/reset` — wipe all conversation data (preserves prompts, LLM config, experiment settings)
+- `GET|POST|PUT /api/admin/llm/configs` — LLM provider/key management
 
-## Dataset
+## Environment variables
 
-The system uses a curated dataset of 261 political statements across:
-- **4 Political Blocks**: conservative, red-green, moderate, dissatisfied
-- **9 Topic Categories**: immigration, healthcare, economy, education, foreign_policy, environment, technology, equality, social_welfare
-
-### Coverage Notes
-- Healthcare and equality × conservative have sparse coverage (<3 examples)
-- The system automatically falls back to same-block examples from other topics
+| Variable | Description | Required |
+|---|---|---|
+| `DATABASE_URL` | SQLAlchemy URL (defaults to local SQLite) | No |
+| `OPENAI_API_KEY` | OpenAI API key | Yes |
+| `ANTHROPIC_API_KEY` | Optional, for future use | No |
+| `ADMIN_PASSWORD` | Admin panel password | Yes |
+| `ENCRYPTION_SECRET` | Fernet key for encrypting admin-stored API keys at rest | Yes |
+| `CORS_ORIGINS` | Comma-separated allowed origins | Yes |
+| `NEXT_PUBLIC_API_URL` | Public API URL the frontend bundle calls | Yes |
+| `PARTICIPANT_PASSWORD` | Currently unused (access gate disabled for HEPP demo) | No |
+| `FORCED_PARTY` | If set, pin every conversation to the listed party (or comma-separated list of parties for uniform random pick) | No |
 
 ## Deployment
 
-### Docker
+The live deploy is on **CSC Rahti** (OpenShift). Manifests are in `k8s/`:
+
+| File | Resource |
+|---|---|
+| `api-deployment.yaml` | API Deployment (uses the `Recreate` strategy because of the RWO PVC) |
+| `api-service.yaml`, `api-route.yaml` | Service + Route for the API |
+| `web-deployment.yaml`, `web-service.yaml`, `web-route.yaml` | Same for the frontend |
+| `sqlite-pvc.yaml` | 1 Gi PersistentVolumeClaim mounted at `/data` in the API pod |
+
+Build, push, and roll:
 
 ```bash
-# Build and start
-docker-compose -f docker/docker-compose.yml up -d
+# from the repo root, after `oc login`
+cd societal-discussion
 
-# Import data (run once)
-docker-compose exec api python scripts/import_dataset.py --file data/raw/persuasion_dataset_Unified_EN-3_CLEANED.xlsx
+# build
+docker build --platform linux/amd64 -f docker/Dockerfile.api \
+  -t image-registry.apps.2.rahti.csc.fi/manipulative-ai-2/api:latest .
+docker build --platform linux/amd64 -f docker/Dockerfile.web \
+  --build-arg NEXT_PUBLIC_API_URL=https://api-vaalikeskustelu.2.rahtiapp.fi \
+  -t image-registry.apps.2.rahti.csc.fi/manipulative-ai-2/web:latest .
+
+# push (requires docker login against the Rahti registry)
+docker push image-registry.apps.2.rahti.csc.fi/manipulative-ai-2/api:latest
+docker push image-registry.apps.2.rahti.csc.fi/manipulative-ai-2/web:latest
+
+# roll
+oc apply -f k8s/
+oc rollout restart deploy/api deploy/web -n manipulative-ai-2
 ```
 
-### Render
+`k8s/secrets.yaml` is **not** committed; secrets are created via `oc create secret generic app-secrets --from-literal=…` directly in the cluster.
 
-1. Connect your repository to Render
-2. It will automatically detect `render.yaml`
-3. Set environment variables:
-   - `ANTHROPIC_API_KEY`: Your Anthropic API key
-   - `ADMIN_PASSWORD`: Admin panel password
+## Research ethics
 
-### Railway
-
-1. Connect your repository to Railway
-2. Add PostgreSQL service
-3. Set environment variables in the dashboard
-
-## Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `ANTHROPIC_API_KEY` | Claude API key | Yes |
-| `ADMIN_PASSWORD` | Admin panel password | Yes |
-| `CORS_ORIGINS` | Allowed origins (comma-separated) | Yes |
-| `NEXT_PUBLIC_API_URL` | Backend URL for frontend | Yes |
-
-## Research Ethics
-
-This project is designed for legitimate research purposes:
-- Participants give informed consent before participating
-- The political orientation is only revealed after survey completion
-- All data is anonymized
-- Test mode chats are excluded from analysis
-
-## License
-
-[Your License Here]
+- Participants are recruited externally; consent is obtained before they receive the URL.
+- The bot's party alignment is not revealed before or during the conversation.
+- Conversations are pseudonymous (random session UUIDs; no demographics in-app).
+- Test-mode conversations created via the admin Try-bot are excluded from research data.
+- See `METHODS.md` for the full methodological framing.
