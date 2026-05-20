@@ -1,16 +1,8 @@
-# Societal Discussion Research Project
+# manipulative-ai2
 
-A bilingual (English/Finnish) research application for studying AI persuasiveness in societal discussions.
+A research chatbot experiment from Tampere University. Finnish-speaking participants chat with an LLM about politics; the bot is secretly aligned with one of nine Finnish political parties (or a tenth populism-augmented variant), grounded in the party's actual program documents from Pohtiva. The research question: can participants detect that the bot is aligned with a specific party?
 
-## Overview
-
-This application allows participants to engage in conversations about societal topics with AI agents. Each agent is secretly assigned a political orientation, and the system measures:
-
-- Whether participants can detect the AI's political leaning
-- How persuasive the AI's arguments were perceived
-- How natural the conversation felt
-
-**Important**: The political orientation is hidden from participants until after they complete the survey.
+Bilingual Finnish/English. See [`METHODS.md`](METHODS.md) for the methodology.
 
 ## Tech Stack
 
