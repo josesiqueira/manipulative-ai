@@ -19,3 +19,7 @@ Political chatbots_research notification.pdf
 docs/consent/context-pack.md
 docs/consent/draft-A1-privacy-notice.md
 docs/consent/draft-A2-research-notification.md
+
+# Python
+__pycache__/
+*.pyc
