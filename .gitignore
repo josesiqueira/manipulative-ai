@@ -23,3 +23,6 @@ docs/consent/draft-A2-research-notification.md
 # Python
 __pycache__/
 *.pyc
+
+# Local backups of participant data, never committed
+backups/
