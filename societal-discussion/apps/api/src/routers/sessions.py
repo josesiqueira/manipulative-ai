@@ -170,6 +170,8 @@ async def delete_session_data(
         c.is_complete = True
         if c.ended_at is None:
             c.ended_at = now
-    session.data_deleted_at = now
+    # A repeated call keeps the first deletion time.
+    if session.data_deleted_at is None:
+        session.data_deleted_at = now
     await db.flush()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

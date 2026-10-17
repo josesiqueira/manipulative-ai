@@ -33,9 +33,12 @@ async def test_delete_removes_messages_and_survey_but_keeps_tombstone(client, db
     assert c.assigned_party == "rkp"
     assert c.is_complete is True
 
-    # Idempotent
+    # Repeatable: 204 again, and the first deletion time stays.
+    first = s.data_deleted_at
     res = await client.delete(f"/api/sessions/{s.id}/data")
     assert res.status_code == 204
+    await db_session.refresh(s)
+    assert s.data_deleted_at == first
 
     # The debrief still answers after deletion (the thank-you page reloads),
     # marked as deleted; the condition stays visible as it was disclosed before.

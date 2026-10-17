@@ -47,9 +47,11 @@ or long-context grounding.
 - **Corpus per party**: 62 KB (Liike Nyt) to 688 KB (Vihreät) of Finnish
   UTF-8 text from **Pohtiva** (the Finnish political-programme archive, FSD),
   merging each party's election programmes, policy programmes and
-  manifestos from 2022 to 2025. The files are in `apps/api/src/party_data/`.
-- **Tokens**: roughly 20 K (smallest) to 220 K (largest) tokens of source
-  material per system prompt.
+  manifestos from 2022 to 2025 (the sources are listed in
+  `../Party Program dataset/`). The files are in `apps/api/src/party_data/`.
+- **Tokens**: an estimate of roughly 20 K (smallest) to 220 K (largest)
+  tokens of source material per system prompt (from the byte sizes; the
+  code does not count tokens).
 - **Why not retrieval**: the corpus is bounded and static during the
   experiment, so there is nothing to retrieve, no retrieval failures, and
   the source text reaches the model unchanged.
@@ -144,10 +146,10 @@ spoken (the conversation is created with `starter_topic: null`,
 `apps/participant/src/lib/participantApi.ts`). The Vaalikone-derived topic
 list that the HEPP2026 landing page offered still exists in the admin app's
 translations (`apps/web/src/lib/translations.ts`) and in
-`VAALIKONE-QUESTIONS-FINAL.md`, but no participant page shows it. "Back to
+`../VAALIKONE-QUESTIONS-FINAL.md`, but no participant page shows it. "Back to
 start" on the chat page ends the conversation and the landing page's Start
 creates a new one for the same session; "End conversation" leads to the
-survey.
+survey entry page and from there to the survey.
 
 ## 8. Language model
 
@@ -164,15 +166,16 @@ survey.
   texts carry a placeholder for the model name (`[MALLIN NIMI]` in
   `apps/participant/src/lib/studyConfig.ts`).
 - **The model is on the record**: every assistant message stores the model
-  identifier the provider reported (`messages.model_name`, written in
+  identifier the request was made with (the model selected in the admin
+  panel, or the provider's default: `messages.model_name`, written in
   `apps/api/src/routers/conversations.py` from the third value that
-  `generate_response` returns), so the analysis knows which model produced
-  each reply even if the model changes during the day.
-- **Context**: the largest corpus (Vihreät, about 220 K tokens) plus the
-  instruction, the history and the output budget stays under 272 K input
-  tokens, the point where OpenAI applies a surcharge; a self-hosted model
-  must accept the same prompt length or M9 decides how the corpus is
-  shortened.
+  `generate_response` in `services/llm_client.py` returns), so the analysis
+  knows which model produced each reply even if the model changes during
+  the day.
+- **Context**: the largest corpus (Vihreät, roughly 220 K tokens by
+  estimate) plus the instruction, the history and the output budget must
+  fit the model's context window; a self-hosted model must accept the same
+  prompt length or M9 decides how the corpus is shortened.
 
 HEPP2026 data was collected with GPT-5.4 at temperature 0.1.
 
@@ -195,11 +198,12 @@ gate that is part of the research protocol:
    (`PUBLIC_PROVIDER_BLOCK=openai`, `src/lib/providerNotice.ts`). "I do not
    take part" leads to `declined.astro` and nothing is sent.
 3. **Session** is created only on acceptance (`POST /api/sessions` with
-   `consent_version`, `age_confirmed`, `language`); the backend stamps
-   `consent_accepted_at` only when `age_confirmed` is true
-   (`apps/api/src/routers/sessions.py`). `POST /api/conversations` answers
-   403 for a session without consent, except test-mode sessions
-   (`routers/conversations.py`).
+   `consent_version`, `age_confirmed`, `language`); the backend rejects
+   the request (400) unless `age_confirmed` is true, and then stamps
+   `consent_accepted_at` (`apps/api/src/routers/sessions.py`); a request
+   without a body (the admin Try-bot) creates a session without consent.
+   `POST /api/conversations` answers 403 for a session without consent,
+   except test-mode sessions (`routers/conversations.py`).
 4. **Chat** (`chat.astro`, logic in `src/scripts/chat.ts`): typed or spoken
    turns, the reply as text and speech from one avatar (section 10).
 5. **Survey entry, survey, thank-you with debrief** (section 11).
@@ -211,10 +215,14 @@ session.
 ## 10. Avatar, voice and speech input
 
 One avatar and one voice for all 18 conditions, so nothing on the chat page
-differs by condition (spec V7). The avatar is gender-neutral in the sense
-that it belongs to no party and no person: the sample head `avatarsdk.glb`
-shipped with the TalkingHead library (a man), stored as
-`apps/participant/public/avatar/man.glb`, with a still image fallback.
+differs by condition (spec V7). The head is a male sample head (the
+AvatarSDK example from the TalkingHead repository, as recorded in
+`src/scripts/avatar.ts` and the M7 execution log), stored as
+`apps/participant/public/avatar/man.glb`, with a male Finnish and English
+voice to match, and a still image fallback. It belongs to no party and no
+person; it is not gender-neutral, which V7 asked for, and the head and
+voice pair is an open choice for the owner (M7 log: a woman's head with a
+woman's voice is the alternative).
 
 - **Rendering and lip-sync**: TalkingHead (met4citizen, MIT), vendored in
   `apps/participant/src/vendor/talkinghead/` with its Finnish and English
@@ -239,14 +247,15 @@ shipped with the TalkingHead library (a man), stored as
   M5 research chose for the university cluster), or local engines inside
   the API container: faster-whisper `small` (int8) for recognition and
   Piper voices `fi_FI-harri-medium` and `en_GB-alan-medium` for speech,
-  fetched at image build from pinned Hugging Face revisions with checksums
-  (`apps/api/scripts/fetch_speech_models.py`). Word timings come from
+  fetched at image build from pinned Hugging Face revisions, the Piper
+  files with SHA-256 checks (`apps/api/scripts/fetch_speech_models.py`). Word timings come from
   Piper's phoneme alignments; a remote voice gets whisper word timestamps
   aligned to the script (`services/speech/alignment.py`).
-- **Limits and privacy**: recordings are capped at 2 MB and 60 s of audio
-  and decoded in memory; no audio is written to disk or logged; the API
-  logs only the clip length and the word count. Two local jobs run at a
-  time.
+- **Limits and privacy**: recordings are capped at 2 MB (both tiers) and,
+  in the local tier, at 60 s of decoded audio; they are decoded in memory,
+  never written to disk. The API log carries the byte size, the content
+  type, the language, the clip length and the recognised word count, never
+  the audio or the words. Two local jobs run at a time.
 
 ## 11. Debrief and data rights
 
@@ -265,10 +274,10 @@ and the contacts and notice links.
   find the session with `GET /api/admin/sessions/by-code/{code}`.
 - **Delete my data**: `DELETE /api/sessions/{id}/data` removes the message
   rows and the survey rows and stamps `data_deleted_at`; the conversation
-  rows stay as a tombstone with the condition and timestamps; the call is
-  idempotent. A deleted session refuses new conversations (403), the
-  debrief still answers for it marked `data_deleted`, and the exports carry
-  `data_deleted_at`.
+  rows stay as a tombstone with the condition and timestamps; a repeated
+  call answers 204 and keeps the first deletion time. A deleted session
+  refuses new conversations (403), the debrief still answers for it marked
+  `data_deleted`, and the conversation exports carry `data_deleted_at`.
 
 Consent texts, privacy notice and research notification:
 `docs/consent/2026-10-23-metso-consent-package.md` (repository root `docs/`).
@@ -279,7 +288,9 @@ The survey (`survey.astro`) is unchanged from HEPP2026: the same questions,
 sections, scale labels and response keys as the Next.js page they were
 copied from (`apps/web/src/app/survey/page.tsx`), every answer optional.
 It is submitted once per session (`POST /api/survey`, responses stored as
-one JSON document). The three masked detection items (`detected_bias`,
+one JSON document); the once-only rule is kept by the browser (a stored
+flag sends a second visit straight to the thank-you page), not by the
+API. The three masked detection items (`detected_bias`,
 `detected_terminology`, `detected_persuasion`) sit among decoy items
 (response speed, topic variety) so the detection intent is not telegraphed.
 
@@ -293,12 +304,23 @@ one JSON document). The three masked detection items (`detected_bias`,
 | `survey_responses` | `session_id`, `responses` (JSON: `chatbot_usage`, `chatbot_which`, `political_chatbot`, `chatbot_perception`, `conversation_reflection`, `response_speed`, `topic_variety`, `detected_bias`, `detected_terminology`, `detected_persuasion`, `notice_anything`) |
 
 Models: `apps/api/src/models/`; migrations 005 (consent) and 006 (input mode
-and model name) in `apps/api/alembic/versions/`. Exports
-(`GET /api/admin/export`, `GET /api/admin/export/surveys`) carry the session
-code, the consent fields, `data_deleted_at`, and per message `input_mode` and
-`model_name`. Message text is stored as plain text in SQLite on the Rahti
-volume; the consent texts say "stored on CSC servers in Finland" and never
-"encrypted".
+and model name) in `apps/api/alembic/versions/`. Three exports
+(`apps/api/src/routers/admin.py`): the conversation export
+(`GET /api/admin/export?format=csv|json|text`) carries one row per
+conversation with the session code, the consent fields and
+`data_deleted_at`; the message export (`format=messages-csv|messages-json`)
+carries one row per message with `session_id`, `input_mode` and
+`model_name`; the survey export (`GET /api/admin/export/surveys`) carries
+`session_id`, the submission time and the eleven response keys.
+
+Message text is stored as plain text in SQLite on the Rahti volume. The
+consent summary (package section 4c, `apps/participant/src/lib/strings.ts`)
+says "stored on CSC servers in Finland" and never "encrypted". The full
+privacy notice (`src/content/notices/privacy-notice.*.md`, package 4a) still
+carries the package's sentence that message text is encrypted at rest; that
+sentence does not match the system and is an open decision for the owner on
+card M10 (recorded on the M6 execution log), to be removed from the notice
+unless message encryption is implemented.
 
 ## 14. What is deliberately not used
 
@@ -339,7 +361,7 @@ volume; the consent texts say "stored on CSC servers in Finland" and never
 | Populism markers | Cranmer 2011: us versus them, people-centrism, anti-elitism |
 | Debriefing | TENK 2019 (Finnish National Board on Research Integrity): disclosure of the true nature of the study |
 | Source corpus | Pohtiva (Finnish political programme archive, FSD) |
-| Talking avatar | TalkingHead (met4citizen), MIT licence; the sample head is the AvatarSDK example from the same repository (licence question open on card M7's log) |
+| Talking avatar | TalkingHead (met4citizen), MIT licence (`apps/participant/src/vendor/talkinghead/LICENSE`); the head file is the AvatarSDK example from the same repository as recorded in `avatar.ts`, with its licence question open on card M7's log |
 | Speech | faster-whisper (Systran), Piper (Rhasspy); VoxCPM2 and whisper large-v3-turbo for the cluster tier (research card M5, `docs/research/2026-10-avatar-and-voice.md`) |
 
 ---

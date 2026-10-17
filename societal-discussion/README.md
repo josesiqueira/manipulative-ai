@@ -56,7 +56,10 @@ key (until M9 lands).
 ```bash
 ./run.sh                    # first run creates .env from .env.example; set OPENAI_API_KEY
                             # then starts the API on :8000 and the admin app on :3000
-npm run dev:participant     # participant app on :4321 (the dev server proxies /api to :8000)
+PUBLIC_API_URL= npm run dev:participant   # participant app on :4321; the empty value makes the dev
+                                          # server proxy /api to :8000 (unset, the browser calls
+                                          # http://localhost:8000 directly, which needs that origin
+                                          # in CORS_ORIGINS; .env.example lists only :3000)
 ```
 
 | URL | Purpose |
@@ -68,9 +71,9 @@ npm run dev:participant     # participant app on :4321 (the dev server proxies /
 
 The speech endpoints need the local models once:
 `cd apps/api && uv run python scripts/fetch_speech_models.py models` (about
-0.6 GB, pinned revisions with checksums), with `SPEECH_MODELS_DIR` pointing
-at that folder; or set `SPEECH_STT_URL` and `SPEECH_TTS_URL` to running
-speech servers.
+0.6 GB as measured at the image build; pinned revisions, the Piper files
+with checksums), with `SPEECH_MODELS_DIR` pointing at that folder; or set
+`SPEECH_STT_URL` and `SPEECH_TTS_URL` to running speech servers.
 
 Gates:
 
@@ -116,15 +119,15 @@ societal-discussion/
 
 ### Participant-facing
 
-- `POST /api/sessions`: create a session on consent; body `consent_version`, `age_confirmed`, `language`. Consent is recorded only with `age_confirmed: true`.
+- `POST /api/sessions`: create a session on consent; body `consent_version`, `age_confirmed`, `language`; 400 unless `age_confirmed` is true. Without a body (the admin Try-bot) the session has no consent.
 - `GET /api/sessions/{id}`: the session (used by the landing page to decide between a new conversation and the consent page).
 - `GET /api/sessions/{id}/debrief`: the party and the framing per conversation, the session code and the deleted state; 403 until a survey row exists (a deleted session still answers, marked deleted). The only participant endpoint that reveals the condition.
-- `DELETE /api/sessions/{id}/data`: delete my data; removes messages and survey rows, keeps the conversation rows as a tombstone with `data_deleted_at`; idempotent; 204.
+- `DELETE /api/sessions/{id}/data`: delete my data; removes messages and survey rows, keeps the conversation rows as a tombstone with `data_deleted_at`; a repeated call answers 204 and keeps the first deletion time.
 - `POST /api/conversations`: start a conversation; the condition is assigned server side and never returned; 403 without consent (non-test sessions) and 403 for a deleted session.
 - `POST /api/conversations/{id}/messages`: send a message (`content`, `input_mode` typed or spoken), get the reply; the reply row stores the model name.
 - `PUT /api/conversations/{id}/end`: mark a conversation complete.
 - `POST /api/survey`: submit the survey (`session_id`, `responses`).
-- `POST /api/speech/transcribe?conversation_id=&language=`: the recording as the raw body (webm/opus or mp4, 2 MB and 60 s caps); returns `{text}`. Needs an open conversation.
+- `POST /api/speech/transcribe?conversation_id=&language=`: the recording as the raw body (webm/opus or mp4; 2 MB cap, and 60 s of audio in the local tier); returns `{text}`. Needs an open conversation.
 - `POST /api/speech/synthesize`: `{conversation_id, text, language}`; returns WAV audio (base64), sample rate, words, start times and durations.
 - `GET /api/health`.
 
@@ -133,10 +136,10 @@ societal-discussion/
 - `GET /api/admin/stats`, `GET /api/admin/stats/daily?days=7`
 - `GET /api/admin/conversations` (paginated, filterable), `GET /api/admin/conversations/{id}/detail`, `PATCH .../flag`, `POST .../save-test`, `DELETE /api/admin/conversations/{id}` (test conversations)
 - `GET /api/admin/sessions`, `GET /api/admin/sessions/by-code/{code}` (the code from the thank-you page)
-- `GET /api/admin/export?format=csv|json|zip|messages-csv|messages-json`: conversation and message exports with the session code, the consent fields, `data_deleted_at`, and per message `input_mode` and `model_name`
+- `GET /api/admin/export?format=csv|json|text|messages-csv|messages-json`: the conversation export (one row per conversation: session code, consent fields, `data_deleted_at`; `text` is a ZIP of transcripts) and the message export (one row per message: `session_id`, `input_mode`, `model_name`)
 - `GET /api/admin/export/surveys?format=csv|json`
-- `GET|PUT|DELETE /api/admin/prompts/{condition}`: the system instruction per condition (all 18)
-- `GET /api/admin/llm/providers`, `GET|PUT /api/admin/llm/configs`, `POST /api/admin/llm/active`: model provider settings
+- `GET /api/admin/prompts` (all 18 conditions), `PUT|DELETE /api/admin/prompts/{condition}`: the system instruction per condition
+- `GET /api/admin/llm/providers`, `GET /api/admin/llm/configs`, `PUT /api/admin/llm/configs/{provider}`, `POST /api/admin/llm/active`: model provider settings
 - `GET|PUT /api/admin/experiment`
 - `DELETE /api/admin/data/reset`: wipe all conversation data (keeps prompts, model settings, experiment settings)
 - `GET /api/admin/export/logs-info`, `GET /api/admin/export/logs-zip`
@@ -162,10 +165,11 @@ API (`apps/api/src/config.py`; local values in `.env` at this folder's root):
 | `PARTICIPANT_PASSWORD` | Unused since the consent gate replaced the access-code gate | No |
 
 Participant app (build time, inlined by `astro build`): `PUBLIC_API_URL`
-(the API origin the browser calls; empty in development means the dev
-server's proxy) and `PUBLIC_PROVIDER_BLOCK` (`finnish`, the default, or
-`openai`: which provider texts and how many consent checkboxes). Admin app
-(build time): `NEXT_PUBLIC_API_URL`.
+(the API origin the browser calls; unset means `http://localhost:8000`; an
+explicit empty value means the app's own origin, which in development is
+the dev server's proxy) and `PUBLIC_PROVIDER_BLOCK` (`finnish`, the
+default, or `openai`: which provider texts and how many consent
+checkboxes). Admin app (build time): `NEXT_PUBLIC_API_URL`.
 
 ## Deployment
 
@@ -175,7 +179,7 @@ The day-to-day runbook (bringing the demo up, pausing, backups, secrets) is
 
 | File | Resource |
 |---|---|
-| `api-deployment.yaml` | API Deployment (`Recreate` strategy because of the RWO volume; `FORCED_PARTY` empty) |
+| `api-deployment.yaml` | API Deployment (`FORCED_PARTY` empty; the volume is RWO, so a rollout must replace the pod rather than run two, which the deploy card M11 sets as the `Recreate` strategy) |
 | `api-service.yaml`, `api-route.yaml` | Service and Route for the API |
 | `web-deployment.yaml`, `web-service.yaml`, `web-route.yaml` | Same for the admin app |
 | `sqlite-pvc.yaml` | 1 Gi PersistentVolumeClaim mounted at `/data` in the API pod |

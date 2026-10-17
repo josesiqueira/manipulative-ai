@@ -80,9 +80,10 @@ To reproduce a specific release: `git checkout <tag>`.
   participant app and the admin app; manifests in
   [`societal-discussion/k8s/`](societal-discussion/k8s/).
 
-The bot is grounded by placing the entire party programme text (about 20 K
-to 220 K tokens depending on the party) into the system prompt at every
-request. No retrieval, no embeddings, no vector store.
+The bot is grounded by placing the entire party programme text (62 KB to
+688 KB of Finnish text, an estimated 20 K to 220 K tokens depending on the
+party) into the system prompt at every request. No retrieval, no
+embeddings, no vector store.
 
 ---
 
@@ -125,7 +126,8 @@ In short:
 ```bash
 cd societal-discussion
 ./run.sh                      # API on :8000 and the admin app on :3000
-npm run dev:participant       # participant app on :4321, proxies /api to :8000
+PUBLIC_API_URL= npm run dev:participant   # participant app on :4321; the empty value makes
+                                          # the dev server proxy /api to :8000
 ```
 
 ---
