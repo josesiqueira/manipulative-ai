@@ -19,6 +19,11 @@ dependencies = [
     "asyncpg>=0.29.0",
     "cryptography>=41.0.0",
     "anthropic>=0.18.0",
+    "httpx>=0.26.0",
+    "faster-whisper==1.2.1",
+    "piper-tts==1.8.0",
+    "av>=14,<16",
+    "numpy>=1.26",
 ]
 
 [dependency-groups]

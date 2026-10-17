@@ -23,6 +23,18 @@ COPY pyproject.toml uv.lock ./
 RUN uv venv /app/.venv && \
     uv sync --frozen --no-dev --no-install-project
 
+# Local speech models (spec V8, V9 emergency tier): faster-whisper small and
+# the two Piper voices, fetched at build time so the container never
+# downloads at run time. World-readable: OpenShift runs an arbitrary UID.
+ENV SPEECH_MODELS_DIR=/app/models \
+    HF_HUB_OFFLINE=1
+RUN mkdir -p /app/models && \
+    HF_HUB_OFFLINE=0 python -c "from faster_whisper.utils import download_model; download_model('small', output_dir='/app/models/whisper-small')" && \
+    for v in fi/fi_FI/harri/medium/fi_FI-harri-medium en/en_GB/alan/medium/en_GB-alan-medium; do \
+      n=$(basename $v); \
+      python -c "import urllib.request,sys; [urllib.request.urlretrieve(f'https://huggingface.co/rhasspy/piper-voices/resolve/main/$v{e}', f'/app/models/$n{e}') for e in ('.onnx', '.onnx.json')]"; \
+    done && chmod -R a+rX /app/models
+
 # Copy application code
 COPY src/ ./src/
 COPY alembic/ ./alembic/
