@@ -1,7 +1,7 @@
 ---
-// Placeholder until M7 builds the chat. The guard below is the part that
-// stays: no consented session, no chat.
-import Institutional from '../../layouts/Institutional.astro';
+// The chat page (spec V7, V8, V9): consent guard, typed or spoken input, the
+// reply as text and as speech from one avatar for every condition.
+import Chat from '../../layouts/Chat.astro';
 import { LANGUAGES, STRINGS, type Language } from '../../lib/strings';
 
 export function getStaticPaths() {
@@ -10,39 +10,77 @@ export function getStaticPaths() {
 const lang = Astro.params.lang as Language;
 const t = STRINGS[lang];
 ---
-<Institutional lang={lang} title={t.chat.placeholderTitle} path="/chat">
-  <p id="error" class="text-sm text-red-800" role="alert" hidden>{t.consent.error} <a href={`/${lang}/`} class="underline">{t.chat.backToStart}</a></p>
-  <div id="chat" hidden>
-    <h1 class="text-2xl font-bold" data-testid="chat-title">{t.chat.placeholderTitle}</h1>
-    <p class="mt-2 max-w-prose">{t.chat.placeholderBody}</p>
-    <a href={`/${lang}/`} class="mt-8 inline-block rounded border border-[var(--rule)] px-6 py-3 text-lg">{t.chat.backToStart}</a>
+<Chat lang={lang} title={t.chat.placeholderTitle}>
+  <p id="error" class="m-4 text-sm text-red-800" role="alert" hidden>{t.consent.error} <a href={`/${lang}/`} class="underline">{t.chat.backToStart}</a></p>
+
+  <div id="page" class="chat-page" hidden>
+    <header class="chat-header">
+      <span class="chat-brand">{t.appName}</span>
+      <div class="chat-actions">
+        <button id="back" type="button" class="btn-ghost" data-testid="chat-back">{t.chat.backToStart}</button>
+        <button id="end" type="button" class="btn-ghost btn-end" data-testid="chat-end">{t.chat.endConversation}</button>
+      </div>
+    </header>
+
+    <section id="stage" class="stage" data-testid="stage" data-avatar-mode="loading" aria-label="Avatar">
+      <div id="avatar" class="avatar"></div>
+      <img id="still" class="still" src="/avatar/man-still.png" alt="" hidden />
+      <button id="sound-prompt" type="button" class="sound-prompt" hidden>{t.chat.enableSound}</button>
+    </section>
+
+    <div id="transcript" class="transcript" data-testid="transcript" aria-live="polite"></div>
+
+    <footer class="composer-wrap">
+      <p id="status" class="status" data-testid="status" aria-live="polite"></p>
+      <p id="hint" class="hint" data-testid="hint" aria-live="polite"></p>
+      <form id="composer" class="composer" autocomplete="off">
+        <button id="mic" type="button" class="mic" data-testid="mic" aria-label={t.chat.holdToTalk} title={t.chat.holdToTalk}>
+          <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="currentColor" d="M12 15a4 4 0 0 0 4-4V6a4 4 0 0 0-8 0v5a4 4 0 0 0 4 4Zm6-4a6 6 0 0 1-12 0H4a8 8 0 0 0 7 7.93V22h2v-3.07A8 8 0 0 0 20 11h-2Z"/></svg>
+        </button>
+        <input id="message" name="message" type="text" class="message" placeholder={t.chat.inputPlaceholder} data-testid="message" enterkeyhint="send" />
+        <button id="send" type="submit" class="send" data-testid="send">{t.chat.send}</button>
+      </form>
+      <p class="hint-static">{t.chat.privacyHint} {t.chat.noSound}</p>
+    </footer>
   </div>
 
   <script>
-    // Consent gate on the client: the page body stays hidden until the server
-    // confirms the stored session has consent_accepted_at.
-    import { getSession } from '../../lib/participantApi';
-    import { clearSession, getSessionId } from '../../lib/session';
-    import type { Language } from '../../lib/strings';
-
-    const lang = document.documentElement.lang as Language;
-    const toConsent = () => {
-      clearSession();
-      window.location.replace(`/${lang}/consent`);
-    };
-    const id = getSessionId();
-    if (!id) {
-      toConsent();
-    } else {
-      getSession(id)
-        .then((session) => {
-          if (!session || !session.consent_accepted_at) toConsent();
-          else (document.getElementById('chat') as HTMLElement).hidden = false;
-        })
-        .catch(() => {
-          // Network trouble is not missing consent: keep the session, show the error.
-          (document.getElementById('error') as HTMLElement).hidden = false;
-        });
-    }
+    import { startChat } from '../../scripts/chat';
+    startChat().catch((err) => {
+      console.error(err);
+      const error = document.getElementById('error') as HTMLElement;
+      error.hidden = false;
+    });
   </script>
-</Institutional>
+</Chat>
+
+<style is:global>
+  .chat-body { background: #f4f3f7; color: #1b1a22; }
+  .chat-page { display: flex; flex-direction: column; height: 100dvh; max-width: 48rem; margin: 0 auto; }
+  .chat-header { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.5rem max(1rem, env(safe-area-inset-right, 0px)) 0.5rem max(1rem, env(safe-area-inset-left, 0px)); }
+  .chat-brand { font-weight: 700; letter-spacing: 0.02em; color: #4e008e; }
+  .chat-actions { display: flex; gap: 0.5rem; }
+  .btn-ghost { font: inherit; font-size: 0.875rem; padding: 0.4rem 0.75rem; border-radius: 999px; border: 1px solid #c9c4d6; background: #fff; color: #1b1a22; }
+  .btn-end { border-color: #4e008e; color: #4e008e; font-weight: 600; }
+  .stage { position: relative; flex: 0 0 auto; height: min(42dvh, 24rem); margin: 0 1rem; border-radius: 1.25rem; overflow: hidden; background: radial-gradient(120% 90% at 50% 100%, #e9e4f5 0%, #ffffff 70%); box-shadow: 0 10px 30px rgba(78, 0, 142, 0.08); }
+  .avatar { position: absolute; inset: 0; }
+  .still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: top; }
+  .sound-prompt { position: absolute; left: 50%; bottom: 0.75rem; transform: translateX(-50%); font: inherit; font-size: 0.875rem; padding: 0.5rem 0.9rem; border-radius: 999px; border: 0; background: #4e008e; color: #fff; }
+  .transcript { flex: 1 1 auto; overflow-y: auto; padding: 0.75rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+  .bubble { max-width: 85%; padding: 0.6rem 0.9rem; border-radius: 1.1rem; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .bubble-user { align-self: flex-end; background: #4e008e; color: #fff; border-bottom-right-radius: 0.35rem; }
+  .bubble-assistant { align-self: flex-start; background: #fff; border: 1px solid #e3dfeb; border-bottom-left-radius: 0.35rem; }
+  .bubble .spoken { color: #1b1a22; }
+  .bubble-assistant:has(.spoken) { color: #8a85a0; }
+  .composer-wrap { flex: 0 0 auto; padding: 0.25rem max(1rem, env(safe-area-inset-right, 0px)) max(0.75rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px)); background: #f4f3f7; }
+  .status { min-height: 1.2em; margin: 0 0 0.25rem; font-size: 0.8rem; color: #4e008e; }
+  .hint { min-height: 1.2em; margin: 0 0 0.25rem; font-size: 0.8rem; color: #8a2d00; }
+  .composer { display: flex; align-items: center; gap: 0.5rem; }
+  .mic { flex: 0 0 auto; width: 3.25rem; height: 3.25rem; border-radius: 50%; border: 0; background: #4e008e; color: #fff; display: grid; place-items: center; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  .mic.recording { background: #c81e1e; box-shadow: 0 0 0 6px rgba(200, 30, 30, 0.25); }
+  .mic:disabled, .send:disabled { opacity: 0.5; }
+  .message { flex: 1 1 auto; min-width: 0; font: inherit; font-size: 1rem; padding: 0.8rem 1rem; border-radius: 999px; border: 1px solid #c9c4d6; background: #fff; }
+  .send { flex: 0 0 auto; font: inherit; font-weight: 600; padding: 0.8rem 1.1rem; border-radius: 999px; border: 0; background: #4e008e; color: #fff; }
+  .hint-static { margin: 0.5rem 0 0; font-size: 0.75rem; color: #6b6680; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>

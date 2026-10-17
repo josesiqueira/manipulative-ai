@@ -10,5 +10,10 @@ export default defineConfig({
   output: 'static',
   adapter: node({ mode: 'standalone' }),
   server: { host: true, port: 4321 },
-  vite: { plugins: [tailwindcss()] },
+  vite: {
+    plugins: [tailwindcss()],
+    // With PUBLIC_API_URL empty the page calls /api on its own origin and the
+    // dev server forwards it to the API, so one HTTPS tunnel serves a phone test.
+    server: { proxy: { '/api': { target: process.env.DEV_API_URL ?? 'http://localhost:8000', changeOrigin: true } } },
+  },
 });

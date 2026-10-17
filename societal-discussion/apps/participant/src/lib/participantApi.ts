@@ -1,6 +1,7 @@
 // The three backend calls the consent flow needs. Runs in client scripts.
 import type { Language } from './strings';
 
+// Empty means the app's own origin (the dev server proxies /api to the API).
 export const API_URL: string = (import.meta.env.PUBLIC_API_URL as string | undefined) ?? 'http://localhost:8000';
 
 export interface SessionInfo {
@@ -38,4 +39,54 @@ export async function createConversation(sessionId: string, language: Language):
   if (!res.ok) throw new Error('conversation-create-failed');
   const data = await res.json();
   return data.id as string;
+}
+
+export type InputMode = 'typed' | 'spoken';
+
+export interface AssistantMessage {
+  id: string;
+  role: string;
+  content: string;
+  created_at: string;
+}
+
+export async function sendMessage(conversationId: string, content: string, inputMode: InputMode): Promise<AssistantMessage> {
+  const res = await fetch(`${API_URL}/api/conversations/${encodeURIComponent(conversationId)}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content, input_mode: inputMode }),
+  });
+  if (!res.ok) throw new Error('message-failed');
+  return res.json();
+}
+
+export async function endConversation(conversationId: string): Promise<void> {
+  await fetch(`${API_URL}/api/conversations/${encodeURIComponent(conversationId)}/end`, { method: 'PUT' }).catch(() => undefined);
+}
+
+// The recording goes as the raw body with its own mime type; nothing is kept on the server.
+export async function transcribe(conversationId: string, blob: Blob, language: Language): Promise<string> {
+  const url = `${API_URL}/api/speech/transcribe?conversation_id=${encodeURIComponent(conversationId)}&language=${language}`;
+  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': blob.type || 'application/octet-stream' }, body: blob });
+  if (!res.ok) throw new Error('transcribe-failed');
+  const data = await res.json();
+  return (data.text as string) ?? '';
+}
+
+export interface SpeechClip {
+  audio_base64: string;
+  sample_rate: number;
+  words: string[];
+  wtimes: number[];
+  wdurations: number[];
+}
+
+export async function synthesize(conversationId: string, text: string, language: Language): Promise<SpeechClip> {
+  const res = await fetch(`${API_URL}/api/speech/synthesize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ conversation_id: conversationId, text, language }),
+  });
+  if (!res.ok) throw new Error('synthesize-failed');
+  return res.json();
 }

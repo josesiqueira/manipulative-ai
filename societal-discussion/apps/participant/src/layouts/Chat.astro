@@ -1,0 +1,27 @@
+---
+// The chat frame: a full-height page with the avatar on top, the transcript
+// in the middle and the composer at the bottom. Nothing here differs by
+// condition (spec V7); the look is the "modern" one, apart from the plain
+// institutional pages.
+import '../styles/global.css';
+import type { Language } from '../lib/strings';
+
+interface Props {
+  lang: Language;
+  title: string;
+}
+const { lang, title } = Astro.props;
+---
+<!doctype html>
+<html lang={lang} translate="no">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="google" content="notranslate" />
+    <meta name="robots" content="noindex" />
+    <title>{title}</title>
+  </head>
+  <body class="chat-body">
+    <slot />
+  </body>
+</html>

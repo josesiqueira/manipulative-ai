@@ -29,7 +29,28 @@ export interface Strings {
   };
   declined: { title: string; body: string; back: string };
   info: { back: string; privacyTitle: string; researchTitle: string };
-  chat: { placeholderTitle: string; placeholderBody: string; backToStart: string };
+  chat: {
+    placeholderTitle: string;
+    placeholderBody: string;
+    backToStart: string;
+    endConversation: string;
+    inputPlaceholder: string;
+    send: string;
+    holdToTalk: string;
+    listening: string;
+    transcribing: string;
+    thinking: string;
+    speaking: string;
+    micDenied: string;
+    micEmpty: string;
+    tapAgain: string;
+    noSound: string;
+    enableSound: string;
+    privacyHint: string;
+    sendError: string;
+    speechError: string;
+    stillFace: string;
+  };
   footer: { contact: string };
 }
 
@@ -76,6 +97,23 @@ export const STRINGS: Record<Language, Strings> = {
       placeholderTitle: 'Keskustelu',
       placeholderBody: 'Keskustelusivu rakennetaan seuraavaksi (kortti M7). Istuntosi on tallessa.',
       backToStart: 'Takaisin alkuun',
+      endConversation: 'Lopeta keskustelu',
+      inputPlaceholder: 'Kirjoita viestisi...',
+      send: 'Lähetä',
+      holdToTalk: 'Pidä pohjassa ja puhu',
+      listening: 'Kuuntelen... päästä irti, kun olet valmis',
+      transcribing: 'Tunnistan puhetta...',
+      thinking: 'Mietin...',
+      speaking: 'Puhun...',
+      micDenied: 'Mikrofonia ei saatu käyttöön. Voit kirjoittaa viestisi.',
+      micEmpty: 'Tallenne jäi tyhjäksi.',
+      tapAgain: 'Napauta mikrofonia uudelleen ja pidä pohjassa puhuessasi.',
+      noSound: 'Ei ääntä? Ota puhelimen äänetön tila pois päältä.',
+      enableSound: 'Napauta ottaaksesi äänen käyttöön',
+      privacyHint: 'Älä kirjoita tai sano nimiä tai muita henkilötietoja.',
+      sendError: 'Viestin lähetys epäonnistui. Yritä uudelleen.',
+      speechError: 'Puheen käsittely epäonnistui. Voit kirjoittaa viestisi.',
+      stillFace: 'Kasvot eivät latautuneet tälle laitteelle; ääni ja teksti toimivat silti.',
     },
     footer: { contact: 'Yhteydenotot:' },
   },
@@ -121,6 +159,23 @@ export const STRINGS: Record<Language, Strings> = {
       placeholderTitle: 'Conversation',
       placeholderBody: 'The chat page is built next (card M7). Your session is kept.',
       backToStart: 'Back to start',
+      endConversation: 'End conversation',
+      inputPlaceholder: 'Type your message...',
+      send: 'Send',
+      holdToTalk: 'Hold to talk',
+      listening: 'Listening... release when you are done',
+      transcribing: 'Recognising speech...',
+      thinking: 'Thinking...',
+      speaking: 'Speaking...',
+      micDenied: 'The microphone could not be used. You can type your message.',
+      micEmpty: 'The recording was empty.',
+      tapAgain: 'Tap the microphone again and hold it while you speak.',
+      noSound: 'No sound? Turn off silent mode on your phone.',
+      enableSound: 'Tap to enable sound',
+      privacyHint: 'Do not type or say names or other personal details.',
+      sendError: 'Failed to send the message. Please try again.',
+      speechError: 'Speech processing failed. You can type your message.',
+      stillFace: 'The face did not load on this device; voice and text still work.',
     },
     footer: { contact: 'Contact:' },
   },
