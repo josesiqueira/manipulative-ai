@@ -33,6 +33,7 @@ from ..models import (
 from ..services.encryption import encrypt_api_key, decrypt_api_key, generate_key_preview
 from ..services.llm_models import AVAILABLE_MODELS, get_models_for_provider
 from ..services.party_grounding import ALL_PARTIES, PARTY_DISPLAY_NAMES
+from ..services.session_code import format_session_code, session_id_prefix_from_code
 
 router = APIRouter()
 settings = get_settings()
@@ -727,8 +728,27 @@ class SessionListItem(BaseModel):
     created_at: datetime
     conversation_count: int
     is_test_mode: bool
+    session_code: str = ""
+    consent_version: str | None = None
+    consent_language: str | None = None
+    age_confirmed: bool = False
+    data_deleted_at: datetime | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+def _session_item(s: Session) -> SessionListItem:
+    return SessionListItem(
+        id=s.id,
+        created_at=s.created_at,
+        conversation_count=len(s.conversations),
+        is_test_mode=s.is_test_mode,
+        session_code=format_session_code(s.id),
+        consent_version=s.consent_version,
+        consent_language=s.consent_language,
+        age_confirmed=s.age_confirmed,
+        data_deleted_at=s.data_deleted_at,
+    )
 
 
 @router.get("/sessions", response_model=list[SessionListItem])
@@ -744,15 +764,29 @@ async def list_sessions(
     )
     sessions = result.scalars().all()
 
-    return [
-        SessionListItem(
-            id=s.id,
-            created_at=s.created_at,
-            conversation_count=len(s.conversations),
-            is_test_mode=s.is_test_mode,
-        )
-        for s in sessions
-    ]
+    return [_session_item(s) for s in sessions]
+
+
+@router.get("/sessions/by-code/{code}", response_model=list[SessionListItem])
+async def find_sessions_by_code(
+    code: str,
+    db: AsyncSession = Depends(get_db),
+    _: bool = Depends(verify_admin),
+):
+    """Look up sessions by the XXXX-XXXX code shown on the thank-you page.
+
+    Used to honour deletion or access requests sent by email. Returns every
+    session whose id starts with the 8 hex characters (normally one)."""
+    prefix = session_id_prefix_from_code(code)
+    if prefix is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Malformed session code")
+    result = await db.execute(
+        select(Session)
+        .options(selectinload(Session.conversations))
+        .where(Session.id.like(f"{prefix}%"))
+        .order_by(Session.created_at.desc())
+    )
+    return [_session_item(s) for s in result.scalars().all()]
 
 
 # ============================================================================
@@ -798,7 +832,7 @@ async def export_data(
 
     query = (
         select(Conversation)
-        .options(selectinload(Conversation.messages))
+        .options(selectinload(Conversation.messages), selectinload(Conversation.session))
         .order_by(Conversation.started_at.asc())
     )
     if filters:
@@ -821,6 +855,8 @@ async def export_data(
                     "role": m.role,
                     "content": m.content,
                     "token_count": m.token_count,
+                    "input_mode": m.input_mode,
+                    "model_name": m.model_name or "",
                     "language": conv.language,
                     "created_at": m.created_at.isoformat() if m.created_at else None,
                 })
@@ -839,7 +875,8 @@ async def export_data(
         output = io.StringIO()
         fieldnames = [
             "session_id", "conversation_id", "message_id",
-            "role", "content", "token_count", "language", "created_at",
+            "role", "content", "token_count", "input_mode", "model_name",
+            "language", "created_at",
         ]
         writer = csv.DictWriter(output, fieldnames=fieldnames)
         writer.writeheader()
@@ -884,6 +921,11 @@ async def export_data(
             "flag_notes": conv.flag_notes or "",
             "started_at": conv.started_at.isoformat() if conv.started_at else None,
             "ended_at": conv.ended_at.isoformat() if conv.ended_at else None,
+            "session_code": format_session_code(conv.session_id),
+            "consent_version": conv.session.consent_version or "",
+            "consent_language": conv.session.consent_language or "",
+            "age_confirmed": conv.session.age_confirmed,
+            "data_deleted_at": conv.session.data_deleted_at.isoformat() if conv.session.data_deleted_at else "",
             "full_transcript": full_transcript,
         })
 
@@ -920,7 +962,8 @@ async def export_data(
             "starter_topic", "is_complete", "message_count",
             "user_message_count", "assistant_message_count",
             "is_test_mode", "is_flagged", "flag_notes",
-            "started_at", "ended_at", "full_transcript",
+            "started_at", "ended_at", "session_code", "consent_version",
+            "consent_language", "age_confirmed", "data_deleted_at", "full_transcript",
         ]
         output = io.StringIO()
         writer = csv.DictWriter(output, fieldnames=fieldnames)
