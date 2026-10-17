@@ -1,238 +1,372 @@
-# Methods — manipulative-ai2
+# Methods: manipulative-ai2, version 3 (Metso demo, 23 October 2026)
 
 Reference summary of the technical and methodological choices behind the
-manipulative-ai2 chatbot experiment. Use this as a starting point for the
-methods section of the thesis / paper.
+manipulative-ai2 chatbot experiment, as the code stands for the public demo
+at the Yleisöluento in Metso, Tampere (23.10.2026). Use this as the starting
+point for the methods section of the thesis or paper. Every statement names
+the file that implements it; the version this text describes is the commit
+that carries it in `git log -- societal-discussion/METHODS.md`.
+
+What changed from the HEPP2026 release: 18 conditions instead of 10, a
+consent gate before any conversation, a public participant app with a
+talking avatar and speech in both directions, a debrief with data rights
+after the survey, and two new fields on every message (input mode and the
+model that answered). The survey questions are unchanged.
 
 ---
 
 ## 1. Experimental goal
 
 The project tests **whether participants can detect that a chatbot's
-responses are aligned with a specific Finnish political party**. The bias
-is hidden: the participant is told they're talking to a chatbot about
-politics, but the bot's underlying political alignment is the experimental
-manipulation. There are 9 conditions (one per party). A single
-participant's session can contain multiple conversations, each randomly
-assigned to a *different* party (no repeats until the full pool is used).
+responses are aligned with a specific Finnish political party**, and whether
+a populist framing on top of the party line is noticed. The bias is hidden:
+the participant is told they are talking to a chatbot about politics and
+the coming elections, but the bot's political alignment is the experimental
+manipulation.
 
-## 2. Grounding technique — Cache-Augmented Generation (CAG)
+There are **18 conditions**: each of the 9 parties in a standard variant
+(`<party>`) and a populist variant (`<party>_populist`). The populist variant
+reads the identical party corpus and adds one fixed markers section to the
+behavioural instruction (section 3), so the populist treatment is the same
+for every party. The list is generated from one base list of nine parties
+in `apps/api/src/services/party_grounding.py` (`BASE_PARTIES`, `ALL_PARTIES`,
+`is_populist()`, `base_party()`).
 
-The bot is not given few-shot examples, persona descriptions, or
-vector-database retrieval. Instead, **the entire party-program corpus**
-for the assigned party is concatenated into the system prompt at every
-request. This is the **CAG approach** (sometimes called *long-context
-grounding* or, in the 2026 literature, *deeply contextualised persona
-prompting*).
+A participant's session can contain several conversations, each assigned
+to a different condition (no repeat within the session until all 18 have
+been used).
 
-- **Corpus size per party**: 62 KB (Liike Nyt) → 687 KB (Vihreät), Finnish
-  UTF-8 text from **Pohtiva** (the Finnish political-program archive),
-  aggregating each party's election programs, policy programs, and
-  manifestos from 2022–2025.
-- **Tokenization**: ~20 K (smallest) to ~220 K (largest) tokens of source
+## 2. Grounding technique: the whole party programme in the prompt
+
+The bot is not given few-shot examples, persona descriptions or
+vector-database retrieval. Instead, **the entire party-programme corpus**
+for the assigned party is placed in the system prompt at every request.
+This is the approach the literature calls cache-augmented generation (CAG)
+or long-context grounding.
+
+- **Corpus per party**: 62 KB (Liike Nyt) to 688 KB (Vihreät) of Finnish
+  UTF-8 text from **Pohtiva** (the Finnish political-programme archive, FSD),
+  merging each party's election programmes, policy programmes and
+  manifestos from 2022 to 2025. The files are in `apps/api/src/party_data/`.
+- **Tokens**: roughly 20 K (smallest) to 220 K (largest) tokens of source
   material per system prompt.
-- **Why CAG over RAG?** The corpus is *bounded and static* during the
-  experiment — exactly the situation where CAG outperforms
-  retrieval-augmented generation: zero retrieval-failure modes, source
-  fidelity preserved, no embedding distortion, simpler implementation,
-  and better persona stability per recent literature.
-- **Code**: `apps/api/src/services/party_grounding.py` loads the text
-  file for the assigned party; `apps/api/src/services/prompt_builder.py`
-  injects it into the system prompt.
+- **Why not retrieval**: the corpus is bounded and static during the
+  experiment, so there is nothing to retrieve, no retrieval failures, and
+  the source text reaches the model unchanged.
+- **Code**: `party_grounding.py` loads the file for the base party of the
+  assigned condition (`PARTY_FILES` maps all 18 ids to the 9 files);
+  `apps/api/src/services/prompt_builder.py` puts it into the system prompt.
 
-## 3. Three-layer system prompt structure
+## 3. System prompt structure
 
-Each LLM request is built from three layers, concatenated in order:
+Each model request is built from three layers, concatenated in order
+(`prompt_builder.py`):
 
 ```
-[1. Behavioral instructions in Finnish]   ← from prompt_configs DB row,
-                                            or DEFAULT_SYSTEM_INSTRUCTION
-[2. Full party program corpus (Finnish)]  ← from apps/api/src/party_data/
-[3. Language directive]                   ← appended at the very end:
-                                              FI: "Vastaa aina suomeksi…"
-                                              EN: "Override any earlier
-                                                   instructions: respond
-                                                   ALWAYS in English…"
+[1. Behavioural instruction in Finnish]   from the prompt_configs table
+                                          (admin override per condition),
+                                          else DEFAULT_SYSTEM_INSTRUCTION,
+                                          with POPULISM_MARKERS_SECTION
+                                          inserted for a populist condition
+[2. Full party programme (Finnish)]       from apps/api/src/party_data/
+[3. Language directive]                   appended last:
+                                          FI "Vastaa aina suomeksi ..."
+                                          EN "... respond ALWAYS in English"
 ```
 
-Layer 3 sits **after** the corpus so it dominates the model's attention.
-This is how the FI/EN toggle works without translating the corpus.
+The populist markers section (`POPULISM_MARKERS_SECTION`) is inserted
+before the heading "Poliittiset ohjelmasi ja näkemyksesi" of the default
+instruction by `_default_instruction_for()`, for every id that
+`is_populist()` accepts. It asks the model to internalise three populism
+features: us versus them, people-centrism and anti-elitism (Cranmer 2011),
+without naming the theory. The admin panel can store a different
+instruction per condition (all 18) in the `prompt_configs` table; a stored
+instruction replaces the default including the markers section.
 
-## 4. Turn-1 anchor + voice-locking instruction
+Layer 3 sits after the corpus so it dominates the model's attention. This
+is how the FI/EN choice works without translating the corpus.
 
-The default behavioral instruction (layer 1) contains a top section
-called **Äänesi ja ilmaisutapasi** ("Your voice and expression") with
-three explicit rules:
+## 4. Turn-1 anchor and voice locking
 
-1. **No hedging.** *"Open every reply with a clear position, never with
-   a caveat. Do not use 'on the one hand … on the other hand'
-   constructions, do not present a neutral view, do not leave the
-   conclusion to the reader."* Counters the RLHF-trained default of
-   GPT-family models to produce balanced/neutral responses.
-2. **Voice locking.** *"Use vivid, party-characteristic language. Draw
-   word choices, metaphors, and argumentation styles directly from the
-   party program below."* Plus an explicit list of hedge phrases to
-   avoid (*"riippuu monista tekijöistä"*, *"tasapaino on tärkeää"*,
-   *"molemmilla puolilla on hyviä huomioita"*).
-3. **Turn-1 importance.** *"Your first reply sets the tone for the whole
-   conversation; if it's neutral, the conversation drifts to neutral."*
+The default behavioural instruction (layer 1) opens with a section
+"Äänesi ja ilmaisutapasi" ("Your voice and expression") with three rules:
 
-The third rule reflects a published finding: LLMs imitate their own
-earlier behavior, so the **first reply disproportionately anchors the
-rest of the conversation**. Locking the voice on turn 1 makes the persona
-more detectable downstream without adding a new intervention variable.
+1. **No hedging.** Open every reply with a clear position, never with a
+   caveat; no "on the one hand, on the other hand"; no neutral view; do not
+   leave the conclusion to the reader. This counters the trained default of
+   chat models to produce balanced answers.
+2. **Voice locking.** Use vivid, party-characteristic language; draw word
+   choices, metaphors and argument styles from the party programme. An
+   explicit list of hedge phrases to avoid is given ("riippuu monista
+   tekijöistä", "tasapaino on tärkeää", "molemmilla puolilla on hyviä
+   huomioita").
+3. **Turn-1 importance.** The first reply sets the tone for the whole
+   conversation; if it is neutral, the conversation drifts to neutral.
 
-## 5. Language handling — one toggle, no parallel prompt
+The third rule reflects a published finding: language models imitate
+their own earlier behaviour, so the first reply anchors the rest of the
+conversation. Locking the voice on turn 1 makes the persona more
+detectable downstream without adding an intervention variable.
 
-Bilingual (FI/EN) is delivered via a **single user choice on the landing
-page**, persisted in `localStorage`, propagated through every page
-(chat, survey, thank-you) and into the conversation record as
-`conversations.language`. The party corpus stays Finnish; only layer 3
-(the language directive) changes. **One Finnish prompt covers both
-languages.** Translating the corpus would have introduced a
-translation-quality confound.
+## 5. Language handling: one choice, no parallel prompt
 
-## 6. Party assignment — stratified, no-repeat, balanced
+The participant app is bilingual (FI/EN) through the URL: every page lives
+under `/fi/` or `/en/` (`apps/participant/src/pages/[lang]/`), the choice is
+remembered in the browser (`localStorage` key `language`, `src/lib/session.ts`)
+and sent with the session (`consent_language`) and with each conversation
+(`conversations.language`). The party corpus stays Finnish; only layer 3
+changes. One Finnish prompt covers both languages, so no translation of the
+corpus confounds the comparison. Speech recognition and the voice follow the
+page language (section 9).
 
-When a participant clicks "Start conversation":
+## 6. Condition assignment: weighted random, no repeat within a session
 
-- The backend (`apps/api/src/services/party_assignment.py`) picks one of
-  the 9 parties using **weighted random favoring globally
-  underrepresented parties**, drawn from the pool of parties **not yet
-  used in this participant's session**.
-- When all 9 have been used, the pool resets.
-- This produces approximately balanced sampling across parties as the
-  study progresses, *without revealing the assignment to the participant*.
+When a conversation is created (`POST /api/conversations`), the backend
+(`apps/api/src/services/party_assignment.py`) picks one of the 18
+conditions:
 
-## 7. Vaalikone-derived topic prompts
+- from the pool of conditions not yet used in this session (test-mode
+  conversations excluded); when all 18 have been used the pool resets;
+- by weighted random that favours conditions with fewer conversations so
+  far across the whole study, so the sample stays roughly balanced;
+- without revealing the assignment to the participant: the condition is
+  never in any participant response until the debrief (section 11).
 
-The 30+ topic cards on the landing page are derived from real Finnish
-voting-advice applications: **HS Eduskuntavaalikone 2023** and **HS / Yle
-Kuntavaalikone 2025**, organized into 8 issue clusters:
+`FORCED_PARTY` (environment) can pin every conversation to one condition or
+to a uniform pick from a comma-separated list; it is empty in the Metso
+deployment (`k8s/api-deployment.yaml`).
 
-1. Talous & verotus (economy & taxation)
-2. Sosiaaliturva & terveydenhuolto (social security & healthcare)
-3. Koulutus (education)
-4. Ympäristö & ilmasto (environment & climate)
-5. Työmarkkinat & maahanmuutto (labor market & immigration)
-6. Turvallisuus & ulkopolitiikka (security & foreign policy)
-7. Arvot & yhteiskunta (values & society)
-8. Kaupunkikehitys & liikenne (urban development & traffic)
+## 7. Conversation start
 
-The participant either clicks a topic (which becomes their first user
-message) or chooses "Free conversation" (no preset starter). Each topic
-card is translated to EN if the participant chose English mode.
-Vaalikone is used **only as a topic source**, not as few-shot examples
-for the bot. (A 3-shot Vaalikone calibration scheme was considered and
-deliberately deferred — see §11.)
+In version 3 the participant app has no topic cards: after consent the
+participant lands on the chat page and opens with their own words, typed or
+spoken (the conversation is created with `starter_topic: null`,
+`apps/participant/src/lib/participantApi.ts`). The Vaalikone-derived topic
+list that the HEPP2026 landing page offered still exists in the admin app's
+translations (`apps/web/src/lib/translations.ts`) and in
+`VAALIKONE-QUESTIONS-FINAL.md`, but no participant page shows it. "Back to
+start" on the chat page ends the conversation and the landing page's Start
+creates a new one for the same session; "End conversation" leads to the
+survey.
 
 ## 8. Language model
 
-- **Model**: OpenAI **GPT-5.4** (March 2026 frontier release).
-- **Context window**: ~1.05M tokens (922 K input + 128 K output).
-  Vihreät's 220 K-token corpus + system prompt (~2 K) + history (~5–10 K)
-  + output budget (~4 K) → ~240 K total per request, comfortably under
-  the 272 K input threshold where OpenAI applies a 2× input / 1.5× output
-  surcharge.
-- **Temperature**: 0.1 — favors response consistency. (The newer GPT-5.5
-  flagship rejects non-default temperatures, which is why we stayed on
-  GPT-5.4.)
+- **Model in the code at this commit**: OpenAI `gpt-5.4` through
+  `apps/api/src/services/llm_providers/openai_provider.py`, selected in the
+  admin panel (`apps/api/src/services/llm_models.py` lists the choices).
+  Temperature 0.1 for the models that accept one; model families that
+  reject a custom temperature get none (`_supports_custom_temperature`).
+- **Model for the Metso run**: a model served on Tampere University
+  hardware (the TSCS AI Cluster or GPT Lab GPU farm 004), chosen by the
+  owner on board card M9 (spec decision V11). A new provider class in
+  `services/llm_providers/` is added when the endpoint is known; OpenAI
+  stays selectable as the fallback (V11a). Until M9 lands, the consent
+  texts carry a placeholder for the model name (`[MALLIN NIMI]` in
+  `apps/participant/src/lib/studyConfig.ts`).
+- **The model is on the record**: every assistant message stores the model
+  identifier the provider reported (`messages.model_name`, written in
+  `apps/api/src/routers/conversations.py` from the third value that
+  `generate_response` returns), so the analysis knows which model produced
+  each reply even if the model changes during the day.
+- **Context**: the largest corpus (Vihreät, about 220 K tokens) plus the
+  instruction, the history and the output budget stays under 272 K input
+  tokens, the point where OpenAI applies a surcharge; a self-hosted model
+  must accept the same prompt length or M9 decides how the corpus is
+  shortened.
 
-## 9. Participant access gate
+HEPP2026 data was collected with GPT-5.4 at temperature 0.1.
 
-To protect against random URL visitors burning OpenAI tokens:
+## 9. Participant flow and the consent gate
 
-- `POST /api/conversations` requires an `X-Participant-Password` header.
-  Defaults to the admin password, overridable via a `PARTICIPANT_PASSWORD`
-  env var.
-- The landing page shows a one-time modal asking for the access code on
-  the first conversation-start; verified codes are cached in
-  `sessionStorage` for the rest of the session.
-- This protects only conversation creation, not subsequent message sends
-  within an already-started conversation — sufficient for the threat
-  model (gates random URL access without making the participant flow
-  heavy).
+The HEPP2026 access-code gate (a password header on conversation creation
+and a one-time modal) no longer exists; `PARTICIPANT_PASSWORD` remains only
+as an unused setting in `apps/api/src/config.py`. It is replaced by a consent
+gate that is part of the research protocol:
 
-## 10. Data collected per conversation
+1. **Landing** (`/fi/` or `/en/`, `apps/participant/src/pages/[lang]/index.astro`):
+   the study line ("scientific study, Tampere University, 18+") and Start.
+2. **Consent** (`consent.astro`): a plain institutional page with the
+   consent summary from the consent package (section 4c), links to the full
+   privacy notice and research notification (`info/[doc].astro`, texts in
+   `src/content/notices/`), and unticked checkboxes that must all be ticked
+   before Start works: age 18+, and read-and-voluntary-and-aware that the
+   bot's viewpoint is undisclosed; a third box about the provider appears
+   only when the build uses the OpenAI provider block
+   (`PUBLIC_PROVIDER_BLOCK=openai`, `src/lib/providerNotice.ts`). "I do not
+   take part" leads to `declined.astro` and nothing is sent.
+3. **Session** is created only on acceptance (`POST /api/sessions` with
+   `consent_version`, `age_confirmed`, `language`); the backend stamps
+   `consent_accepted_at` only when `age_confirmed` is true
+   (`apps/api/src/routers/sessions.py`). `POST /api/conversations` answers
+   403 for a session without consent, except test-mode sessions
+   (`routers/conversations.py`).
+4. **Chat** (`chat.astro`, logic in `src/scripts/chat.ts`): typed or spoken
+   turns, the reply as text and speech from one avatar (section 10).
+5. **Survey entry, survey, thank-you with debrief** (section 11).
 
-| Field                                                                      | Source                                       |
-|----------------------------------------------------------------------------|----------------------------------------------|
-| `session_id`, `created_at`, `is_test_mode`                                 | `sessions` table                             |
-| `assigned_party`, `language`, `starter_topic`, `started_at`, `ended_at`, `is_complete`, `is_flagged`, `flag_notes`, `is_test_saved` | `conversations` table                        |
-| `role`, `content`, `token_count`, `created_at`                             | `messages` table (one row per turn)          |
-| `responses` JSONB (chatbot_usage, chatbot_perception, conversation_reflection, response_speed, topic_variety, **detected_bias**, **detected_terminology**, **detected_persuasion**, notice_anything, …) | `survey_responses` table                     |
+The consent version is a constant (`studyConfig.ts`, `2026-10-23-v1`) and
+is bumped whenever the consent wording changes; it is stored on every
+session.
 
-The three **bolded** survey items are the masked detection measures —
-embedded among decoy items (response speed, topic variety) so the
-bias-detection intent isn't telegraphed to the participant.
+## 10. Avatar, voice and speech input
 
-## 11. What's deliberately *not* used
+One avatar and one voice for all 18 conditions, so nothing on the chat page
+differs by condition (spec V7). The avatar is gender-neutral in the sense
+that it belongs to no party and no person: the sample head `avatarsdk.glb`
+shipped with the TalkingHead library (a man), stored as
+`apps/participant/public/avatar/man.glb`, with a still image fallback.
 
-- **No few-shot prompting.** The 2025–2026 literature shows few-shot on
-  top of full-corpus grounding has diminishing returns and adds a
-  confounded intervention variable. A 3-shot Vaalikone calibration
-  scheme is documented as a potential follow-up study but is not used in
-  the primary protocol.
-- **No vector RAG / embedding retrieval.** The static-corpus + 1M-token
-  context window makes retrieval unnecessary and avoids
-  retrieval-failure modes.
-- **No fine-tuning.** Same model + different system prompt is the
-  manipulation — keeps the experimental condition pure and reproducible.
-- **No persona "you are a Politician X" labels.** The bot is told to
-  *internalize* the views in the corpus as its own, never to *play* a
-  party — this avoids the model's RLHF-trained tendency to refuse or
-  hedge when role-playing political figures.
+- **Rendering and lip-sync**: TalkingHead (met4citizen, MIT), vendored in
+  `apps/participant/src/vendor/talkinghead/` with its Finnish and English
+  lip-sync modules; the mouth is driven by the word timings that come with
+  each audio clip (`speakAudio`). If WebGL or the head file fails, the page
+  shows the still face and the voice still plays (`src/scripts/avatar.ts`).
+- **Voice output**: every assistant reply is shown as text and spoken,
+  sentence by sentence (`src/lib/sentences.ts` splits; `chat.ts` fetches the
+  next sentence while the current one plays; the words light up as they are
+  spoken). Each sentence goes to `POST /api/speech/synthesize`
+  (`apps/api/src/routers/speech.py`), which returns WAV audio plus the
+  words with start times and durations.
+- **Speech input**: a hold-to-talk microphone button; the browser asks for
+  permission on first use; the recording (webm/opus or mp4) is sent as the
+  raw request body to `POST /api/speech/transcribe` with the page language;
+  the text comes back and is sent as an ordinary message with
+  `input_mode: spoken`. The phone's own speech recognition and voices are
+  never used, so no audio or text goes to a phone vendor's cloud.
+- **Two engine tiers** (`apps/api/src/services/speech/`): remote servers
+  with an OpenAI-compatible API (`SPEECH_STT_URL`, `SPEECH_TTS_URL`; the
+  defaults name faster-whisper large-v3-turbo and VoxCPM2, the models the
+  M5 research chose for the university cluster), or local engines inside
+  the API container: faster-whisper `small` (int8) for recognition and
+  Piper voices `fi_FI-harri-medium` and `en_GB-alan-medium` for speech,
+  fetched at image build from pinned Hugging Face revisions with checksums
+  (`apps/api/scripts/fetch_speech_models.py`). Word timings come from
+  Piper's phoneme alignments; a remote voice gets whisper word timestamps
+  aligned to the script (`services/speech/alignment.py`).
+- **Limits and privacy**: recordings are capped at 2 MB and 60 s of audio
+  and decoded in memory; no audio is written to disk or logged; the API
+  logs only the clip length and the word count. Two local jobs run at a
+  time.
 
-## 12. Methodological notes worth citing
+## 11. Debrief and data rights
 
-- **Persona drift** (degradation of voice consistency after ~8–12 turns)
-  is documented in the recent literature. The 3–5 minute target
-  conversation length (typically 5–10 turns) sits *before* the drift
-  cliff. GPT-5.4's 1M context window further mitigates this versus older
-  models.
-- **CAG vs RAG**: corpus is static and bounded — textbook CAG use case;
-  no need for retrieval infrastructure.
-- **Manipulation simplicity**: by deliberately keeping the intervention
-  to "system prompt + party corpus + language toggle + turn-1 anchor",
-  the experimental claim ("can participants detect *corpus-grounded*
-  party alignment?") is clean and reproducible. Heavier interventions
-  (few-shot examples, theoretical scaffolding) are reserved for planned
-  follow-up studies.
+After the survey the thank-you page (`apps/participant/src/pages/[lang]/thank-you.astro`)
+calls `GET /api/sessions/{id}/debrief`, the one participant endpoint that
+discloses the condition, and only once a survey row exists for the session
+(403 before that). It shows, per conversation, the party's display name and
+whether the populist framing was on; what the replies were (a model's text
+from public programmes, not the party's statements); why the study did not
+say so beforehand; the session code; "Delete my data"; the provider note;
+and the contacts and notice links.
 
-## 13. References used in design choices
+- **Session code**: the first 8 hex characters of the session id as
+  `XXXX-XXXX` (`apps/api/src/services/session_code.py`), shown with a copy
+  button. The participant keeps it to ask for their data later; researchers
+  find the session with `GET /api/admin/sessions/by-code/{code}`.
+- **Delete my data**: `DELETE /api/sessions/{id}/data` removes the message
+  rows and the survey rows and stamps `data_deleted_at`; the conversation
+  rows stay as a tombstone with the condition and timestamps; the call is
+  idempotent. A deleted session refuses new conversations (403), the
+  debrief still answers for it marked `data_deleted`, and the exports carry
+  `data_deleted_at`.
+
+Consent texts, privacy notice and research notification:
+`docs/consent/2026-10-23-metso-consent-package.md` (repository root `docs/`).
+
+## 12. Survey
+
+The survey (`survey.astro`) is unchanged from HEPP2026: the same questions,
+sections, scale labels and response keys as the Next.js page they were
+copied from (`apps/web/src/app/survey/page.tsx`), every answer optional.
+It is submitted once per session (`POST /api/survey`, responses stored as
+one JSON document). The three masked detection items (`detected_bias`,
+`detected_terminology`, `detected_persuasion`) sit among decoy items
+(response speed, topic variety) so the detection intent is not telegraphed.
+
+## 13. Data collected
+
+| Table | Fields |
+|---|---|
+| `sessions` | `id`, `created_at`, `is_test_mode`, `consent_accepted_at`, `consent_version`, `consent_language`, `age_confirmed`, `data_deleted_at` |
+| `conversations` | `session_id`, `assigned_party` (one of the 18 condition ids), `language`, `starter_topic`, `started_at`, `ended_at`, `is_complete`, `is_flagged`, `flag_notes`, `is_test_mode`, `is_test_saved` |
+| `messages` | `conversation_id`, `role`, `content`, `token_count`, `input_mode` (`typed` or `spoken`), `model_name`, `created_at` |
+| `survey_responses` | `session_id`, `responses` (JSON: `chatbot_usage`, `chatbot_which`, `political_chatbot`, `chatbot_perception`, `conversation_reflection`, `response_speed`, `topic_variety`, `detected_bias`, `detected_terminology`, `detected_persuasion`, `notice_anything`) |
+
+Models: `apps/api/src/models/`; migrations 005 (consent) and 006 (input mode
+and model name) in `apps/api/alembic/versions/`. Exports
+(`GET /api/admin/export`, `GET /api/admin/export/surveys`) carry the session
+code, the consent fields, `data_deleted_at`, and per message `input_mode` and
+`model_name`. Message text is stored as plain text in SQLite on the Rahti
+volume; the consent texts say "stored on CSC servers in Finland" and never
+"encrypted".
+
+## 14. What is deliberately not used
+
+- **No few-shot prompting.** Few-shot on top of full-corpus grounding has
+  diminishing returns and adds a confounded intervention variable.
+- **No vector retrieval.** The static corpus and the long context window
+  make retrieval unnecessary.
+- **No fine-tuning.** Same model plus a different system prompt is the
+  manipulation; the condition stays pure and reproducible.
+- **No "you are Politician X" labels.** The bot is told to internalise the
+  views in the corpus as its own, never to play a party, which avoids the
+  model's tendency to refuse or hedge when role-playing political figures.
+- **No phone speech services.** Recognition and voice run on our servers
+  (section 10).
+
+## 15. Methodological notes worth citing
+
+- **Persona drift** (loss of voice consistency after roughly 8 to 12
+  turns) is documented in the recent literature. The 3 to 5 minute target
+  conversation (typically 5 to 10 turns) sits before the drift cliff.
+- **Grounding over retrieval**: the corpus is static and bounded, the
+  textbook case for putting the whole text in the prompt.
+- **One identical populist treatment** across nine parties lets the
+  populist effect be separated from the party effect.
+- **Manipulation simplicity**: the intervention is "system prompt + party
+  corpus + optional populist markers + language directive + turn-1 anchor";
+  the avatar and the voice are constant across conditions and therefore not
+  part of the manipulation.
+
+## 16. References used in design choices
 
 | Topic | Source |
 |---|---|
-| CAG vs RAG for static corpora; persona stability | "Deeply Contextualised Persona Prompting" (Emergent Mind, 2026); "Consistently Simulating Human Personas" (arXiv 2511.00222) |
-| Persona drift; turn-by-turn voice consistency | "Stable Personas: Dual-Assessment of Temporal Stability" (arXiv 2601.22812); "Persona Drift" — Echo Protocol framework |
-| Few-shot vs grounding tradeoffs | "Are LLMs Enough for Hyperpartisan/Bias Detection? ICL vs Fine-Tuning" (arXiv 2509.07768); "CEA-LIST at CheckThat! 2025" (arXiv 2507.07539) |
-| Persona prompting risks; double-edged effects | "Persona Prompting as a Lens on LLM Social Reasoning" (EACL 2026); "Persona is a Double-Edged Sword: Rethinking Role-play Prompts in Zero-shot Reasoning Tasks" (OpenReview) |
-| Dashboard design (admin side) | "Dashboard Design Patterns" (144-dashboard study, ResearchGate); "Dashboard Design in 2026: Do's and Don'ts" (think.design) |
-| Source corpus | Pohtiva (Finnish political program archive) |
-| Topic prompts | HS Eduskuntavaalikone 2023; HS / Yle Kuntavaalikone 2025 |
-| Populism markers (potential per-party scaffolding) | Cranmer 2011 — us-vs-them, people-centrism, anti-elitism |
+| Grounding with the full corpus; persona stability | "Deeply Contextualised Persona Prompting" (Emergent Mind, 2026); "Consistently Simulating Human Personas" (arXiv 2511.00222) |
+| Persona drift; turn-by-turn voice consistency | "Stable Personas: Dual-Assessment of Temporal Stability" (arXiv 2601.22812); "Persona Drift", Echo Protocol framework |
+| Few-shot versus grounding | "Are LLMs Enough for Hyperpartisan/Bias Detection? ICL vs Fine-Tuning" (arXiv 2509.07768); "CEA-LIST at CheckThat! 2025" (arXiv 2507.07539) |
+| Persona prompting risks | "Persona Prompting as a Lens on LLM Social Reasoning" (EACL 2026); "Persona is a Double-Edged Sword" (OpenReview) |
+| Populism markers | Cranmer 2011: us versus them, people-centrism, anti-elitism |
+| Debriefing | TENK 2019 (Finnish National Board on Research Integrity): disclosure of the true nature of the study |
+| Source corpus | Pohtiva (Finnish political programme archive, FSD) |
+| Talking avatar | TalkingHead (met4citizen), MIT licence; the sample head is the AvatarSDK example from the same repository (licence question open on card M7's log) |
+| Speech | faster-whisper (Systran), Piper (Rhasspy); VoxCPM2 and whisper large-v3-turbo for the cluster tier (research card M5, `docs/research/2026-10-avatar-and-voice.md`) |
 
 ---
 
 ## Quick reference: file map
 
-| Concern                          | Location                                                         |
-|----------------------------------|------------------------------------------------------------------|
-| Party corpus files (9 .txt)      | `apps/api/src/party_data/`                                       |
-| CAG injection                    | `apps/api/src/services/prompt_builder.py`                        |
-| Party list + display names       | `apps/api/src/services/party_grounding.py`                       |
-| No-repeat weighted assignment    | `apps/api/src/services/party_assignment.py`                      |
-| Conversation creation endpoint   | `apps/api/src/routers/conversations.py`                          |
-| Access-code gate                 | `apps/api/src/routers/conversations.py` (`verify_participant_password`) |
-| Admin endpoints (stats, exports) | `apps/api/src/routers/admin.py`                                  |
-| LLM provider abstraction         | `apps/api/src/services/llm_client.py`, `llm_providers/`          |
-| Model registry (selectable)      | `apps/api/src/services/llm_models.py`                            |
-| FI/EN translations (UI)          | `apps/web/src/lib/translations.ts`                               |
-| Landing page + access modal      | `apps/web/src/app/page.tsx`                                      |
-| Chat page                        | `apps/web/src/app/chat/page.tsx`                                 |
-| Survey                           | `apps/web/src/app/survey/page.tsx`                               |
-| Admin dashboard                  | `apps/web/src/app/admin/page.tsx`                                |
-| Admin prompts editor             | `apps/web/src/app/admin/prompts/page.tsx`                        |
-| Try-bot (testing)                | `apps/web/src/app/admin/try-bot/page.tsx`                        |
-| Conversation list / detail       | `apps/web/src/app/admin/conversations/`                          |
-| Data export + survey schema      | `apps/web/src/app/admin/components/ExportPanel.tsx`              |
+| Concern | Location |
+|---|---|
+| Party corpus files (9 .txt) | `apps/api/src/party_data/` |
+| 18 condition ids, display names, populist helpers | `apps/api/src/services/party_grounding.py` |
+| System prompt and populist markers | `apps/api/src/services/prompt_builder.py` |
+| Weighted no-repeat assignment | `apps/api/src/services/party_assignment.py` |
+| Sessions, consent, debrief, delete | `apps/api/src/routers/sessions.py` |
+| Conversations, messages (input mode, model name) | `apps/api/src/routers/conversations.py` |
+| Survey | `apps/api/src/routers/survey.py` |
+| Speech endpoints and engines | `apps/api/src/routers/speech.py`, `apps/api/src/services/speech/` |
+| Speech models fetched at build | `apps/api/scripts/fetch_speech_models.py`, `apps/api/Dockerfile` |
+| Session code | `apps/api/src/services/session_code.py` |
+| Admin endpoints (stats, exports, by-code lookup) | `apps/api/src/routers/admin.py` |
+| Model provider abstraction | `apps/api/src/services/llm_client.py`, `llm_providers/`, `llm_models.py` |
+| Participant app (Astro) | `apps/participant/` |
+| Consent, declined, notices | `apps/participant/src/pages/[lang]/consent.astro`, `declined.astro`, `info/[doc].astro`, `src/content/notices/` |
+| Study constants and provider texts | `apps/participant/src/lib/studyConfig.ts`, `providerNotice.ts` |
+| Chat page, avatar, audio | `apps/participant/src/pages/[lang]/chat.astro`, `src/scripts/chat.ts`, `avatar.ts`, `audio.ts`, `src/vendor/talkinghead/` |
+| Survey entry, survey, thank-you with debrief | `apps/participant/src/pages/[lang]/survey-entry.astro`, `survey.astro`, `thank-you.astro` |
+| Participant strings (FI, EN) | `apps/participant/src/lib/strings.ts` |
+| Browser tests, including the real-API flow | `apps/participant/tests/` |
+| Admin app (Next.js) | `apps/web/src/app/admin/` (18 conditions in `admin/lib/types.ts`) |
+| Consent package and notices (source texts) | `../docs/consent/2026-10-23-metso-consent-package.md` |
+| Design decisions for version 3 | `../docs/superpowers/specs/2026-10-16-metso-v3-design.md` |
