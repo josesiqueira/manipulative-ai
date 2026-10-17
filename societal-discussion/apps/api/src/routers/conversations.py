@@ -91,6 +91,14 @@ async def create_conversation(
             detail="Session not found",
         )
 
+    # Participants must have accepted the research notification on the
+    # consent page. Try-bot sessions are exempt (is_test_mode).
+    if not session.is_test_mode and session.consent_accepted_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Consent required",
+        )
+
     # Assign party. FORCED_PARTY can be:
     #   - empty                               → normal no-repeat weighted random
     #   - "perussuomalaiset"                  → every conversation goes there
