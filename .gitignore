@@ -26,3 +26,4 @@ __pycache__/
 
 # Local backups of participant data, never committed
 backups/
+.playwright-mcp/
