@@ -24,7 +24,7 @@ class PromptConfig(Base):
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
     )
 
-    # Party identifier — one of services.party_grounding.ALL_PARTIES (9 Finnish parties)
+    # Party identifier, one of services.party_grounding.ALL_PARTIES (9 parties plus their populist twins)
     party: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
 
     # Editable system instruction text (the behavioral prompt, NOT the party program)

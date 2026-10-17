@@ -26,7 +26,7 @@ class Conversation(Base):
     )
     assigned_party: Mapped[str] = mapped_column(
         String(50), nullable=False
-    )  # one of services.party_grounding.ALL_PARTIES (9 Finnish parties)
+    )  # one of services.party_grounding.ALL_PARTIES (9 parties plus their populist twins)
     language: Mapped[str] = mapped_column(
         String(2), nullable=False, default="fi"
     )  # 'fi' or 'en' — which language the bot should respond in
