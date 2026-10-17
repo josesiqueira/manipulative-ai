@@ -9,7 +9,7 @@ via the admin panel. The party program text is always appended at the end.
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .party_grounding import load_party_program
+from .party_grounding import load_party_program, is_populist
 from ..models import PromptConfig
 
 LANGUAGE_INSTRUCTIONS = {
@@ -88,23 +88,19 @@ keskustellaan mieluummin itse aiheesta")
 
 
 def _default_instruction_for(party: str) -> str:
-    """Resolve the in-code default instruction, with per-party overrides.
+    """Resolve the in-code default instruction for a party.
 
-    `perussuomalaiset_populist` adds the academic populism-markers section
-    just before the 'Poliittiset ohjelmasi ja näkemyksesi' heading so the
-    populist scaffolding is included for that party. Every other party
-    falls back to the plain DEFAULT_SYSTEM_INSTRUCTION.
+    Populist twins (`<party>_populist`) get the academic populism-markers
+    section inserted just before the 'Poliittiset ohjelmasi ja näkemyksesi'
+    heading. Base parties get the plain DEFAULT_SYSTEM_INSTRUCTION, so the
+    markers never leak into the standard conditions.
     """
-    if party == "perussuomalaiset_populist":
-        anchor = "## Poliittiset ohjelmasi ja näkemyksesi"
-        if anchor in DEFAULT_SYSTEM_INSTRUCTION:
-            return DEFAULT_SYSTEM_INSTRUCTION.replace(
-                anchor,
-                POPULISM_MARKERS_SECTION + anchor,
-                1,
-            )
-        return DEFAULT_SYSTEM_INSTRUCTION + "\n\n" + POPULISM_MARKERS_SECTION
-    return DEFAULT_SYSTEM_INSTRUCTION
+    if not is_populist(party):
+        return DEFAULT_SYSTEM_INSTRUCTION
+    anchor = "## Poliittiset ohjelmasi ja näkemyksesi"
+    if anchor in DEFAULT_SYSTEM_INSTRUCTION:
+        return DEFAULT_SYSTEM_INSTRUCTION.replace(anchor, POPULISM_MARKERS_SECTION + anchor, 1)
+    return DEFAULT_SYSTEM_INSTRUCTION + "\n\n" + POPULISM_MARKERS_SECTION
 
 
 async def get_system_instruction(db: AsyncSession, party: str) -> str:

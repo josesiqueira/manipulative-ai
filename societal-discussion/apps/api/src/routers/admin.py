@@ -1449,7 +1449,7 @@ async def get_all_prompts(
         else:
             # Use the per-party resolver so the admin Prompts page shows the
             # same default that the bot would actually use (e.g. populism
-            # markers for perussuomalaiset_populist).
+            # markers for every populist twin).
             instruction = _default_instruction_for(party)
             source = "default"
             updated_at = None
