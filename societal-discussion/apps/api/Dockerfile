@@ -27,6 +27,7 @@ RUN uv venv /app/.venv && \
 COPY src/ ./src/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
+COPY start.sh ./
 
 # Create non-root user (OpenShift requirement)
 # OpenShift runs containers with arbitrary UIDs, so we need proper permissions
@@ -43,5 +44,5 @@ USER 1001
 # Expose port 8080 (Rahti requirement)
 EXPOSE 8080
 
-# Run the application directly (no uv run - dependencies already installed)
-CMD ["python", "-m", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Migrations first, then the server (no uv run: dependencies already installed)
+CMD ["sh", "./start.sh"]
