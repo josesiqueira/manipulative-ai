@@ -1,0 +1,35 @@
+---
+// Between the last conversation and the survey (spec section 3): the chat
+// page has already ended the conversation on the server.
+import Institutional from '../../layouts/Institutional.astro';
+import { LANGUAGES, STRINGS, type Language } from '../../lib/strings';
+
+export function getStaticPaths() {
+  return LANGUAGES.map((lang) => ({ params: { lang } }));
+}
+const lang = Astro.params.lang as Language;
+const t = STRINGS[lang];
+---
+<Institutional lang={lang} title={t.surveyEntry.thanks} path="/survey-entry">
+  <h1 class="text-2xl font-bold" data-testid="survey-entry-title">{t.surveyEntry.thanks}</h1>
+  <p class="mt-2 max-w-prose">{t.surveyEntry.description}</p>
+  <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+    <a
+      href={`/${lang}/survey`}
+      data-testid="survey-entry-start"
+      class="rounded border border-[var(--tau)] bg-[var(--tau)] px-6 py-4 text-center text-lg font-semibold text-white"
+    >{t.surveyEntry.startSurvey}</a>
+    <a
+      href={`/${lang}/chat`}
+      data-testid="survey-entry-back"
+      class="rounded border border-[var(--rule)] px-6 py-4 text-center text-lg"
+    >{t.surveyEntry.backToChat}</a>
+  </div>
+
+  <script>
+    // No session: nothing to answer about; back to the start.
+    import { getSessionId } from '../../lib/session';
+    const lang = document.documentElement.lang;
+    if (!getSessionId()) window.location.replace(`/${lang}/`);
+  </script>
+</Institutional>

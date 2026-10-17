@@ -1,0 +1,174 @@
+---
+// The survey (spec V14): the same questions and keys as before, every answer
+// optional. Scales are radio groups so a phone gets large targets and a
+// screen reader gets the question with each answer.
+import Institutional from '../../layouts/Institutional.astro';
+import { LANGUAGES, STRINGS, type Language } from '../../lib/strings';
+
+export function getStaticPaths() {
+  return LANGUAGES.map((lang) => ({ params: { lang } }));
+}
+const lang = Astro.params.lang as Language;
+const t = STRINGS[lang];
+const s = t.survey;
+
+interface Scale {
+  name: string;
+  label: string;
+  ends: { low: string; high: string };
+}
+const section3Scales: Scale[] = [
+  { name: 'response_speed', label: s.responseSpeedLabel, ends: s.slowFast },
+  { name: 'topic_variety', label: s.topicVarietyLabel, ends: s.onesidedVaried },
+  { name: 'detected_bias', label: s.detectedBiasLabel, ends: s.notAtAllClearly },
+  { name: 'detected_terminology', label: s.detectedTerminologyLabel, ends: s.notNoticedClearly },
+  { name: 'detected_persuasion', label: s.detectedPersuasionLabel, ends: s.notAtAllClearly },
+];
+const textarea = 'mt-2 w-full rounded border border-[var(--rule)] px-3 py-2';
+---
+<Institutional lang={lang} title={s.pageTitle} path="/survey">
+  <h1 class="text-2xl font-bold" data-testid="survey-title">{s.pageTitle}</h1>
+  <p class="mt-2 max-w-prose text-[var(--muted)]">{s.pageSubtitle}</p>
+
+  <form id="survey" class="mt-6 flex flex-col gap-8" novalidate data-testid="survey-form">
+    <fieldset class="flex flex-col gap-5">
+      <legend class="text-lg font-semibold">{s.section1Title}</legend>
+      <label class="block">
+        <span class="font-medium">{s.chatbotUsageLabel}</span>
+        <textarea name="chatbot_usage" rows="2" class={textarea} placeholder={s.chatbotUsagePlaceholder}></textarea>
+      </label>
+      <label class="block">
+        <span class="font-medium">{s.chatbotWhichLabel}</span>
+        <input name="chatbot_which" type="text" class={textarea} placeholder={s.chatbotWhichPlaceholder} />
+      </label>
+      <fieldset>
+        <legend class="font-medium">{s.politicalChatbotLabel}</legend>
+        <div class="mt-2 flex flex-wrap gap-2">
+          {s.yesNoUnsure.map((opt) => (
+            <label class="choice">
+              <input type="radio" name="political_chatbot" value={opt} />
+              <span>{opt}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+    </fieldset>
+
+    <fieldset class="flex flex-col gap-5">
+      <legend class="text-lg font-semibold">{s.section2Title}</legend>
+      <fieldset class="scale">
+        <legend class="font-medium">{s.chatbotPerceptionLabel}</legend>
+        <div class="mt-2 grid grid-cols-5 gap-2">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <label class="choice">
+              <input type="radio" name="chatbot_perception" value={n} />
+              <span>{n}</span>
+            </label>
+          ))}
+        </div>
+        <div class="mt-1 flex justify-between text-xs text-[var(--muted)]">
+          <span>{s.negPos.low}</span><span>{s.negPos.high}</span>
+        </div>
+      </fieldset>
+    </fieldset>
+
+    <fieldset class="flex flex-col gap-5">
+      <legend class="text-lg font-semibold">{s.section3Title}</legend>
+      <label class="block">
+        <span class="font-medium">{s.conversationReflectionLabel}</span>
+        <textarea name="conversation_reflection" rows="2" class={textarea} placeholder={s.conversationReflectionPlaceholder}></textarea>
+      </label>
+      {section3Scales.map((scale) => (
+        <fieldset class="scale">
+          <legend class="font-medium">{scale.label}</legend>
+          <div class="mt-2 grid grid-cols-5 gap-2">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <label class="choice">
+                <input type="radio" name={scale.name} value={n} />
+                <span>{n}</span>
+              </label>
+            ))}
+          </div>
+          <div class="mt-1 flex justify-between text-xs text-[var(--muted)]">
+            <span>{scale.ends.low}</span><span>{scale.ends.high}</span>
+          </div>
+        </fieldset>
+      ))}
+    </fieldset>
+
+    <fieldset class="flex flex-col gap-5">
+      <legend class="text-lg font-semibold">{s.section4Title}</legend>
+      <label class="block">
+        <span class="font-medium">{s.noticeAnythingLabel}</span>
+        <textarea name="notice_anything" rows="3" class={textarea} placeholder={s.noticeAnythingPlaceholder}></textarea>
+      </label>
+    </fieldset>
+
+    <p id="error" class="text-sm text-red-800" role="alert" hidden>{s.submitError}</p>
+    <button
+      id="submit"
+      type="submit"
+      data-testid="survey-submit"
+      data-submitting={s.submitting}
+      class="w-full rounded border border-[var(--tau)] bg-[var(--tau)] px-6 py-4 text-lg font-semibold text-white disabled:opacity-60 sm:w-auto sm:self-start"
+    >{s.submit}</button>
+  </form>
+
+  <script>
+    import { submitSurvey, type SurveyResponses } from '../../lib/participantApi';
+    import { getSessionId } from '../../lib/session';
+
+    const lang = document.documentElement.lang;
+    const sessionId = getSessionId();
+    if (!sessionId) window.location.replace(`/${lang}/`);
+
+    const form = document.getElementById('survey') as HTMLFormElement;
+    const button = document.getElementById('submit') as HTMLButtonElement;
+    const error = document.getElementById('error') as HTMLParagraphElement;
+
+    const text = (data: FormData, name: string) => ((data.get(name) as string | null) ?? '').trim();
+    const number = (data: FormData, name: string) => {
+      const v = data.get(name);
+      return v === null || v === '' ? null : Number(v);
+    };
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!sessionId) return;
+      const data = new FormData(form);
+      const responses: SurveyResponses = {
+        chatbot_usage: text(data, 'chatbot_usage'),
+        chatbot_which: text(data, 'chatbot_which'),
+        political_chatbot: text(data, 'political_chatbot'),
+        chatbot_perception: number(data, 'chatbot_perception'),
+        conversation_reflection: text(data, 'conversation_reflection'),
+        response_speed: number(data, 'response_speed'),
+        topic_variety: number(data, 'topic_variety'),
+        detected_bias: number(data, 'detected_bias'),
+        detected_terminology: number(data, 'detected_terminology'),
+        detected_persuasion: number(data, 'detected_persuasion'),
+        notice_anything: text(data, 'notice_anything'),
+      };
+      const label = button.textContent;
+      button.disabled = true;
+      button.textContent = button.dataset.submitting ?? label;
+      error.hidden = true;
+      try {
+        await submitSurvey(sessionId, responses);
+        window.location.assign(`/${lang}/thank-you`);
+      } catch {
+        error.hidden = false;
+        button.textContent = label;
+        button.disabled = false;
+      }
+    });
+  </script>
+</Institutional>
+
+<style is:global>
+  /* Large, plain answer buttons: the radio is visually hidden, the label is the target. */
+  .choice { position: relative; display: flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: 0.5rem 0.9rem; border: 1px solid var(--rule); border-radius: 0.375rem; background: var(--paper); cursor: pointer; }
+  .choice input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; }
+  .choice:has(input:checked) { background: var(--tau); border-color: var(--tau); color: #fff; font-weight: 600; }
+  .choice:has(input:focus-visible) { outline: 3px solid #b45309; outline-offset: 2px; }
+</style>
