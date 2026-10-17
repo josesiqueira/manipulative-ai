@@ -132,14 +132,13 @@ test.describe('chat page', () => {
     expect(reply.y).toBeLessThan(transcript.y + transcript.height);
     // The transcript has room for several lines on a phone.
     expect(transcript.height).toBeGreaterThan(160);
-    // While the head speaks, the transcript follows the highlighted words.
+    // While the head speaks, the transcript follows the highlighted words:
+    // it scrolls down from where the reply started, by itself.
+    const scrollTop = () => page.evaluate(() => document.querySelector('[data-testid=transcript]')!.scrollTop);
+    const start = await scrollTop();
     await expect
-      .poll(async () => {
-        const t = await box('[data-testid=transcript]');
-        const r = await box('.bubble-assistant');
-        return r.y + r.height <= t.y + t.height + 1;
-      }, { timeout: 60_000, message: 'the end of the reply scrolls into view while it is spoken' })
-      .toBe(true);
+      .poll(scrollTop, { timeout: 60_000, message: 'the transcript scrolls along with the spoken words' })
+      .toBeGreaterThan(start + 40);
   });
 
   test('a held microphone button records, transcribes and sends the text as spoken', async ({ page }) => {

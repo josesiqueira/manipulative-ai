@@ -6,6 +6,9 @@ import { defineConfig, devices } from '@playwright/test';
 const ORIGIN = 'http://127.0.0.1:4321';
 // A second build with PUBLIC_PROVIDER_BLOCK=openai proves the V11a fallback screen.
 const OPENAI_ORIGIN = 'http://127.0.0.1:4322';
+// REAL_API=1 runs tests/real-flow.spec.ts against servers already running
+// (see that file); no build and no fake.
+const REAL = process.env.REAL_API === '1';
 
 export default defineConfig({
   testDir: './tests',
@@ -15,7 +18,7 @@ export default defineConfig({
   workers: 3,
   retries: 0,
   use: {
-    baseURL: ORIGIN,
+    baseURL: REAL ? (process.env.REAL_APP_URL ?? ORIGIN) : ORIGIN,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     permissions: ['microphone'],
@@ -29,7 +32,7 @@ export default defineConfig({
     { name: 'phone', testIgnore: /openai/, use: { ...devices['Pixel 7'] } },
     { name: 'openai-block', testMatch: /openai/, use: { ...devices['Pixel 7'], baseURL: OPENAI_ORIGIN } },
   ],
-  webServer: [
+  webServer: REAL ? undefined : [
     {
       command: `PUBLIC_API_URL=${ORIGIN} npm run build && HOST=127.0.0.1 PORT=4321 node dist/server/entry.mjs`,
       url: `${ORIGIN}/fi/`,

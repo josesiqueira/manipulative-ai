@@ -84,7 +84,7 @@ export interface Strings {
     submitting: string;
     submitError: string;
   };
-  thankYou: { title: string; description: string };
+  thankYou: { title: string; description: string; loading: string };
   debrief: {
     title: string;
     intro: string;
@@ -218,6 +218,7 @@ export const STRINGS: Record<Language, Strings> = {
     thankYou: {
       title: 'Kiitos osallistumisesta!',
       description: 'Vastauksesi on tallennettu. Voit nyt sulkea tämän sivun.',
+      loading: 'Haetaan...',
     },
     debrief: {
       title: 'Kiitos osallistumisestasi!',
@@ -355,6 +356,7 @@ export const STRINGS: Record<Language, Strings> = {
     thankYou: {
       title: 'Thank you for participating!',
       description: 'Your responses have been recorded. You can now close this page.',
+      loading: 'Loading...',
     },
     debrief: {
       title: 'Thank you for taking part!',
