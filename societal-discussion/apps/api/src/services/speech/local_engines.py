@@ -129,6 +129,8 @@ def _transcribe_sync(audio: bytes, language: str) -> str:
             condition_on_previous_text=False,
         )
         text = " ".join(s.text.strip() for s in segments)
+    # Operational log: clip length and word count only, never the words.
+    print(f"Speech transcribe: clip {samples.size / 16000:.1f} s, {len(text.split())} words recognised")
     return text.strip()
 
 

@@ -26,6 +26,7 @@ export async function startChat(): Promise<void> {
   const avatarEl = $('avatar');
   const stillEl = $('still');
   const transcript = $('transcript');
+  const TRANSCRIPT_PADDING = 12; // px, matches .transcript padding in chat.astro
   const form = $<HTMLFormElement>('composer');
   const input = $<HTMLInputElement>('message');
   const sendBtn = $<HTMLButtonElement>('send');
@@ -105,9 +106,30 @@ export async function startChat(): Promise<void> {
     el.className = role === 'user' ? 'bubble bubble-user' : 'bubble bubble-assistant';
     el.dataset.role = role;
     el.textContent = text;
+    const previous = transcript.lastElementChild as HTMLElement | null;
     transcript.appendChild(el);
-    transcript.scrollTop = transcript.scrollHeight;
+    if (role === 'assistant' && previous) {
+      // A reply can be longer than the visible area on a phone: keep the
+      // question at the top and let the reply start below it, instead of
+      // jumping to the end and hiding what was asked.
+      transcript.scrollTop = Math.max(0, previous.offsetTop - TRANSCRIPT_PADDING);
+    } else {
+      transcript.scrollTop = transcript.scrollHeight;
+    }
     return el;
+  };
+  // While the head speaks, the transcript follows the highlighted words so
+  // the line being spoken stays in view.
+  const followSpoken = (spoken: HTMLElement) => {
+    const range = document.createRange();
+    range.selectNodeContents(spoken);
+    range.collapse(false);
+    let caret = range.getBoundingClientRect();
+    if (caret.height === 0 && caret.top === 0) caret = spoken.getBoundingClientRect();
+    const view = transcript.getBoundingClientRect();
+    if (caret.bottom > view.bottom - TRANSCRIPT_PADDING * 2) {
+      transcript.scrollBy({ top: caret.bottom - (view.top + view.height * 0.6), behavior: 'smooth' });
+    }
   };
   const setBusy = (busy: boolean, label = '') => {
     sendBtn.disabled = busy;
@@ -151,6 +173,7 @@ export async function startChat(): Promise<void> {
           spokenWords = Math.min(spokenWords + 1, words.length);
           spoken.textContent = words.slice(0, spokenWords).join(' ') + (spokenWords < words.length ? ' ' : '');
           rest.textContent = words.slice(spokenWords).join(' ');
+          followSpoken(spoken);
         });
       }
     } catch (err) {

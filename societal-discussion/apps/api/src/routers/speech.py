@@ -67,6 +67,7 @@ async def transcribe(
     if not data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty recording")
     mime = request.headers.get("content-type", "")
+    print(f"Speech transcribe: {size} bytes, {mime or 'no content type'}, language {_language(language)}")
     try:
         text = await speech.transcribe(data, mime, _language(language))
     except Exception as exc:  # noqa: BLE001

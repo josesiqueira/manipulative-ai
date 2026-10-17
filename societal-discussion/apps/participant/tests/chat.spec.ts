@@ -22,7 +22,7 @@ test.afterEach(() => {
   thirdParty.length = 0;
 });
 
-async function fakeApi(page: Page, reply = 'Hyvää iltaa. Tervetuloa keskustelemaan.') {
+async function fakeApi(page: Page, reply = 'Hyvää iltaa. Tervetuloa keskustelemaan.', synthesizeDelayMs = 0) {
   const calls: Call[] = [];
   await page.route('**/*', async (route: Route) => {
     const url = new URL(route.request().url());
@@ -47,6 +47,7 @@ async function fakeApi(page: Page, reply = 'Hyvää iltaa. Tervetuloa keskustele
     if (req.method() === 'POST' && url.pathname === '/api/speech/synthesize') {
       const text = (body as { text: string }).text;
       const words = text.split(' ');
+      if (synthesizeDelayMs) await new Promise((resolve) => setTimeout(resolve, synthesizeDelayMs));
       return json(200, { audio_base64: silentWavBase64(), sample_rate: 16000, words, wtimes: words.map((_, i) => i * 100), wdurations: words.map(() => 90) });
     }
     return json(500, { detail: `unexpected ${req.method()} ${url.pathname}` });
@@ -102,6 +103,43 @@ test.describe('chat page', () => {
     // The first reply was cut short: fewer than its 8 sentences were requested before the second turn.
     const firstTurnSynth = calls.filter((c) => c.path === '/api/speech/synthesize').length;
     expect(firstTurnSynth).toBeLessThan(16);
+  });
+
+  test('a long reply leaves the question in view and never slides under the avatar', async ({ page }) => {
+    // Jose on his Android phone, 2026-10-17: the spoken question "did not
+    // appear"; it had scrolled under the avatar card, which has no visible
+    // boundary against the transcript.
+    const long = Array.from({ length: 12 }, (_, i) => `Pitkä vastauslause numero ${i + 1} kertoo kannastani perusteellisesti.`).join(' ');
+    // The voice answers slowly, so the positions are measured before playback scrolls the transcript along.
+    await fakeApi(page, long, 1500);
+    await openChat(page);
+    await expect(page.getByTestId('stage')).toHaveAttribute('data-avatar-mode', /live|still/, { timeout: 60_000 });
+    await page.getByTestId('message').fill('Mitä mieltä olette maahanmuutosta?');
+    await page.getByTestId('send').click();
+    await expect(page.locator('.bubble-assistant')).toContainText('numero 12', { timeout: 20_000 });
+    const box = async (selector: string) => (await page.locator(selector).boundingBox())!;
+    const stage = await box('[data-testid=stage]');
+    const transcript = await box('[data-testid=transcript]');
+    const question = await box('.bubble-user');
+    const reply = await box('.bubble-assistant');
+    // The avatar card ends above the transcript, with a gap.
+    expect(stage.y + stage.height).toBeLessThanOrEqual(transcript.y);
+    // The question stays fully inside the visible transcript when the reply arrives.
+    expect(question.y).toBeGreaterThanOrEqual(transcript.y);
+    expect(question.y + question.height).toBeLessThanOrEqual(transcript.y + transcript.height);
+    // The reply starts in view, below the question.
+    expect(reply.y).toBeGreaterThanOrEqual(question.y + question.height);
+    expect(reply.y).toBeLessThan(transcript.y + transcript.height);
+    // The transcript has room for several lines on a phone.
+    expect(transcript.height).toBeGreaterThan(160);
+    // While the head speaks, the transcript follows the highlighted words.
+    await expect
+      .poll(async () => {
+        const t = await box('[data-testid=transcript]');
+        const r = await box('.bubble-assistant');
+        return r.y + r.height <= t.y + t.height + 1;
+      }, { timeout: 60_000, message: 'the end of the reply scrolls into view while it is spoken' })
+      .toBe(true);
   });
 
   test('a held microphone button records, transcribes and sends the text as spoken', async ({ page }) => {
