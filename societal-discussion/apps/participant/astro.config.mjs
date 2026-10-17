@@ -14,6 +14,10 @@ export default defineConfig({
     plugins: [tailwindcss()],
     // With PUBLIC_API_URL empty the page calls /api on its own origin and the
     // dev server forwards it to the API, so one HTTPS tunnel serves a phone test.
-    server: { proxy: { '/api': { target: process.env.DEV_API_URL ?? 'http://localhost:8000', changeOrigin: true } } },
+    server: {
+      proxy: { '/api': { target: process.env.DEV_API_URL ?? 'http://localhost:8000', changeOrigin: true } },
+      // A temporary HTTPS tunnel (cloudflared) for phone tests of the dev server.
+      allowedHosts: ['.trycloudflare.com'],
+    },
   },
 });
