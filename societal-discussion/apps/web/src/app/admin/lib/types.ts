@@ -97,8 +97,9 @@ export interface FlagConversationRequest {
   flag_notes?: string;
 }
 
-// Domain constants — keep in sync with apps/api/src/services/party_grounding.py
-export const PARTIES = [
+// Domain constants. Keep in sync with apps/api/src/services/party_grounding.py:
+// 9 base parties plus a "<party>_populist" twin for each (18 conditions).
+export const BASE_PARTIES = [
   'sdp',
   'vasemmistoliitto',
   'vihreat',
@@ -108,10 +109,24 @@ export const PARTIES = [
   'perussuomalaiset',
   'kristillisdemokraatit',
   'liikenyt',
-  'perussuomalaiset_populist',
 ] as const;
 
-export const PARTY_DISPLAY_NAMES: Record<string, string> = {
+export const POPULIST_SUFFIX = '_populist';
+
+export const PARTIES: readonly string[] = [
+  ...BASE_PARTIES,
+  ...BASE_PARTIES.map((p) => `${p}${POPULIST_SUFFIX}`),
+];
+
+export function isPopulist(party: string): boolean {
+  return party.endsWith(POPULIST_SUFFIX);
+}
+
+export function baseParty(party: string): string {
+  return isPopulist(party) ? party.slice(0, -POPULIST_SUFFIX.length) : party;
+}
+
+const BASE_DISPLAY_NAMES: Record<string, string> = {
   sdp: 'SDP',
   vasemmistoliitto: 'Vasemmistoliitto',
   vihreat: 'Vihreät',
@@ -121,21 +136,43 @@ export const PARTY_DISPLAY_NAMES: Record<string, string> = {
   perussuomalaiset: 'Perussuomalaiset',
   kristillisdemokraatit: 'Kristillisdemokraatit',
   liikenyt: 'Liike Nyt',
-  perussuomalaiset_populist: 'Perussuomalaiset Populist',
 };
 
-// Colors loosely match each party's brand identity while staying visually
-// distinct in charts and badges. The "populist" variant of Perussuomalaiset
-// shares the brand navy but darkened to mark it as a separate condition.
-export const PARTY_COLORS: Record<string, string> = {
-  sdp: '#DC2626',                       // red
-  vasemmistoliitto: '#9333EA',          // purple (brand red would clash with SDP)
-  vihreat: '#16A34A',                   // emerald green
-  rkp: '#FACC15',                       // yellow
-  keskusta: '#65A30D',                  // olive green
-  kokoomus: '#2563EB',                  // royal blue
-  perussuomalaiset: '#1E3A8A',          // navy blue
-  kristillisdemokraatit: '#F59E0B',     // amber
-  liikenyt: '#0D9488',                  // teal
-  perussuomalaiset_populist: '#0C1E55', // very dark navy (perussuomalaiset, darker)
+export const PARTY_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
+  PARTIES.map((p) => [
+    p,
+    isPopulist(p) ? `${BASE_DISPLAY_NAMES[baseParty(p)]} Populist` : BASE_DISPLAY_NAMES[p],
+  ]),
+);
+
+// Base colors loosely match each party's brand identity while staying
+// visually distinct in charts and badges. The populist twin uses a darker
+// shade of the same hue so the pair reads as related but separate. All 18
+// values are unique.
+const BASE_COLORS: Record<string, string> = {
+  sdp: '#DC2626',                   // red
+  vasemmistoliitto: '#9333EA',      // purple (brand red would clash with SDP)
+  vihreat: '#16A34A',               // emerald green
+  rkp: '#FACC15',                   // yellow
+  keskusta: '#65A30D',              // olive green
+  kokoomus: '#2563EB',              // royal blue
+  perussuomalaiset: '#1E3A8A',      // navy blue
+  kristillisdemokraatit: '#F59E0B', // amber
+  liikenyt: '#0D9488',              // teal
 };
+
+const POPULIST_COLORS: Record<string, string> = {
+  sdp: '#7F1D1D',
+  vasemmistoliitto: '#581C87',
+  vihreat: '#14532D',
+  rkp: '#A16207',
+  keskusta: '#365314',
+  kokoomus: '#1E40AF',
+  perussuomalaiset: '#0C1E55',      // unchanged from the HEPP2026 value
+  kristillisdemokraatit: '#92400E',
+  liikenyt: '#134E4A',
+};
+
+export const PARTY_COLORS: Record<string, string> = Object.fromEntries(
+  PARTIES.map((p) => [p, isPopulist(p) ? POPULIST_COLORS[baseParty(p)] : BASE_COLORS[p]]),
+);
