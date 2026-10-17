@@ -32,7 +32,8 @@ async function fakeApi(page: Page, options: FakeOptions = {}): Promise<Call[]> {
       return json(201, { id: 'sv1', session_id: body?.session_id });
     }
     if (req.method() === 'GET' && url.pathname === '/api/sessions/ok/debrief') {
-      if (!surveyRow) return json(403, { detail: 'Survey not submitted' });
+      // As the backend: the survey row gates the debrief, except for a deleted session.
+      if (!surveyRow && !deleted) return json(403, { detail: 'Survey not submitted' });
       return json(200, {
         session_code: '3F2A-9C11',
         data_deleted: deleted,
@@ -44,6 +45,7 @@ async function fakeApi(page: Page, options: FakeOptions = {}): Promise<Call[]> {
     }
     if (req.method() === 'DELETE' && url.pathname === '/api/sessions/ok/data') {
       deleted = true;
+      surveyRow = false; // the backend removes the survey rows
       return route.fulfill({ status: 204, body: '' });
     }
     return json(500, { detail: `unexpected ${req.method()} ${url.pathname}` });
@@ -57,7 +59,7 @@ async function withSession(page: Page, path: string) {
   await page.goto(path);
 }
 
-const scale = (page: Page, name: string, value: number) => page.locator(`input[name="${name}"][value="${value}"]`).check({ force: true });
+const scale = (page: Page, name: string, value: number) => page.locator(`input[name="${name}"][value="${value}"]`).check();
 
 test.describe('survey and debrief', () => {
   test('survey-entry without a session goes back to the start', async ({ page }) => {
@@ -83,7 +85,7 @@ test.describe('survey and debrief', () => {
     const calls = await fakeApi(page);
     await withSession(page, '/fi/survey');
     await page.locator('textarea[name="chatbot_usage"]').fill('Päivittäin töissä.');
-    await page.locator('input[name="political_chatbot"][value="Kyllä"]').check({ force: true });
+    await page.locator('input[name="political_chatbot"][value="Kyllä"]').check();
     await scale(page, 'chatbot_perception', 4);
     await scale(page, 'response_speed', 5);
     await scale(page, 'detected_bias', 2);
@@ -124,7 +126,7 @@ test.describe('survey and debrief', () => {
   });
 
   test('a failed submit keeps the answers and shows the error', async ({ page }) => {
-    await fakeApi(page);
+    const calls = await fakeApi(page);
     await page.route('**/api/survey', (route) => route.fulfill({ status: 500, body: '{}' }));
     await withSession(page, '/fi/survey');
     await scale(page, 'topic_variety', 3);
@@ -133,6 +135,32 @@ test.describe('survey and debrief', () => {
     await expect(page).toHaveURL(/\/fi\/survey$/);
     await expect(page.locator('input[name="topic_variety"][value="3"]')).toBeChecked();
     await expect(page.getByTestId('survey-submit')).toBeEnabled();
+    expect(calls.filter((c) => c.path.endsWith('/debrief'))).toHaveLength(0);
+  });
+
+  test('a second visit to the survey after a submit goes to the thank-you page, no second row', async ({ page }) => {
+    const calls = await fakeApi(page);
+    await withSession(page, '/fi/survey');
+    await page.getByTestId('survey-submit').click();
+    await expect(page).toHaveURL(/\/fi\/thank-you$/);
+    await page.goto('/fi/survey');
+    await expect(page).toHaveURL(/\/fi\/thank-you$/);
+    expect(calls.filter((c) => c.path === '/api/survey')).toHaveLength(1);
+  });
+
+  test('a failed debrief request shows an error with a retry, never the plain text', async ({ page }) => {
+    await fakeApi(page, { surveyRow: true });
+    let failures = 1;
+    await page.route('**/api/sessions/ok/debrief', (route) => {
+      if (failures-- > 0) return route.fulfill({ status: 500, body: '{}' });
+      return route.fallback();
+    });
+    await withSession(page, '/fi/thank-you');
+    await expect(page.getByTestId('debrief-error')).toBeVisible();
+    await expect(page.getByTestId('thank-you-plain')).toBeHidden();
+    await page.getByTestId('debrief-retry').click();
+    await expect(page.getByTestId('debrief')).toBeVisible();
+    await expect(page.getByTestId('debrief-conversation')).toHaveCount(2);
   });
 
   test('copy puts the code on the clipboard', async ({ page, context, browserName }) => {
@@ -160,8 +188,12 @@ test.describe('survey and debrief', () => {
     await expect(page.getByTestId('session-code')).toBeHidden();
     await expect(page.getByTestId('delete-data')).toBeHidden();
     expect(calls.filter((c) => c.method === 'DELETE' && c.path === '/api/sessions/ok/data')).toHaveLength(1);
-    // The debrief itself (the party) stays readable after deletion.
+    // The debrief itself (the party) stays readable after deletion, also on a reload.
     await expect(page.getByTestId('debrief-party').first()).toHaveText('Kokoomus');
+    await page.reload();
+    await expect(page.getByTestId('data-deleted')).toBeVisible();
+    await expect(page.getByTestId('debrief-party').first()).toHaveText('Kokoomus');
+    await expect(page.getByTestId('session-code')).toBeHidden();
   });
 
   test('a session already deleted shows the deleted text, never the code', async ({ page }) => {

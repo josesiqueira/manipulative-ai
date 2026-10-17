@@ -17,11 +17,20 @@ const t = STRINGS[lang];
 const d = t.debrief;
 const fill = (template: string, values: Record<string, string>) =>
   Object.entries(values).reduce((acc, [key, value]) => acc.split(`{{${key}}}`).join(value), template);
+// Same, but the values become links (mail addresses and the Pohtiva site are
+// tappable on a phone); the template text itself is escaped first.
+const escape = (text: string) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const link = (href: string, text: string) => `<a class="underline" href="${href}">${escape(text)}</a>`;
+const fillLinks = (template: string, values: Record<string, string>) => fill(escape(template), values);
 const h2 = 'text-lg font-semibold';
 const section = 'mt-8 max-w-prose';
 ---
 <Institutional lang={lang} title={t.thankYou.title} path="/thank-you">
   <p id="loading" role="status" class="text-[var(--muted)]">{t.thankYou.loading}</p>
+  <div id="load-error" role="alert" data-testid="debrief-error" hidden>
+    <p class="text-red-800">{d.loadError}</p>
+    <button id="retry" type="button" class="mt-3 rounded border border-[var(--tau)] px-5 py-3 font-semibold text-[var(--tau)]" data-testid="debrief-retry">{d.retry}</button>
+  </div>
   <div id="plain" data-testid="thank-you-plain" hidden>
     <h1 class="text-2xl font-bold">{t.thankYou.title}</h1>
     <p class="mt-2 max-w-prose">{t.thankYou.description}</p>
@@ -39,7 +48,7 @@ const section = 'mt-8 max-w-prose';
 
     <section class={section}>
       <h2 class={h2}>{d.repliesTitle}</h2>
-      <p class="mt-2">{fill(d.repliesBody, { POHTIVA: STUDY.pohtivaUrl })}</p>
+      <p class="mt-2" set:html={fillLinks(d.repliesBody, { POHTIVA: link(STUDY.pohtivaUrl, STUDY.pohtivaUrl) })}></p>
     </section>
 
     <section class={section}>
@@ -74,14 +83,15 @@ const section = 'mt-8 max-w-prose';
 
     <section class={section}>
       <h2 class={h2}>{d.contactTitle}</h2>
-      <p class="mt-2">
-        {fill(d.contactBody, {
-          EMAIL: STUDY.contactEmail,
-          RESEARCHER: STUDY.responsibleResearcher,
-          RESEARCHER_EMAIL: STUDY.responsibleResearcherEmail,
-          DPO: STUDY.dpoEmail,
+      <p
+        class="mt-2"
+        set:html={fillLinks(d.contactBody, {
+          EMAIL: link(`mailto:${STUDY.contactEmail}`, STUDY.contactEmail),
+          RESEARCHER: escape(STUDY.responsibleResearcher),
+          RESEARCHER_EMAIL: link(`mailto:${STUDY.responsibleResearcherEmail}`, STUDY.responsibleResearcherEmail),
+          DPO: link(`mailto:${STUDY.dpoEmail}`, STUDY.dpoEmail),
         })}
-      </p>
+      ></p>
       <p class="mt-2">
         <a class="underline" href={`/${lang}/info/research-notification`} target="_blank" rel="noreferrer">{t.consent.linksResearch}</a>
         <span aria-hidden="true"> · </span>
@@ -107,6 +117,7 @@ const section = 'mt-8 max-w-prose';
 
     const render = (debrief: Debrief) => {
       const list = $('conversations');
+      list.replaceChildren();
       debrief.conversations.forEach((c, i) => {
         const li = document.createElement('li');
         li.className = 'rounded border border-[var(--rule)] px-3 py-2';
@@ -135,14 +146,25 @@ const section = 'mt-8 max-w-prose';
       if (announce) $('data-deleted').focus();
     };
 
+    // The plain text is for "no debrief to give" (no session, no survey row);
+    // a failed request gets an error line and a retry, since this page is the
+    // disclosure the participant must see.
     const sessionId = getSessionId();
-    if (!sessionId) {
-      showPlain();
-    } else {
-      getDebrief(sessionId)
-        .then((debrief) => (debrief ? render(debrief) : showPlain()))
-        .catch(showPlain);
-    }
+    const load = async () => {
+      if (!sessionId) return showPlain();
+      $('load-error').hidden = true;
+      $('loading').hidden = false;
+      try {
+        const debrief = await getDebrief(sessionId);
+        if (debrief) render(debrief);
+        else showPlain();
+      } catch {
+        $('loading').hidden = true;
+        $('load-error').hidden = false;
+      }
+    };
+    $('retry').addEventListener('click', () => void load());
+    void load();
 
     $('copy').addEventListener('click', async () => {
       const button = $<HTMLButtonElement>('copy');

@@ -2,7 +2,7 @@
 // runs only in client scripts (no window on the server).
 import type { Language } from './strings';
 
-const KEYS = { session: 'sessionId', conversation: 'conversationId', language: 'language' } as const;
+const KEYS = { session: 'sessionId', conversation: 'conversationId', language: 'language', survey: 'surveySubmitted' } as const;
 
 function read(key: string): string | null {
   try {
@@ -31,7 +31,13 @@ export function getStoredLanguage(): Language {
 }
 export const setStoredLanguage = (lang: Language) => write(KEYS.language, lang);
 
+// Set once the survey is stored, so a second visit to the survey page goes
+// straight to the thank-you page instead of storing a second row.
+export const isSurveySubmitted = () => read(KEYS.survey) === '1';
+export const setSurveySubmitted = () => write(KEYS.survey, '1');
+
 export function clearSession(): void {
   setSessionId(null);
   setConversationId(null);
+  write(KEYS.survey, null);
 }

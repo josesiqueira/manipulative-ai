@@ -20,7 +20,7 @@ test.describe('real flow', () => {
   test.skip(!REAL, 'set REAL_API=1 to run against a real API');
   test.setTimeout(240_000);
 
-  test('consent, chat, survey, debrief, delete, admin tombstone', async ({ page, request }) => {
+  test('consent, chat, survey, debrief, delete, admin tombstone', async ({ page, context, request }) => {
     await page.goto(`${APP}/fi/consent`);
     for (const box of await page.locator('input[type=checkbox]').all()) await box.check();
     await page.getByTestId('consent-start').click();
@@ -40,8 +40,8 @@ test.describe('real flow', () => {
     await page.getByTestId('chat-end').click();
     await page.waitForURL(/\/fi\/survey-entry/);
     await page.getByTestId('survey-entry-start').click();
-    await page.waitForURL(/\/fi\/survey/);
-    await page.locator('input[name="detected_persuasion"][value="4"]').check({ force: true });
+    await page.waitForURL(/\/fi\/survey$/);
+    await page.locator('input[name="detected_persuasion"][value="4"]').check();
     await page.locator('textarea[name="notice_anything"]').fill('Testi: todellinen läpikulku.');
     await page.getByTestId('survey-submit').click();
     await page.waitForURL(/\/fi\/thank-you/);
@@ -51,6 +51,10 @@ test.describe('real flow', () => {
     expect(party).toBeTruthy();
     const code = (await page.getByTestId('session-code').textContent()) ?? '';
     expect(code).toMatch(/^[0-9A-F]{4}-[0-9A-F]{4}$/);
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.getByTestId('copy-code').click();
+    await expect(page.getByTestId('copy-code')).toHaveText('Kopioitu');
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(code);
 
     // Stored before the deletion: the admin sees the messages with their input mode and model name.
     const headers = { 'X-Admin-Password': ADMIN };
@@ -71,6 +75,14 @@ test.describe('real flow', () => {
     await page.getByTestId('delete-data').click();
     await page.getByTestId('delete-yes').click();
     await expect(page.getByTestId('data-deleted')).toBeVisible();
+    // A reload after the deletion still shows the debrief, marked deleted.
+    await page.reload();
+    await expect(page.getByTestId('data-deleted')).toBeVisible();
+    await expect(page.getByTestId('debrief-party').first()).toHaveText(party!);
+    // The tombstone takes no new conversation: Start on the landing page goes to consent for a new session.
+    await page.goto(`${APP}/fi/`);
+    await page.getByTestId('landing-start').click();
+    await page.waitForURL(/\/fi\/consent$/);
 
     // The tombstone: the session is found by its code with data_deleted_at set, the conversation has no messages.
     const byCode = await request.get(`${API}/api/admin/sessions/by-code/${code}`, { headers });

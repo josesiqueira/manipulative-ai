@@ -122,7 +122,10 @@ async def get_debrief(
     session = result.scalar_one_or_none()
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
-    if not session.survey_responses:
+    # The survey row gates the disclosure. A deleted session has no survey
+    # rows any more, but it was debriefed before the deletion: a reload of
+    # the thank-you page must still show the debrief and the deleted state.
+    if not session.survey_responses and session.data_deleted_at is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Survey not submitted")
 
     conversations = sorted(session.conversations, key=lambda c: c.started_at)

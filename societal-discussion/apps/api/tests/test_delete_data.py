@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from sqlalchemy import func, select
 
 from src.models import Conversation, Message, Session, SurveyResponse
@@ -8,7 +10,7 @@ async def _count(db_session, model) -> int:
 
 
 async def test_delete_removes_messages_and_survey_but_keeps_tombstone(client, db_session):
-    s = Session(consent_version="t", age_confirmed=True)
+    s = Session(consent_version="t", age_confirmed=True, consent_accepted_at=datetime.now())
     db_session.add(s)
     await db_session.flush()
     c = Conversation(session_id=s.id, assigned_party="rkp", language="fi")
@@ -35,9 +37,17 @@ async def test_delete_removes_messages_and_survey_but_keeps_tombstone(client, db
     res = await client.delete(f"/api/sessions/{s.id}/data")
     assert res.status_code == 204
 
-    # The debrief still works after deletion? No: the survey row is gone, so 403.
+    # The debrief still answers after deletion (the thank-you page reloads),
+    # marked as deleted; the condition stays visible as it was disclosed before.
     res = await client.get(f"/api/sessions/{s.id}/debrief")
+    assert res.status_code == 200
+    assert res.json()["data_deleted"] is True
+    assert res.json()["conversations"][0]["party_display_name"]
+
+    # No new conversation under a tombstone.
+    res = await client.post("/api/conversations", json={"session_id": s.id, "starter_topic": None, "language": "fi"})
     assert res.status_code == 403
+    assert res.json()["detail"] == "Session data deleted"
 
 
 async def test_delete_unknown_session_is_404(client):

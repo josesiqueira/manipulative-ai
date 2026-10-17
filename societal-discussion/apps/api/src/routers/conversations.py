@@ -99,6 +99,13 @@ async def create_conversation(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Consent required",
         )
+    # A session whose data the participant deleted is a tombstone: no new
+    # conversation may be stored under it (the browser starts a new session).
+    if session.data_deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Session data deleted",
+        )
 
     # Assign party. FORCED_PARTY can be:
     #   - empty                               → normal no-repeat weighted random

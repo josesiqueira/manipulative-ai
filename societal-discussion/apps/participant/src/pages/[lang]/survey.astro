@@ -116,11 +116,12 @@ const textarea = 'mt-2 w-full rounded border border-[var(--rule)] px-3 py-2.5 pl
 
   <script>
     import { submitSurvey, type SurveyResponses } from '../../lib/participantApi';
-    import { getSessionId } from '../../lib/session';
+    import { getSessionId, isSurveySubmitted, setSurveySubmitted } from '../../lib/session';
 
     const lang = document.documentElement.lang;
     const sessionId = getSessionId();
     if (!sessionId) window.location.replace(`/${lang}/`);
+    else if (isSurveySubmitted()) window.location.replace(`/${lang}/thank-you`);
 
     const form = document.getElementById('survey') as HTMLFormElement;
     const button = document.getElementById('submit') as HTMLButtonElement;
@@ -156,7 +157,8 @@ const textarea = 'mt-2 w-full rounded border border-[var(--rule)] px-3 py-2.5 pl
       error.hidden = true;
       try {
         await submitSurvey(sessionId, responses);
-        window.location.assign(`/${lang}/thank-you`);
+        setSurveySubmitted();
+        window.location.replace(`/${lang}/thank-you`);
       } catch {
         error.hidden = false;
         button.textContent = label;

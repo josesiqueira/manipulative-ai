@@ -109,6 +109,8 @@ export interface Strings {
     deleting: string;
     deleted: string;
     deleteError: string;
+    loadError: string;
+    retry: string;
     contactTitle: string;
     contactBody: string; // contains {{EMAIL}}, {{RESEARCHER}}, {{RESEARCHER_EMAIL}}, {{DPO}}
   };
@@ -179,7 +181,7 @@ export const STRINGS: Record<Language, Strings> = {
     // Survey texts unchanged from the Next.js app (spec V14).
     surveyEntry: {
       thanks: 'Kiitos keskustelusta!',
-      description: 'Vastaa seuraavaksi lyhyeen kyselyyn kokemuksestasi. Kysely kestää noin 2 - 3 minuuttia.',
+      description: 'Vastaa seuraavaksi lyhyeen kyselyyn kokemuksestasi. Kysely kestää noin 2-3 minuuttia.',
       startSurvey: 'Aloita kysely',
       backToChat: 'Takaisin keskusteluun',
     },
@@ -249,6 +251,8 @@ export const STRINGS: Record<Language, Strings> = {
       deleting: 'Poistetaan...',
       deleted: 'Tietosi on poistettu. Kiitos, että osallistuit.',
       deleteError: 'Poisto epäonnistui. Yritä uudelleen tai lähetä koodi sähköpostilla.',
+      loadError: 'Tutkimuksen tietojen haku epäonnistui. Tarkista yhteys ja yritä uudelleen.',
+      retry: 'Yritä uudelleen',
       contactTitle: 'Kysymykset ja palaute',
       contactBody:
         'José Siqueira de Cerqueira, Tampereen yliopisto, {{EMAIL}} (paikalla tänään). Vastuullinen tutkija: {{RESEARCHER}}, Vaasan yliopisto, {{RESEARCHER_EMAIL}}. Tietosuoja: {{DPO}}.',
@@ -387,6 +391,8 @@ export const STRINGS: Record<Language, Strings> = {
       deleting: 'Deleting...',
       deleted: 'Your data has been deleted. Thank you for taking part.',
       deleteError: 'Deletion failed. Try again or email us the code.',
+      loadError: 'Loading the study information failed. Check the connection and try again.',
+      retry: 'Try again',
       contactTitle: 'Questions and feedback',
       contactBody:
         'José Siqueira de Cerqueira, Tampere University, {{EMAIL}} (on site today). Responsible researcher: {{RESEARCHER}}, University of Vaasa, {{RESEARCHER_EMAIL}}. Data protection: {{DPO}}.',
