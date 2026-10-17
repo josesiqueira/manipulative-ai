@@ -5,8 +5,6 @@ synthesis). Only the URL, the model name and the voice are configuration.
 """
 from __future__ import annotations
 
-import io
-
 import httpx
 import numpy as np
 
@@ -46,10 +44,13 @@ async def synthesize_remote(text: str, language: str) -> tuple[np.ndarray, int]:
                 "voice": settings.speech_tts_voice,
                 "input": text,
                 "response_format": "wav",
-                "language": language,
+                # "language" is not an OpenAI field; only servers that ask for it get it.
+                **({"language": language} if settings.speech_tts_send_language else {}),
             },
         )
     res.raise_for_status()
-    from .wav import read_wav
+    from .local_engines import decode_any
 
-    return read_wav(io.BytesIO(res.content))
+    # Decoded with PyAV: servers stream WAVs with placeholder sizes or the
+    # extensible header, which Python's wave module refuses.
+    return decode_any(res.content)

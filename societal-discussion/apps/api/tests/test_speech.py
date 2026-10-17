@@ -100,7 +100,7 @@ def test_decode_clip_resamples_and_stops_at_the_cap():
 async def test_synthesize_returns_wav_and_aligned_words(client, monkeypatch):
     async def fake_local(text, language):
         rate = 16000
-        return np.zeros(rate, dtype=np.float32), rate  # one second of silence
+        return np.zeros(rate, dtype=np.float32), rate, None  # one second of silence, no alignments
 
     async def fake_times(samples, language):
         return [("Hyvää", 0.1, 0.4), ("iltaa", 0.5, 0.9)]
@@ -144,3 +144,51 @@ async def test_remote_engines_are_used_when_urls_are_set(client, monkeypatch):
     monkeypatch.setattr(stt_module, "transcribe_remote", fake_remote)
     assert await speech_service.transcribe(b"abc", "audio/mp4", "en") == "remote text"
     assert calls == [("audio/mp4", "en")]
+
+
+async def test_synthesize_uses_piper_alignments_when_they_match_the_words(client, monkeypatch):
+    async def fake_local(text, language):
+        return np.zeros(16000, dtype=np.float32), 16000, [(0, 300), (350, 800)]
+
+    async def no_whisper(samples, language):
+        raise AssertionError("whisper must not run when Piper gives timings")
+
+    monkeypatch.setattr(tts_module, "synthesize_local", fake_local)
+    monkeypatch.setattr(tts_module, "word_times_local", no_whisper)
+    cid = await _conversation(client)
+    res = await client.post("/api/speech/synthesize", json={"conversation_id": cid, "text": "Hyvää iltaa.", "language": "fi"})
+    assert res.status_code == 200
+    assert res.json()["wtimes"] == [0, 350]
+    assert res.json()["wdurations"] == [300, 450]
+
+
+def test_words_from_alignments_splits_on_spaces():
+    from types import SimpleNamespace
+
+    from src.services.speech.local_engines import _words_from_alignments
+
+    al = [SimpleNamespace(phoneme=p, num_samples=n) for p, n in [("^", 100), ("h", 200), ("i", 200), (" ", 100), ("m", 300), ("$", 100)]]
+    assert _words_from_alignments(al, 0, 1000) == [(100, 500), (600, 900)]
+
+
+def test_decode_any_reads_a_wav_at_its_own_rate():
+    from src.services.speech.local_engines import decode_any
+
+    samples, rate = decode_any(_wav_bytes(1.0, rate=22050))
+    assert rate == 22050
+    assert abs(samples.shape[0] - 22050) < 100
+
+
+async def test_transcribe_streamed_body_over_the_cap_is_rejected(client, monkeypatch):
+    monkeypatch.setattr(speech_router.speech, "transcribe", None)
+    cid = await _conversation(client)
+    big = b"0" * (speech_router.get_settings().speech_max_upload_bytes + 1)
+
+    async def gen():
+        yield big[: len(big) // 2]
+        yield big[len(big) // 2 :]
+
+    res = await client.post(
+        f"/api/speech/transcribe?conversation_id={cid}", content=gen(), headers={"Content-Type": "audio/webm"}
+    )
+    assert res.status_code == 413

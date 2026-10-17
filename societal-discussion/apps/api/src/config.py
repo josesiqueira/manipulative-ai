@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     speech_tts_url: str = ""            # e.g. http://voxcpm:8000 (POST /v1/audio/speech)
     speech_tts_model: str = "voxcpm2"
     speech_tts_voice: str = "default"
+    speech_tts_send_language: bool = False  # add a "language" field to /v1/audio/speech
     speech_api_key: str = ""            # bearer token for the remote servers, if any
     speech_models_dir: str = "models"   # Piper voices and the whisper model directory
     speech_local_whisper_model: str = "small"   # size name (downloaded) or a directory under models_dir
