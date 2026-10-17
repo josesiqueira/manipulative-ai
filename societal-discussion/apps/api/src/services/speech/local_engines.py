@@ -47,16 +47,49 @@ def piper_voice(language: str):
 
 
 MAX_CLIP_SECONDS = 60
+MAX_CLIP_SAMPLES = MAX_CLIP_SECONDS * 16000
+
+# At most two local engine jobs at once; the rest wait in the event loop
+# instead of piling up threads.
+_jobs = asyncio.Semaphore(2)
+
+
+def decode_clip(audio: bytes, max_samples: int = MAX_CLIP_SAMPLES) -> np.ndarray:
+    """Decode a phone recording (webm/opus, mp4/aac, wav) to 16 kHz mono float
+    samples, frame by frame, and stop as soon as the cap is reached: a small
+    compressed upload can hold minutes of audio, and one push-to-talk turn
+    never needs more than a minute."""
+    import av
+
+    out: list[np.ndarray] = []
+    total = 0
+    resampler = av.AudioResampler(format="s16", layout="mono", rate=16000)
+    with av.open(io.BytesIO(audio), mode="r") as container:
+        stream = next((s for s in container.streams if s.type == "audio"), None)
+        if stream is None:
+            raise ValueError("No audio stream")
+        for frame in container.decode(stream):
+            for resampled in resampler.resample(frame):
+                block = resampled.to_ndarray().reshape(-1)
+                total += block.shape[0]
+                out.append(block)
+                if total > max_samples:
+                    raise ValueError("Recording too long")
+        for resampled in resampler.resample(None):
+            block = resampled.to_ndarray().reshape(-1)
+            total += block.shape[0]
+            out.append(block)
+    if total > max_samples:
+        raise ValueError("Recording too long")
+    if not out:
+        return np.zeros(0, dtype=np.float32)
+    return (np.concatenate(out).astype(np.float32) / 32768.0)
 
 
 def _transcribe_sync(audio: bytes, language: str) -> str:
-    from faster_whisper import decode_audio
-
-    samples = decode_audio(io.BytesIO(audio), sampling_rate=16000)
-    if samples.shape[0] > MAX_CLIP_SECONDS * 16000:
-        # A small compressed upload can decode to minutes of audio; one
-        # push-to-talk turn never needs more than a minute.
-        raise ValueError("Recording too long")
+    samples = decode_clip(audio)
+    if samples.size == 0:
+        return ""
     with _lock:
         segments, _ = whisper_model().transcribe(
             samples,
@@ -96,12 +129,15 @@ def _synthesize_sync(text: str, language: str) -> tuple[np.ndarray, int]:
 
 
 async def transcribe_local(audio: bytes, language: str) -> str:
-    return await asyncio.wait_for(asyncio.to_thread(_transcribe_sync, audio, language), timeout=60)
+    async with _jobs:
+        return await asyncio.wait_for(asyncio.to_thread(_transcribe_sync, audio, language), timeout=60)
 
 
 async def synthesize_local(text: str, language: str) -> tuple[np.ndarray, int]:
-    return await asyncio.to_thread(_synthesize_sync, text, language)
+    async with _jobs:
+        return await asyncio.to_thread(_synthesize_sync, text, language)
 
 
 async def word_times_local(samples_16k: np.ndarray, language: str) -> list[tuple[str, float, float]]:
-    return await asyncio.to_thread(_word_times_sync, samples_16k, language)
+    async with _jobs:
+        return await asyncio.to_thread(_word_times_sync, samples_16k, language)

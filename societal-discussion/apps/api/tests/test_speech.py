@@ -76,18 +76,25 @@ async def test_transcribe_rejects_empty_and_oversized_uploads(client, monkeypatc
     assert res.status_code == 413
 
 
-async def test_local_engine_rejects_clips_over_a_minute(monkeypatch):
-    import numpy as np
+def _wav_bytes(seconds: float, rate: int = 8000) -> bytes:
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(b"\x00\x00" * int(seconds * rate))
+    return buf.getvalue()
 
-    from src.services.speech import local_engines
 
-    monkeypatch.setattr(
-        "faster_whisper.decode_audio", lambda *_a, **_k: np.zeros(61 * 16000, dtype=np.float32)
-    )
+def test_decode_clip_resamples_and_stops_at_the_cap():
     import pytest
 
+    from src.services.speech.local_engines import decode_clip
+
+    samples = decode_clip(_wav_bytes(2.0))
+    assert abs(samples.shape[0] - 32000) < 200  # 2 s at 16 kHz
     with pytest.raises(ValueError):
-        local_engines._transcribe_sync(b"x", "fi")
+        decode_clip(_wav_bytes(61.0))
 
 
 async def test_synthesize_returns_wav_and_aligned_words(client, monkeypatch):
