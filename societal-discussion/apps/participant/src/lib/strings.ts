@@ -51,6 +51,67 @@ export interface Strings {
     speechError: string;
     stillFace: string;
   };
+  surveyEntry: { thanks: string; description: string; startSurvey: string; backToChat: string };
+  survey: {
+    pageTitle: string;
+    pageSubtitle: string;
+    section1Title: string;
+    chatbotUsageLabel: string;
+    chatbotUsagePlaceholder: string;
+    chatbotWhichLabel: string;
+    chatbotWhichPlaceholder: string;
+    politicalChatbotLabel: string;
+    yesNoUnsure: [string, string, string];
+    section2Title: string;
+    chatbotPerceptionLabel: string;
+    negPos: { low: string; high: string };
+    section3Title: string;
+    conversationReflectionLabel: string;
+    conversationReflectionPlaceholder: string;
+    responseSpeedLabel: string;
+    slowFast: { low: string; high: string };
+    topicVarietyLabel: string;
+    onesidedVaried: { low: string; high: string };
+    detectedBiasLabel: string;
+    notAtAllClearly: { low: string; high: string };
+    detectedTerminologyLabel: string;
+    notNoticedClearly: { low: string; high: string };
+    detectedPersuasionLabel: string;
+    section4Title: string;
+    noticeAnythingLabel: string;
+    noticeAnythingPlaceholder: string;
+    submit: string;
+    submitting: string;
+    submitError: string;
+  };
+  thankYou: { title: string; description: string };
+  debrief: {
+    title: string;
+    intro: string;
+    setupTitle: string;
+    setupIntro: string;
+    conversationLabel: string; // contains {{N}}
+    populistOn: string;
+    populistOff: string;
+    repliesTitle: string;
+    repliesBody: string; // contains {{POHTIVA}}
+    whyTitle: string;
+    whyBody: string;
+    dataTitle: string;
+    codeLabel: string;
+    copy: string;
+    copied: string;
+    dataBody: string; // contains {{EMAIL}}
+    deleteButton: string;
+    deleteConfirm: string;
+    deleteYes: string;
+    deleteNo: string;
+    deleting: string;
+    deleted: string;
+    deleteError: string;
+    contactTitle: string;
+    contactBody: string; // contains {{EMAIL}}, {{RESEARCHER}}, {{RESEARCHER_EMAIL}}, {{DPO}}
+  };
   footer: { contact: string };
 }
 
@@ -115,6 +176,82 @@ export const STRINGS: Record<Language, Strings> = {
       speechError: 'Puheen käsittely epäonnistui. Voit kirjoittaa viestisi.',
       stillFace: 'Kasvot eivät latautuneet tälle laitteelle; ääni ja teksti toimivat silti.',
     },
+    // Survey texts unchanged from the Next.js app (spec V14).
+    surveyEntry: {
+      thanks: 'Kiitos keskustelusta!',
+      description: 'Vastaa seuraavaksi lyhyeen kyselyyn kokemuksestasi. Kysely kestää noin 2 - 3 minuuttia.',
+      startSurvey: 'Aloita kysely',
+      backToChat: 'Takaisin keskusteluun',
+    },
+    survey: {
+      pageTitle: 'Kysely',
+      pageSubtitle: 'Vastaa seuraaviin kysymyksiin keskustelukokemuksesi perusteella.',
+      section1Title: 'Chatbottien käyttö',
+      chatbotUsageLabel: 'Käytätkö chatbotteja (esim. ChatGPT, Copilot, Gemini)? Miten?',
+      chatbotUsagePlaceholder: 'Kerro lyhyesti...',
+      chatbotWhichLabel: 'Mitä chatbotteja käytät? (voit listata useita)',
+      chatbotWhichPlaceholder: 'Esim. ChatGPT, Copilot...',
+      politicalChatbotLabel: 'Oletko keskustellut poliittisista aiheista chatbotin kanssa aiemmin?',
+      yesNoUnsure: ['Kyllä', 'Ei', 'En osaa sanoa'],
+      section2Title: 'Suhtautuminen chatbotteihin',
+      chatbotPerceptionLabel: 'Miten suhtaudut chatbotteihin yleisesti? (1 = hyvin kielteisesti, 5 = hyvin myönteisesti)',
+      negPos: { low: 'Kielteisesti', high: 'Myönteisesti' },
+      section3Title: 'Keskustelukokemuksesi',
+      conversationReflectionLabel: 'Mitä pidit käymistäsi keskusteluista?',
+      conversationReflectionPlaceholder: 'Kerro vapaasti...',
+      responseSpeedLabel: 'Miten arvioit chatbotin vastausnopeutta? (1 = liian hidas, 5 = erittäin nopea)',
+      slowFast: { low: 'Hidas', high: 'Nopea' },
+      topicVarietyLabel: 'Miten monipuolisesti chatbot käsitteli aiheita? (1 = yksipuolisesti, 5 = monipuolisesti)',
+      onesidedVaried: { low: 'Yksipuolisesti', high: 'Monipuolisesti' },
+      detectedBiasLabel: 'Havaitko chatbotin vastauksissa puolueellisuutta? (1 = en lainkaan, 5 = selvästi)',
+      notAtAllClearly: { low: 'En lainkaan', high: 'Selvästi' },
+      detectedTerminologyLabel: 'Käyttikö chatbot tietynlaista sanastoa tai termejä? (1 = en huomannut, 5 = selvästi)',
+      notNoticedClearly: { low: 'En huomannut', high: 'Selvästi' },
+      detectedPersuasionLabel: 'Yrittikö chatbot mielestäsi vaikuttaa mielipiteeseesi? (1 = ei lainkaan, 5 = selvästi)',
+      section4Title: 'Vapaa palaute',
+      noticeAnythingLabel: 'Huomasitko chatbotin vastauksissa jotain erityistä? Kerro vapaasti.',
+      noticeAnythingPlaceholder: 'Vapaamuotoinen vastaus...',
+      submit: 'Lähetä vastaukset',
+      submitting: 'Lähetetään...',
+      submitError: 'Kyselyn lähetys epäonnistui. Yritä uudelleen.',
+    },
+    thankYou: {
+      title: 'Kiitos osallistumisesta!',
+      description: 'Vastauksesi on tallennettu. Voit nyt sulkea tämän sivun.',
+    },
+    debrief: {
+      title: 'Kiitos osallistumisestasi!',
+      intro: 'Nyt voimme kertoa, mistä tutkimuksessa oli kyse.',
+      setupTitle: 'Miten chatbot oli asetettu',
+      setupIntro:
+        'Chatbot, jonka kanssa keskustelit, oli ohjeistettu noudattamaan yhden suomalaisen puolueen ohjelmaa. Keskusteluissasi puolue oli:',
+      conversationLabel: 'Keskustelu {{N}}',
+      populistOn:
+        'Lisäksi chatbottia ohjeistettiin käyttämään populistista puhetapaa, esimerkiksi asettamaan vastakkain "tavallinen kansa" ja "eliitti".',
+      populistOff: 'Chatbottia ei ohjeistettu käyttämään erityistä puhetapaa puolueen ohjelman lisäksi.',
+      repliesTitle: 'Mitä vastaukset olivat',
+      repliesBody:
+        'Vastaukset tuotti tekoälymalli puolueen julkisten ohjelmien pohjalta (lähde: Pohtiva-tietokanta, {{POHTIVA}}). Ne eivät ole puolueen tai sen ehdokkaiden lausuntoja, ja malli voi esittää puolueen kannat virheellisesti. Jos jokin väite jäi mietityttämään, tarkista se puolueen omista lähteistä.',
+      whyTitle: 'Miksi emme kertoneet tätä etukäteen',
+      whyBody:
+        'Tutkimme, huomaavatko ihmiset chatbotin piilotetun poliittisen painotuksen ja vaikuttamisen. Jos olisimme kertoneet puolueen etukäteen, tätä ei olisi voinut tutkia. Puolue arvottiin jokaiseen keskusteluun erikseen, joten muut saivat todennäköisesti eri puolueen. Pyydämme, ettet kerro omaa puoluettasi niille, jotka eivät ole vielä lopettaneet.',
+      dataTitle: 'Sinun tietosi',
+      codeLabel: 'Istuntokoodisi on',
+      copy: 'Kopioi',
+      copied: 'Kopioitu',
+      dataBody:
+        'Ota kuvakaappaus, jos haluat myöhemmin pyytää tietojesi näyttämistä tai poistamista; kirjoita osoitteeseen {{EMAIL}} ja mainitse koodi. Voit myös poistaa keskustelusi ja kyselyvastauksesi heti alla olevalla painikkeella. Poisto on lopullinen. Ilman koodia emme voi myöhemmin löytää tietojasi.',
+      deleteButton: 'Poista tietoni',
+      deleteConfirm: 'Poistetaanko keskustelusi ja kyselyvastauksesi pysyvästi?',
+      deleteYes: 'Kyllä, poista',
+      deleteNo: 'Peruuta',
+      deleting: 'Poistetaan...',
+      deleted: 'Tietosi on poistettu. Kiitos, että osallistuit.',
+      deleteError: 'Poisto epäonnistui. Yritä uudelleen tai lähetä koodi sähköpostilla.',
+      contactTitle: 'Kysymykset ja palaute',
+      contactBody:
+        'José Siqueira de Cerqueira, Tampereen yliopisto, {{EMAIL}} (paikalla tänään). Vastuullinen tutkija: {{RESEARCHER}}, Vaasan yliopisto, {{RESEARCHER_EMAIL}}. Tietosuoja: {{DPO}}.',
+    },
     footer: { contact: 'Yhteydenotot:' },
   },
   en: {
@@ -176,6 +313,81 @@ export const STRINGS: Record<Language, Strings> = {
       sendError: 'Failed to send the message. Please try again.',
       speechError: 'Speech processing failed. You can type your message.',
       stillFace: 'The face did not load on this device; voice and text still work.',
+    },
+    surveyEntry: {
+      thanks: 'Thank you for the conversation!',
+      description: 'Next, please answer a short survey about your experience. The survey takes about 2 to 3 minutes.',
+      startSurvey: 'Start the survey',
+      backToChat: 'Back to chat',
+    },
+    survey: {
+      pageTitle: 'Survey',
+      pageSubtitle: 'Answer the following questions based on your conversation experience.',
+      section1Title: 'Chatbot usage',
+      chatbotUsageLabel: 'Do you use chatbots (e.g. ChatGPT, Copilot, Gemini)? How?',
+      chatbotUsagePlaceholder: 'Briefly tell us...',
+      chatbotWhichLabel: 'Which chatbots do you use? (you can list several)',
+      chatbotWhichPlaceholder: 'E.g. ChatGPT, Copilot...',
+      politicalChatbotLabel: 'Have you talked about political topics with a chatbot before?',
+      yesNoUnsure: ['Yes', 'No', "I'm not sure"],
+      section2Title: 'Attitude toward chatbots',
+      chatbotPerceptionLabel: 'How do you feel about chatbots in general? (1 = very negatively, 5 = very positively)',
+      negPos: { low: 'Negatively', high: 'Positively' },
+      section3Title: 'Your conversation experience',
+      conversationReflectionLabel: 'What did you think of the conversations you had?',
+      conversationReflectionPlaceholder: 'Tell us freely...',
+      responseSpeedLabel: "How would you rate the chatbot's response speed? (1 = too slow, 5 = very fast)",
+      slowFast: { low: 'Slow', high: 'Fast' },
+      topicVarietyLabel: "How varied was the chatbot's coverage of topics? (1 = one-sided, 5 = varied)",
+      onesidedVaried: { low: 'One-sided', high: 'Varied' },
+      detectedBiasLabel: "Did you notice bias in the chatbot's responses? (1 = not at all, 5 = clearly)",
+      notAtAllClearly: { low: 'Not at all', high: 'Clearly' },
+      detectedTerminologyLabel: 'Did the chatbot use particular vocabulary or terminology? (1 = did not notice, 5 = clearly)',
+      notNoticedClearly: { low: 'Did not notice', high: 'Clearly' },
+      detectedPersuasionLabel: 'Did the chatbot try to influence your opinion? (1 = not at all, 5 = clearly)',
+      section4Title: 'Free feedback',
+      noticeAnythingLabel: "Did you notice anything particular about the chatbot's responses? Tell us freely.",
+      noticeAnythingPlaceholder: 'Free-form response...',
+      submit: 'Submit responses',
+      submitting: 'Submitting...',
+      submitError: 'Failed to submit the survey. Please try again.',
+    },
+    thankYou: {
+      title: 'Thank you for participating!',
+      description: 'Your responses have been recorded. You can now close this page.',
+    },
+    debrief: {
+      title: 'Thank you for taking part!',
+      intro: 'Now we can tell you what the study was about.',
+      setupTitle: 'How the chatbot was set up',
+      setupIntro:
+        'The chatbot you talked to was instructed to follow the programme of one Finnish political party. In your conversations the party was:',
+      conversationLabel: 'Conversation {{N}}',
+      populistOn:
+        'In addition, it was instructed to use a populist style, for example setting "ordinary people" against "the elite".',
+      populistOff: 'It was not instructed to use any particular style beyond the party programme.',
+      repliesTitle: 'What the replies were',
+      repliesBody:
+        "The replies were generated by an AI model from the party's public programmes (source: the Pohtiva database, {{POHTIVA}}). They are not statements by the party or its candidates, and the model can misstate the party's positions. If a claim stayed with you, check it against the party's own sources.",
+      whyTitle: 'Why we did not tell you beforehand',
+      whyBody:
+        "We study whether people notice a chatbot's hidden political slant and persuasion. Had we named the party in advance, this could not have been studied. The party was drawn at random for each conversation, so other people most likely got a different one. Please do not tell your party to people who have not yet finished.",
+      dataTitle: 'Your data',
+      codeLabel: 'Your session code is',
+      copy: 'Copy',
+      copied: 'Copied',
+      dataBody:
+        'Take a screenshot if you may later want to ask us to show or delete your data; write to {{EMAIL}} and quote the code. You can also delete your conversation and survey answers right now with the button below. Deletion is permanent. Without the code we cannot find your data later.',
+      deleteButton: 'Delete my data',
+      deleteConfirm: 'Permanently delete your conversations and survey answers?',
+      deleteYes: 'Yes, delete',
+      deleteNo: 'Cancel',
+      deleting: 'Deleting...',
+      deleted: 'Your data has been deleted. Thank you for taking part.',
+      deleteError: 'Deletion failed. Try again or email us the code.',
+      contactTitle: 'Questions and feedback',
+      contactBody:
+        'José Siqueira de Cerqueira, Tampere University, {{EMAIL}} (on site today). Responsible researcher: {{RESEARCHER}}, University of Vaasa, {{RESEARCHER_EMAIL}}. Data protection: {{DPO}}.',
     },
     footer: { contact: 'Contact:' },
   },

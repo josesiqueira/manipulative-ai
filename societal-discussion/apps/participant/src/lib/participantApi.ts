@@ -1,4 +1,4 @@
-// The three backend calls the consent flow needs. Runs in client scripts.
+// The backend calls the participant pages need. Runs in client scripts.
 import type { Language } from './strings';
 
 // Empty means the app's own origin (the dev server proxies /api to the API).
@@ -89,4 +89,57 @@ export async function synthesize(conversationId: string, text: string, language:
   });
   if (!res.ok) throw new Error('synthesize-failed');
   return res.json();
+}
+
+// Survey (spec V14): every answer optional; the keys are the ones the
+// researchers' export already knows.
+export interface SurveyResponses {
+  chatbot_usage: string;
+  chatbot_which: string;
+  political_chatbot: string;
+  chatbot_perception: number | null;
+  conversation_reflection: string;
+  response_speed: number | null;
+  topic_variety: number | null;
+  detected_bias: number | null;
+  detected_terminology: number | null;
+  detected_persuasion: number | null;
+  notice_anything: string;
+}
+
+export async function submitSurvey(sessionId: string, responses: SurveyResponses): Promise<void> {
+  const res = await fetch(`${API_URL}/api/survey`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, responses }),
+  });
+  if (!res.ok) throw new Error('survey-failed');
+}
+
+// Debrief (spec V13): the one participant call that reveals the condition,
+// and only after the survey row exists.
+export interface DebriefConversation {
+  id: string;
+  party_display_name: string;
+  is_populist: boolean;
+  started_at: string;
+}
+
+export interface Debrief {
+  session_code: string;
+  data_deleted: boolean;
+  conversations: DebriefConversation[];
+}
+
+// null before the survey (403) or for an unknown session (404).
+export async function getDebrief(sessionId: string): Promise<Debrief | null> {
+  const res = await fetch(`${API_URL}/api/sessions/${encodeURIComponent(sessionId)}/debrief`);
+  if (res.status === 403 || res.status === 404) return null;
+  if (!res.ok) throw new Error('debrief-failed');
+  return res.json();
+}
+
+export async function deleteSessionData(sessionId: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/sessions/${encodeURIComponent(sessionId)}/data`, { method: 'DELETE' });
+  if (!res.ok) throw new Error('delete-failed');
 }
