@@ -12,7 +12,16 @@ export default defineConfig({
   timeout: 30_000,
   fullyParallel: true,
   retries: 0,
-  use: { baseURL: ORIGIN, trace: 'retain-on-failure' },
+  use: {
+    baseURL: ORIGIN,
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure',
+    permissions: ['microphone'],
+    // Fake microphone and software WebGL for the chat page tests.
+    launchOptions: {
+      args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--enable-unsafe-swiftshader'],
+    },
+  },
   projects: [
     { name: 'desktop', testIgnore: /openai/, use: { ...devices['Desktop Chrome'] } },
     { name: 'phone', testIgnore: /openai/, use: { ...devices['Pixel 7'] } },

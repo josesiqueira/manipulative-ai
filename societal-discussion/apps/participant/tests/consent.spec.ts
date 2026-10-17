@@ -115,13 +115,13 @@ test.describe('consent gate', () => {
     for (const box of await page.locator('[data-consent-box]').all()) await box.check();
     await page.getByTestId('consent-start').click();
     await expect(page).toHaveURL(/\/en\/chat$/);
-    await expect(page.getByTestId('chat-title')).toBeVisible();
+    await expect(page.getByTestId('transcript')).toBeVisible();
 
     const [sessionCall] = sessionCalls(fake);
     expect(sessionCall.body).toEqual({ consent_version: '2026-10-23-v1', age_confirmed: true, language: 'en' });
     const [conversationCall] = conversationCalls(fake);
     expect(conversationCall.body).toMatchObject({ session_id: Object.keys(fake.sessions)[0], language: 'en' });
-    expect(fake.calls.map((c) => `${c.method} ${c.path}`)).toEqual([
+    expect(fake.calls.map((c) => `${c.method} ${c.path}`).slice(0, 3)).toEqual([
       'POST /api/sessions',
       'POST /api/conversations',
       `GET /api/sessions/${Object.keys(fake.sessions)[0]}`,

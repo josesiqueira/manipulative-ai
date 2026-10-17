@@ -2,7 +2,7 @@
 
 The public side of Vaalikeskustelu for the Metso demo (spec: `docs/superpowers/specs/2026-10-16-metso-v3-design.md`). The Next.js app in `../web` keeps the admin panel.
 
-Pages, each under `/fi/` and `/en/`: landing, `consent`, `declined`, `chat` (placeholder until card M7), `info/privacy-notice`, `info/research-notification`. `/` sends the visitor to the stored language.
+Pages, each under `/fi/` and `/en/`: landing, `consent`, `declined`, `chat`, `info/privacy-notice`, `info/research-notification`. `/` sends the visitor to the stored language.
 
 ## Commands
 
@@ -29,3 +29,19 @@ Browser tests need Playwright's Chromium once: `npx playwright install chromium`
 - `src/lib/providerNotice.ts`: every provider-specific sentence, both blocks.
 - `src/content/notices/*.md`: the full privacy notice and research notification from the consent package, with `{{RETENTION_END}}` and the provider fences filled at build time. Square-bracket items are open human decisions (M10).
 - `public/tampere/`: Tampere University logo files, unchanged; rules in `../../../tampere/README.md`.
+
+## Chat page
+
+`src/pages/[lang]/chat.astro` with the logic in `src/scripts/chat.ts`: consent guard, a typed turn (text box) or a spoken turn (hold the microphone button; the recording goes to `POST /api/speech/transcribe` and the text is sent as an ordinary message with `input_mode: spoken`), the reply shown as text and spoken sentence by sentence (`POST /api/speech/synthesize` per sentence, played through the avatar). The avatar is TalkingHead (`src/vendor/talkinghead`, MIT) with the head in `public/avatar/man.glb`; if WebGL or the file fails, the still image `man-still.png` is shown and the voice still plays (`data-avatar-mode` on the stage says which). One AudioContext is unlocked on the first tap release; the microphone is open only while the button is held.
+
+## Phone test from a laptop
+
+The microphone needs HTTPS, so a phone cannot test against `http://<laptop-ip>`. With the API running on port 8000 and `PUBLIC_API_URL=` (empty) the dev server proxies `/api` to it, and one HTTPS tunnel is enough:
+
+```
+cd societal-discussion/apps/api && uv run uvicorn src.main:app --port 8000   # SPEECH_MODELS_DIR must hold the voices
+cd societal-discussion/apps/participant && PUBLIC_API_URL= npm run dev
+cloudflared tunnel --url http://localhost:4321   # prints an https://...trycloudflare.com address for the phone
+```
+
+Add the tunnel origin to the API's `CORS_ORIGINS` only if the API is called directly; through the proxy it is same-origin.
