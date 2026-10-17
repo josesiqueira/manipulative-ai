@@ -35,7 +35,8 @@ class Settings(BaseSettings):
     forced_party: str = ""
 
     # CORS
-    cors_origins: str = "http://localhost:3000"
+    # Next.js admin (3000), Astro participant app dev (4321) and preview (8080).
+    cors_origins: str = "http://localhost:3000,http://localhost:4321,http://127.0.0.1:4321,http://localhost:8080,http://127.0.0.1:8080"
 
     # Application
     debug: bool = False

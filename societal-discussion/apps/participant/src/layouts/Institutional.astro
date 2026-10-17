@@ -1,0 +1,65 @@
+---
+// The plain institutional frame for the consent flow (spec V4): a purple top
+// bar with the one-line negative logo in its own cell, a divider, the app
+// name as a separate element (tampere/README.md), black text on white, no
+// animation, a footer bar with the contact address.
+import '../styles/global.css';
+import { STRINGS, type Language } from '../lib/strings';
+import { STUDY } from '../lib/studyConfig';
+
+interface Props {
+  lang: Language;
+  title: string;
+  // Path of the current page without the language prefix, for the toggle.
+  path: string;
+}
+
+const { lang, title, path } = Astro.props;
+const t = STRINGS[lang];
+const other: Language = lang === 'fi' ? 'en' : 'fi';
+const logo = lang === 'fi' ? '/tampere/tau-fi-negative.svg' : '/tampere/tau-en-negative.svg';
+const logoAlt = lang === 'fi' ? 'Tampereen yliopisto' : 'Tampere University';
+---
+<!doctype html>
+<html lang={lang} translate="no">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="google" content="notranslate" />
+    <meta name="robots" content="noindex" />
+    <title>{title}</title>
+  </head>
+  <body class="min-h-dvh flex flex-col">
+    <header class="bg-[var(--tau)] text-white">
+      <div class="mx-auto flex max-w-3xl items-center gap-4 px-4 py-3">
+        <a href={`/${lang}/`} class="flex items-center py-1" aria-label={logoAlt}>
+          <img src={logo} alt={logoAlt} class="block h-8 w-auto sm:h-9" data-testid="tau-logo" />
+        </a>
+        <span class="h-8 w-px bg-white/50" aria-hidden="true"></span>
+        <span class="text-sm font-semibold tracking-wide sm:text-base">{t.appName}</span>
+        <nav class="ml-auto text-sm" aria-label="Language">
+          <a href={`/${other}${path}`} data-lang-switch={other} class="underline underline-offset-4">{t.langToggle[other]}</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
+      <slot />
+    </main>
+
+    <footer class="bg-[var(--tau)] text-white">
+      <div class="mx-auto flex max-w-3xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 text-sm">
+        <img src={logo} alt="" class="block h-6 w-auto" />
+        <span class="text-white/90">{t.footer.contact} <span class="select-all">{STUDY.contactEmail}</span></span>
+      </div>
+    </footer>
+
+    <script>
+      // The toggle also remembers the choice so "/" can send the visitor back here.
+      import { setStoredLanguage } from '../lib/session';
+      document.querySelectorAll<HTMLAnchorElement>('[data-lang-switch]').forEach((a) => {
+        a.addEventListener('click', () => setStoredLanguage(a.dataset.langSwitch === 'en' ? 'en' : 'fi'));
+      });
+    </script>
+  </body>
+</html>

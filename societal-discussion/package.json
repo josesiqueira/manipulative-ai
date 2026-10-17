@@ -9,7 +9,9 @@
     "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
     "dev:web": "npm run dev --workspace=apps/web",
     "dev:api": "cd apps/api && uvicorn src.main:app --reload --port 8000",
+    "dev:participant": "npm run dev --workspace=apps/participant",
     "build": "npm run build --workspace=apps/web",
+    "build:participant": "npm run build --workspace=apps/participant",
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present"
   },
