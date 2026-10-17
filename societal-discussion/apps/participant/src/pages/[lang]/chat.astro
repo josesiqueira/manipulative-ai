@@ -11,6 +11,7 @@ const lang = Astro.params.lang as Language;
 const t = STRINGS[lang];
 ---
 <Institutional lang={lang} title={t.chat.placeholderTitle} path="/chat">
+  <p id="error" class="text-sm text-red-800" role="alert" hidden>{t.consent.error} <a href={`/${lang}/`} class="underline">{t.chat.backToStart}</a></p>
   <div id="chat" hidden>
     <h1 class="text-2xl font-bold" data-testid="chat-title">{t.chat.placeholderTitle}</h1>
     <p class="mt-2 max-w-prose">{t.chat.placeholderBody}</p>
@@ -38,7 +39,10 @@ const t = STRINGS[lang];
           if (!session || !session.consent_accepted_at) toConsent();
           else (document.getElementById('chat') as HTMLElement).hidden = false;
         })
-        .catch(toConsent);
+        .catch(() => {
+          // Network trouble is not missing consent: keep the session, show the error.
+          (document.getElementById('error') as HTMLElement).hidden = false;
+        });
     }
   </script>
 </Institutional>

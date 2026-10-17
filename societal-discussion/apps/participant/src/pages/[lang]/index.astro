@@ -19,7 +19,7 @@ const t = STRINGS[lang];
     data-starting={t.landing.starting}
     class="mt-8 w-full rounded border border-[var(--tau)] bg-[var(--tau)] px-6 py-4 text-lg font-semibold text-white disabled:opacity-60 sm:w-auto"
   >{t.landing.start}</button>
-  <p id="error" class="mt-3 text-sm text-red-800" hidden>{t.consent.error}</p>
+  <p id="error" class="mt-3 text-sm text-red-800" role="alert" hidden>{t.consent.error}</p>
 
   <script>
     // Start: a stored session that the server still reports as consented gets

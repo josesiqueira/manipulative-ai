@@ -9,6 +9,7 @@ export const LANGUAGES: Language[] = ['fi', 'en'];
 
 export interface Strings {
   langToggle: Record<Language, string>;
+  langNav: string;
   appName: string;
   landing: { title: string; studyLine: string; intro: string; start: string; starting: string };
   consent: {
@@ -35,6 +36,7 @@ export interface Strings {
 export const STRINGS: Record<Language, Strings> = {
   fi: {
     langToggle: { fi: 'Suomeksi', en: 'In English' },
+    langNav: 'Kieli',
     appName: 'Vaalikeskustelu',
     landing: {
       title: 'Vaalikeskustelu',
@@ -79,6 +81,7 @@ export const STRINGS: Record<Language, Strings> = {
   },
   en: {
     langToggle: { fi: 'Suomeksi', en: 'In English' },
+    langNav: 'Language',
     appName: 'Vaalikeskustelu',
     landing: {
       title: 'Vaalikeskustelu',

@@ -30,12 +30,14 @@ const entry = files[`../../../content/notices/${doc}.${lang}.md`];
 if (!entry) throw new Error(`Missing notice file for ${doc} ${lang}`);
 const provider = PROVIDER_NOTICE[lang];
 const paragraphs = (text: string) => text.split('\n\n').map((p) => `<p>${p}</p>`).join('\n');
+// The Markdown compiler wraps each token in its own <p>, so the whole
+// paragraph is replaced, not just the token.
 const html = (await entry.compiledContent())
   .replaceAll('{{RETENTION_END}}', STUDY.retentionEnd[lang])
-  .replace('{{PROVIDER_NOTICE_13}}', paragraphs(provider.notice13))
-  .replace('{{PROVIDER_NOTIFICATION_3}}', paragraphs(provider.notification3))
-  .replaceAll('[MODEL NAME]', STUDY.modelName)
-  .replaceAll('[MALLIN NIMI]', STUDY.modelName);
+  .replace('<p>{{PROVIDER_NOTICE_13}}</p>', paragraphs(provider.notice13))
+  .replace('<p>{{PROVIDER_NOTIFICATION_3}}</p>', paragraphs(provider.notification3))
+  .replaceAll('[MODEL NAME]', STUDY.modelName.en)
+  .replaceAll('[MALLIN NIMI]', STUDY.modelName.fi);
 ---
 <Institutional lang={lang} title={title} path={`/info/${doc}`}>
   <a href={`/${lang}/consent`} class="text-sm underline">{t.info.back}</a>

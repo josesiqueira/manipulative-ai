@@ -19,5 +19,5 @@ export const STUDY = {
   dpoEmail: 'tietosuojavastaava@uwasa.fi',
   pohtivaUrl: 'https://www.fsd.tuni.fi/pohtiva/',
   // Filled when M9 names the model; until then the notices show the bracket.
-  modelName: '[MODEL NAME]',
+  modelName: { fi: '[MALLIN NIMI]', en: '[MODEL NAME]' },
 } as const;

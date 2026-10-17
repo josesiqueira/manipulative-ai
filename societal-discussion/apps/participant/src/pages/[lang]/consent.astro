@@ -41,7 +41,7 @@ const boxes = [
       ))}
     </div>
 
-    <p id="error" class="mt-4 text-sm text-red-800" hidden>{t.consent.error}</p>
+    <p id="error" class="mt-4 text-sm text-red-800" role="alert" hidden>{t.consent.error}</p>
 
     <div class="mt-6 flex flex-col gap-3 sm:flex-row">
       <button
@@ -70,7 +70,7 @@ const boxes = [
     // The session is created only here, only after every box is ticked. A
     // reload starts from unticked boxes (the browser is told not to restore).
     import { createConversation, createSession } from '../../lib/participantApi';
-    import { setConversationId, setSessionId } from '../../lib/session';
+    import { getSessionId, setConversationId, setSessionId } from '../../lib/session';
     import { STUDY } from '../../lib/studyConfig';
     import type { Language } from '../../lib/strings';
 
@@ -81,10 +81,17 @@ const boxes = [
     const error = document.getElementById('error') as HTMLParagraphElement;
 
     form.setAttribute('autocomplete', 'off');
-    boxes.forEach((b) => (b.checked = false));
     const update = () => (start.disabled = !boxes.every((b) => b.checked));
+    const reset = () => {
+      boxes.forEach((b) => (b.checked = false));
+      update();
+    };
     boxes.forEach((b) => b.addEventListener('change', update));
-    update();
+    reset();
+    // Coming back through the browser's page cache keeps the old ticks; reset them.
+    window.addEventListener('pageshow', (event) => {
+      if (event.persisted) reset();
+    });
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -92,9 +99,14 @@ const boxes = [
       start.disabled = true;
       error.hidden = true;
       try {
-        const session = await createSession(STUDY.consentVersion, lang);
-        setSessionId(session.id);
-        const conversationId = await createConversation(session.id, lang);
+        // A retry after a failed conversation call reuses the session already created.
+        let sessionId = getSessionId();
+        if (!sessionId) {
+          const session = await createSession(STUDY.consentVersion, lang);
+          sessionId = session.id;
+          setSessionId(sessionId);
+        }
+        const conversationId = await createConversation(sessionId, lang);
         setConversationId(conversationId);
         window.location.assign(`/${lang}/chat`);
       } catch {

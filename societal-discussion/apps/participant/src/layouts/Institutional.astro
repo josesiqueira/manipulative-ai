@@ -37,7 +37,7 @@ const logoAlt = lang === 'fi' ? 'Tampereen yliopisto' : 'Tampere University';
         </a>
         <span class="h-8 w-px bg-white/50" aria-hidden="true"></span>
         <span class="text-sm font-semibold tracking-wide sm:text-base">{t.appName}</span>
-        <nav class="ml-auto text-sm" aria-label="Language">
+        <nav class="ml-auto text-sm" aria-label={t.langNav}>
           <a href={`/${other}${path}`} data-lang-switch={other} class="underline underline-offset-4">{t.langToggle[other]}</a>
         </nav>
       </div>

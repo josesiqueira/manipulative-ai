@@ -120,7 +120,7 @@ test.describe('consent gate', () => {
     const [sessionCall] = sessionCalls(fake);
     expect(sessionCall.body).toEqual({ consent_version: '2026-10-23-v1', age_confirmed: true, language: 'en' });
     const [conversationCall] = conversationCalls(fake);
-    expect(conversationCall.body).toMatchObject({ session_id: sessionCall ? Object.keys(fake.sessions)[0] : '', language: 'en' });
+    expect(conversationCall.body).toMatchObject({ session_id: Object.keys(fake.sessions)[0], language: 'en' });
     expect(fake.calls.map((c) => `${c.method} ${c.path}`)).toEqual([
       'POST /api/sessions',
       'POST /api/conversations',
@@ -187,6 +187,7 @@ test.describe('phone width', () => {
       await page.goto(path);
       const widths = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, inner: window.innerWidth }));
       expect(widths.scroll).toBeLessThanOrEqual(widths.inner);
+      await expect(page.getByTestId('tau-logo')).toBeVisible();
     });
   }
 });

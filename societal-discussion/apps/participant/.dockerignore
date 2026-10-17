@@ -1,0 +1,8 @@
+node_modules
+dist
+dist-openai
+.astro
+test-results
+playwright-report
+.env
+tests
