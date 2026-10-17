@@ -48,7 +48,7 @@ spec:
             # restore normal no-repeat random assignment across all
             # registered parties.
             - name: FORCED_PARTY
-              value: "perussuomalaiset,perussuomalaiset_populist"
+              value: ""
           volumeMounts:
             - name: sqlite-data
               mountPath: /data
