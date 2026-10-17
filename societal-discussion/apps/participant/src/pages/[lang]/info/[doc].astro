@@ -1,0 +1,55 @@
+---
+// Full notices, prerendered per language from src/content/notices. The
+// provider fence and the retention date are filled from the config modules so
+// the notice always says the same as the consent page.
+import Institutional from '../../../layouts/Institutional.astro';
+import { LANGUAGES, STRINGS, type Language } from '../../../lib/strings';
+import { STUDY } from '../../../lib/studyConfig';
+import { PROVIDER_NOTICE } from '../../../lib/providerNotice';
+
+type Doc = 'privacy-notice' | 'research-notification';
+const DOCS: Doc[] = ['privacy-notice', 'research-notification'];
+
+export function getStaticPaths() {
+  return LANGUAGES.flatMap((lang) =>
+    (['privacy-notice', 'research-notification'] as const).map((doc) => ({ params: { lang, doc } })),
+  );
+}
+
+const lang = Astro.params.lang as Language;
+const doc = Astro.params.doc as Doc;
+if (!DOCS.includes(doc)) throw new Error(`Unknown notice: ${doc}`);
+const t = STRINGS[lang];
+const title = doc === 'privacy-notice' ? t.info.privacyTitle : t.info.researchTitle;
+
+const files = import.meta.glob('../../../content/notices/*.md', { eager: true }) as Record<
+  string,
+  { compiledContent: () => Promise<string> }
+>;
+const entry = files[`../../../content/notices/${doc}.${lang}.md`];
+if (!entry) throw new Error(`Missing notice file for ${doc} ${lang}`);
+const provider = PROVIDER_NOTICE[lang];
+const paragraphs = (text: string) => text.split('\n\n').map((p) => `<p>${p}</p>`).join('\n');
+const html = (await entry.compiledContent())
+  .replaceAll('{{RETENTION_END}}', STUDY.retentionEnd[lang])
+  .replace('{{PROVIDER_NOTICE_13}}', paragraphs(provider.notice13))
+  .replace('{{PROVIDER_NOTIFICATION_3}}', paragraphs(provider.notification3))
+  .replaceAll('[MODEL NAME]', STUDY.modelName)
+  .replaceAll('[MALLIN NIMI]', STUDY.modelName);
+---
+<Institutional lang={lang} title={title} path={`/info/${doc}`}>
+  <a href={`/${lang}/consent`} class="text-sm underline">{t.info.back}</a>
+  <article class="notice mt-4 max-w-prose" data-testid="notice" set:html={html} />
+</Institutional>
+
+<style is:global>
+  .notice h1 { font-size: 1.5rem; font-weight: 700; margin-top: 0.5rem; }
+  .notice h2 { font-size: 1.125rem; font-weight: 600; margin-top: 1.5rem; }
+  .notice h3 { font-size: 1rem; font-weight: 600; margin-top: 1rem; }
+  .notice p { margin-top: 0.75rem; }
+  .notice ul, .notice ol { margin-top: 0.5rem; padding-left: 1.5rem; list-style: disc; }
+  .notice li { margin-top: 0.25rem; }
+  .notice a { text-decoration: underline; }
+  .notice table { border-collapse: collapse; margin-top: 0.75rem; }
+  .notice td, .notice th { border: 1px solid var(--rule); padding: 0.25rem 0.5rem; vertical-align: top; }
+</style>

@@ -1,0 +1,44 @@
+---
+// Placeholder until M7 builds the chat. The guard below is the part that
+// stays: no consented session, no chat.
+import Institutional from '../../layouts/Institutional.astro';
+import { LANGUAGES, STRINGS, type Language } from '../../lib/strings';
+
+export function getStaticPaths() {
+  return LANGUAGES.map((lang) => ({ params: { lang } }));
+}
+const lang = Astro.params.lang as Language;
+const t = STRINGS[lang];
+---
+<Institutional lang={lang} title={t.chat.placeholderTitle} path="/chat">
+  <div id="chat" hidden>
+    <h1 class="text-2xl font-bold" data-testid="chat-title">{t.chat.placeholderTitle}</h1>
+    <p class="mt-2 max-w-prose">{t.chat.placeholderBody}</p>
+    <a href={`/${lang}/`} class="mt-8 inline-block rounded border border-[var(--rule)] px-6 py-3 text-lg">{t.chat.backToStart}</a>
+  </div>
+
+  <script>
+    // Consent gate on the client: the page body stays hidden until the server
+    // confirms the stored session has consent_accepted_at.
+    import { getSession } from '../../lib/participantApi';
+    import { clearSession, getSessionId } from '../../lib/session';
+    import type { Language } from '../../lib/strings';
+
+    const lang = document.documentElement.lang as Language;
+    const toConsent = () => {
+      clearSession();
+      window.location.replace(`/${lang}/consent`);
+    };
+    const id = getSessionId();
+    if (!id) {
+      toConsent();
+    } else {
+      getSession(id)
+        .then((session) => {
+          if (!session || !session.consent_accepted_at) toConsent();
+          else (document.getElementById('chat') as HTMLElement).hidden = false;
+        })
+        .catch(toConsent);
+    }
+  </script>
+</Institutional>

@@ -1,0 +1,106 @@
+---
+import Institutional from '../../layouts/Institutional.astro';
+import { LANGUAGES, STRINGS, type Language } from '../../lib/strings';
+import { STUDY } from '../../lib/studyConfig';
+import { PROVIDER_NOTICE } from '../../lib/providerNotice';
+
+export function getStaticPaths() {
+  return LANGUAGES.map((lang) => ({ params: { lang } }));
+}
+const lang = Astro.params.lang as Language;
+const t = STRINGS[lang];
+const provider = PROVIDER_NOTICE[lang];
+const bullets = t.consent.bullets.map((b) =>
+  b.replace('{{PROVIDER_BULLET}}', provider.bullet).replace('{{RETENTION_END}}', STUDY.retentionEnd[lang]),
+);
+const boxes = [
+  { id: 'cb-age', label: t.consent.checkboxAge },
+  { id: 'cb-read', label: t.consent.checkboxRead },
+  ...(provider.checkbox ? [{ id: 'cb-transfer', label: provider.checkbox }] : []),
+];
+---
+<Institutional lang={lang} title={t.consent.heading} path="/consent">
+  <h1 class="text-2xl font-bold">{t.consent.heading}</h1>
+  <p class="mt-2 max-w-prose">{t.consent.intro}</p>
+
+  <section class="mt-6" aria-labelledby="brief">
+    <h2 id="brief" class="text-lg font-semibold">{t.consent.briefTitle}</h2>
+    <ul class="mt-2 max-w-prose list-disc space-y-2 pl-5" data-testid="consent-bullets">
+      {bullets.map((b) => <li>{b}</li>)}
+    </ul>
+  </section>
+
+  <form id="consent" class="mt-6" novalidate>
+    <h2 class="text-lg font-semibold">{t.consent.confirmTitle}</h2>
+    <div class="mt-2 space-y-3">
+      {boxes.map((box) => (
+        <label for={box.id} class="flex max-w-prose items-start gap-3">
+          <input id={box.id} name={box.id} type="checkbox" class="mt-1 h-5 w-5 shrink-0 accent-[var(--tau)]" data-consent-box />
+          <span>{box.label}</span>
+        </label>
+      ))}
+    </div>
+
+    <p id="error" class="mt-4 text-sm text-red-800" hidden>{t.consent.error}</p>
+
+    <div class="mt-6 flex flex-col gap-3 sm:flex-row">
+      <button
+        id="start"
+        type="submit"
+        disabled
+        data-testid="consent-start"
+        class="rounded border border-[var(--tau)] bg-[var(--tau)] px-6 py-3 text-lg font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+      >{t.consent.start}</button>
+      <a
+        href={`/${lang}/declined`}
+        data-testid="consent-decline"
+        class="rounded border border-[var(--rule)] px-6 py-3 text-center text-lg text-[var(--ink)]"
+      >{t.consent.decline}</a>
+    </div>
+  </form>
+
+  <p class="mt-8 text-sm text-[var(--muted)]">
+    <a class="underline" href={`/${lang}/info/research-notification`} target="_blank" rel="noreferrer">{t.consent.linksResearch}</a>
+    {' · '}
+    <a class="underline" href={`/${lang}/info/privacy-notice`} target="_blank" rel="noreferrer">{t.consent.linksPrivacy}</a>
+    {' '}{t.consent.linksHint}
+  </p>
+
+  <script>
+    // The session is created only here, only after every box is ticked. A
+    // reload starts from unticked boxes (the browser is told not to restore).
+    import { createConversation, createSession } from '../../lib/participantApi';
+    import { setConversationId, setSessionId } from '../../lib/session';
+    import { STUDY } from '../../lib/studyConfig';
+    import type { Language } from '../../lib/strings';
+
+    const lang = document.documentElement.lang as Language;
+    const form = document.getElementById('consent') as HTMLFormElement;
+    const boxes = Array.from(form.querySelectorAll<HTMLInputElement>('[data-consent-box]'));
+    const start = document.getElementById('start') as HTMLButtonElement;
+    const error = document.getElementById('error') as HTMLParagraphElement;
+
+    form.setAttribute('autocomplete', 'off');
+    boxes.forEach((b) => (b.checked = false));
+    const update = () => (start.disabled = !boxes.every((b) => b.checked));
+    boxes.forEach((b) => b.addEventListener('change', update));
+    update();
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!boxes.every((b) => b.checked)) return;
+      start.disabled = true;
+      error.hidden = true;
+      try {
+        const session = await createSession(STUDY.consentVersion, lang);
+        setSessionId(session.id);
+        const conversationId = await createConversation(session.id, lang);
+        setConversationId(conversationId);
+        window.location.assign(`/${lang}/chat`);
+      } catch {
+        error.hidden = false;
+        start.disabled = false;
+      }
+    });
+  </script>
+</Institutional>

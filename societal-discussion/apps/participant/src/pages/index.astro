@@ -1,0 +1,21 @@
+---
+// "/" sends the visitor to the stored language (default Finnish). The choice
+// lives in localStorage, so this has to be a client script; the noscript link
+// covers crawlers and text browsers.
+---
+<!doctype html>
+<html lang="fi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Vaalikeskustelu</title>
+  </head>
+  <body>
+    <noscript><a href="/fi/">Vaalikeskustelu</a></noscript>
+    <script>
+      import { getStoredLanguage } from '../lib/session';
+      window.location.replace(`/${getStoredLanguage()}/`);
+    </script>
+  </body>
+</html>

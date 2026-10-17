@@ -1,0 +1,15 @@
+---
+import Institutional from '../../layouts/Institutional.astro';
+import { LANGUAGES, STRINGS, type Language } from '../../lib/strings';
+
+export function getStaticPaths() {
+  return LANGUAGES.map((lang) => ({ params: { lang } }));
+}
+const lang = Astro.params.lang as Language;
+const t = STRINGS[lang];
+---
+<Institutional lang={lang} title={t.declined.title} path="/declined">
+  <h1 class="text-2xl font-bold" data-testid="declined-title">{t.declined.title}</h1>
+  <p class="mt-2 max-w-prose">{t.declined.body}</p>
+  <a href={`/${lang}/`} class="mt-8 inline-block rounded border border-[var(--rule)] px-6 py-3 text-lg">{t.declined.back}</a>
+</Institutional>
