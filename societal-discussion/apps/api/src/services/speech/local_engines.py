@@ -46,10 +46,17 @@ def piper_voice(language: str):
     return PiperVoice.load(path)
 
 
+MAX_CLIP_SECONDS = 60
+
+
 def _transcribe_sync(audio: bytes, language: str) -> str:
     from faster_whisper import decode_audio
 
     samples = decode_audio(io.BytesIO(audio), sampling_rate=16000)
+    if samples.shape[0] > MAX_CLIP_SECONDS * 16000:
+        # A small compressed upload can decode to minutes of audio; one
+        # push-to-talk turn never needs more than a minute.
+        raise ValueError("Recording too long")
     with _lock:
         segments, _ = whisper_model().transcribe(
             samples,
@@ -89,7 +96,7 @@ def _synthesize_sync(text: str, language: str) -> tuple[np.ndarray, int]:
 
 
 async def transcribe_local(audio: bytes, language: str) -> str:
-    return await asyncio.to_thread(_transcribe_sync, audio, language)
+    return await asyncio.wait_for(asyncio.to_thread(_transcribe_sync, audio, language), timeout=60)
 
 
 async def synthesize_local(text: str, language: str) -> tuple[np.ndarray, int]:

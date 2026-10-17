@@ -33,9 +33,9 @@ async def test_transcribe_passes_bytes_and_mime_to_the_engine(client, monkeypatc
     monkeypatch.setattr(speech_router.speech, "transcribe", fake_transcribe)
     cid = await _conversation(client)
     res = await client.post(
-        "/api/speech/transcribe",
-        files={"audio": ("turn.webm", b"\x1aE\xdf\xa3fake", "audio/webm;codecs=opus")},
-        data={"conversation_id": cid, "language": "fi"},
+        f"/api/speech/transcribe?conversation_id={cid}&language=fi",
+        content=b"\x1aE\xdf\xa3fake",
+        headers={"Content-Type": "audio/webm;codecs=opus"},
     )
     assert res.status_code == 200
     assert res.json() == {"text": "hei maailma"}
@@ -51,16 +51,12 @@ async def test_transcribe_needs_an_open_conversation(client, monkeypatch):
 
     monkeypatch.setattr(speech_router.speech, "transcribe", fake_transcribe)
     res = await client.post(
-        "/api/speech/transcribe",
-        files={"audio": ("t.webm", b"abc", "audio/webm")},
-        data={"conversation_id": "nope"},
+        "/api/speech/transcribe?conversation_id=nope", content=b"abc", headers={"Content-Type": "audio/webm"}
     )
     assert res.status_code == 404
     cid = await _conversation(client, complete=True)
     res = await client.post(
-        "/api/speech/transcribe",
-        files={"audio": ("t.webm", b"abc", "audio/webm")},
-        data={"conversation_id": cid},
+        f"/api/speech/transcribe?conversation_id={cid}", content=b"abc", headers={"Content-Type": "audio/webm"}
     )
     assert res.status_code == 400
     assert called == []
@@ -70,14 +66,28 @@ async def test_transcribe_rejects_empty_and_oversized_uploads(client, monkeypatc
     monkeypatch.setattr(speech_router.speech, "transcribe", None)
     cid = await _conversation(client)
     res = await client.post(
-        "/api/speech/transcribe", files={"audio": ("t.webm", b"", "audio/webm")}, data={"conversation_id": cid}
+        f"/api/speech/transcribe?conversation_id={cid}", content=b"", headers={"Content-Type": "audio/webm"}
     )
     assert res.status_code == 400
     big = b"0" * (speech_router.get_settings().speech_max_upload_bytes + 1)
     res = await client.post(
-        "/api/speech/transcribe", files={"audio": ("t.webm", big, "audio/webm")}, data={"conversation_id": cid}
+        f"/api/speech/transcribe?conversation_id={cid}", content=big, headers={"Content-Type": "audio/webm"}
     )
     assert res.status_code == 413
+
+
+async def test_local_engine_rejects_clips_over_a_minute(monkeypatch):
+    import numpy as np
+
+    from src.services.speech import local_engines
+
+    monkeypatch.setattr(
+        "faster_whisper.decode_audio", lambda *_a, **_k: np.zeros(61 * 16000, dtype=np.float32)
+    )
+    import pytest
+
+    with pytest.raises(ValueError):
+        local_engines._transcribe_sync(b"x", "fi")
 
 
 async def test_synthesize_returns_wav_and_aligned_words(client, monkeypatch):

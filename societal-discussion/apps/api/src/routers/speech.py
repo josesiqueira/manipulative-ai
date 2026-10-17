@@ -1,7 +1,8 @@
 """
 Speech endpoints for the chat page (spec V8, V9).
 
-POST /api/speech/transcribe   multipart audio + conversation_id + language -> {text}
+POST /api/speech/transcribe?conversation_id=..&language=..  body: the recording as
+    recorded (Content-Type audio/webm or audio/mp4) -> {text}
 POST /api/speech/synthesize   {conversation_id, text, language} -> WAV (base64) + word timings
 
 Both need a conversation that exists and is not complete. No audio and no
@@ -10,7 +11,7 @@ page sends it as an ordinary message.
 """
 import base64
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -43,20 +44,31 @@ class TranscriptionResponse(BaseModel):
 
 @router.post("/transcribe", response_model=TranscriptionResponse)
 async def transcribe(
-    audio: UploadFile = File(...),
-    conversation_id: str = Form(...),
-    language: str = Form("fi"),
+    request: Request,
+    conversation_id: str,
+    language: str = "fi",
     db: AsyncSession = Depends(get_db),
 ):
+    """The recording is the raw request body, so it stays in memory: no
+    multipart spool file, and the stream is cut off at the byte cap."""
     settings = get_settings()
     await _open_conversation(db, conversation_id)
-    data = await audio.read(settings.speech_max_upload_bytes + 1)
-    if len(data) > settings.speech_max_upload_bytes:
-        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Recording too long")
+    declared = request.headers.get("content-length")
+    if declared and declared.isdigit() and int(declared) > settings.speech_max_upload_bytes:
+        raise HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail="Recording too long")
+    chunks: list[bytes] = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > settings.speech_max_upload_bytes:
+            raise HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail="Recording too long")
+        chunks.append(chunk)
+    data = b"".join(chunks)
     if not data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Empty recording")
+    mime = request.headers.get("content-type", "")
     try:
-        text = await speech.transcribe(data, audio.content_type or "", _language(language))
+        text = await speech.transcribe(data, mime, _language(language))
     except Exception as exc:  # noqa: BLE001
         print(f"Speech recognition error: {type(exc).__name__}")
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Speech recognition failed")
@@ -83,7 +95,7 @@ async def synthesize(data: SynthesisRequest, db: AsyncSession = Depends(get_db))
     await _open_conversation(db, data.conversation_id)
     text = data.text.strip()
     if len(text) > settings.speech_max_text_chars:
-        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Text too long")
+        raise HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail="Text too long")
     try:
         result = await speech.synthesize(text, _language(data.language))
     except Exception as exc:  # noqa: BLE001
