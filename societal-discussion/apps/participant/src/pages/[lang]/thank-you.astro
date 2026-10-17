@@ -1,0 +1,177 @@
+---
+// Thank-you with the debrief (spec V13, 2026-09-18 E6 and E7): the party per
+// conversation and whether the populist framing was on, the session code
+// with a copy button, "Delete my data", the provider note and the contacts.
+// Shown only when the server has a survey row for the session; otherwise the
+// plain thank-you text.
+import Institutional from '../../layouts/Institutional.astro';
+import { LANGUAGES, STRINGS, type Language } from '../../lib/strings';
+import { STUDY } from '../../lib/studyConfig';
+import { PROVIDER_NOTICE } from '../../lib/providerNotice';
+
+export function getStaticPaths() {
+  return LANGUAGES.map((lang) => ({ params: { lang } }));
+}
+const lang = Astro.params.lang as Language;
+const t = STRINGS[lang];
+const d = t.debrief;
+const fill = (template: string, values: Record<string, string>) =>
+  Object.entries(values).reduce((acc, [key, value]) => acc.split(`{{${key}}}`).join(value), template);
+const h2 = 'text-lg font-semibold';
+const section = 'mt-8 max-w-prose';
+---
+<Institutional lang={lang} title={t.thankYou.title} path="/thank-you">
+  <div id="plain" data-testid="thank-you-plain" hidden>
+    <h1 class="text-2xl font-bold">{t.thankYou.title}</h1>
+    <p class="mt-2 max-w-prose">{t.thankYou.description}</p>
+  </div>
+
+  <article id="debrief" data-testid="debrief" hidden>
+    <h1 class="text-2xl font-bold">{d.title}</h1>
+    <p class="mt-2 max-w-prose">{d.intro}</p>
+
+    <section class={section}>
+      <h2 class={h2}>{d.setupTitle}</h2>
+      <p class="mt-2">{d.setupIntro}</p>
+      <ol id="conversations" class="mt-3 flex flex-col gap-3" data-testid="debrief-conversations"></ol>
+    </section>
+
+    <section class={section}>
+      <h2 class={h2}>{d.repliesTitle}</h2>
+      <p class="mt-2">{fill(d.repliesBody, { POHTIVA: STUDY.pohtivaUrl })}</p>
+    </section>
+
+    <section class={section}>
+      <h2 class={h2}>{d.whyTitle}</h2>
+      <p class="mt-2">{d.whyBody}</p>
+    </section>
+
+    <section class={section}>
+      <h2 class={h2}>{d.dataTitle}</h2>
+      <div id="data-live">
+        <p class="mt-2">
+          {d.codeLabel}
+          <code id="code" class="ml-1 text-xl font-bold tracking-widest" data-testid="session-code"></code>
+          <button id="copy" type="button" class="ml-2 rounded border border-[var(--rule)] px-3 py-1 text-sm" data-testid="copy-code" data-copied={d.copied}>{d.copy}</button>
+        </p>
+        <p class="mt-3">{fill(d.dataBody, { EMAIL: STUDY.contactEmail })}</p>
+        <div id="delete-ask" class="mt-4">
+          <button id="delete" type="button" class="w-full rounded border border-red-700 px-6 py-3 font-medium text-red-800 sm:w-auto" data-testid="delete-data">{d.deleteButton}</button>
+        </div>
+        <div id="delete-confirm" class="mt-4 rounded border border-red-700 p-4" hidden>
+          <p class="font-medium">{d.deleteConfirm}</p>
+          <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+            <button id="delete-yes" type="button" class="rounded bg-red-800 px-6 py-3 font-semibold text-white" data-testid="delete-yes" data-deleting={d.deleting}>{d.deleteYes}</button>
+            <button id="delete-no" type="button" class="rounded border border-[var(--rule)] px-6 py-3" data-testid="delete-no">{d.deleteNo}</button>
+          </div>
+        </div>
+        <p id="delete-error" class="mt-2 text-sm text-red-800" role="alert" hidden>{d.deleteError}</p>
+      </div>
+      <p id="data-deleted" class="mt-2 font-medium" data-testid="data-deleted" hidden>{d.deleted}</p>
+      <p class="mt-4 text-sm text-[var(--muted)]">{PROVIDER_NOTICE[lang].debriefNote}</p>
+    </section>
+
+    <section class={section}>
+      <h2 class={h2}>{d.contactTitle}</h2>
+      <p class="mt-2">
+        {fill(d.contactBody, {
+          EMAIL: STUDY.contactEmail,
+          RESEARCHER: STUDY.responsibleResearcher,
+          RESEARCHER_EMAIL: STUDY.responsibleResearcherEmail,
+          DPO: STUDY.dpoEmail,
+        })}
+      </p>
+      <p class="mt-2">
+        <a class="underline" href={`/${lang}/info/research-notification`} target="_blank" rel="noreferrer">{t.consent.linksResearch}</a>
+        <span aria-hidden="true"> · </span>
+        <a class="underline" href={`/${lang}/info/privacy-notice`} target="_blank" rel="noreferrer">{t.consent.linksPrivacy}</a>
+      </p>
+    </section>
+  </article>
+
+  <script>
+    import { deleteSessionData, getDebrief, type Debrief } from '../../lib/participantApi';
+    import { getSessionId } from '../../lib/session';
+    import { STRINGS, type Language } from '../../lib/strings';
+
+    const lang = document.documentElement.lang as Language;
+    const d = STRINGS[lang].debrief;
+    const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+    const showPlain = () => {
+      $('plain').hidden = false;
+    };
+
+    const render = (debrief: Debrief) => {
+      const list = $('conversations');
+      debrief.conversations.forEach((c, i) => {
+        const li = document.createElement('li');
+        li.className = 'border-l-4 border-[var(--tau)] pl-3';
+        li.dataset.testid = 'debrief-conversation';
+        const label = document.createElement('span');
+        label.className = 'text-[var(--muted)]';
+        label.textContent = `${d.conversationLabel.split('{{N}}').join(String(i + 1))}: `;
+        const party = document.createElement('strong');
+        party.textContent = c.party_display_name;
+        party.dataset.testid = 'debrief-party';
+        const style = document.createElement('p');
+        style.textContent = c.is_populist ? d.populistOn : d.populistOff;
+        style.dataset.testid = c.is_populist ? 'populist-on' : 'populist-off';
+        li.append(label, party, style);
+        list.appendChild(li);
+      });
+      $('code').textContent = debrief.session_code;
+      if (debrief.data_deleted) markDeleted();
+      $('debrief').hidden = false;
+    };
+
+    const markDeleted = () => {
+      $('data-live').hidden = true;
+      $('data-deleted').hidden = false;
+    };
+
+    const sessionId = getSessionId();
+    if (!sessionId) {
+      showPlain();
+    } else {
+      getDebrief(sessionId)
+        .then((debrief) => (debrief ? render(debrief) : showPlain()))
+        .catch(showPlain);
+    }
+
+    $('copy').addEventListener('click', async () => {
+      const button = $<HTMLButtonElement>('copy');
+      try {
+        await navigator.clipboard.writeText($('code').textContent ?? '');
+        button.textContent = button.dataset.copied ?? button.textContent;
+      } catch {
+        // Clipboard blocked: the code stays on screen and in the screenshot.
+      }
+    });
+
+    $('delete').addEventListener('click', () => {
+      $('delete-ask').hidden = true;
+      $('delete-confirm').hidden = false;
+      $('delete-error').hidden = true;
+    });
+    $('delete-no').addEventListener('click', () => {
+      $('delete-confirm').hidden = true;
+      $('delete-ask').hidden = false;
+    });
+    $('delete-yes').addEventListener('click', async () => {
+      if (!sessionId) return;
+      const yes = $<HTMLButtonElement>('delete-yes');
+      const label = yes.textContent;
+      yes.disabled = true;
+      yes.textContent = yes.dataset.deleting ?? label;
+      try {
+        await deleteSessionData(sessionId);
+        markDeleted();
+      } catch {
+        $('delete-error').hidden = false;
+        yes.disabled = false;
+        yes.textContent = label;
+      }
+    });
+  </script>
+</Institutional>
