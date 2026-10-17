@@ -45,11 +45,11 @@ async def generate_response(
     db: AsyncSession,
     conversation: Conversation,
     user_message: str,
-) -> tuple[str, int]:
+) -> tuple[str, int, str]:
     """
     Generate an AI response for a conversation message.
 
-    Returns (response_text, token_count).
+    Returns (response_text, token_count, model_name).
     """
     conversation_history = [
         {"role": msg.role, "content": msg.content}
@@ -73,4 +73,4 @@ async def generate_response(
         temperature=0.1,
     )
 
-    return response_text, token_count
+    return response_text, token_count, model

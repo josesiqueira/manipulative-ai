@@ -55,6 +55,7 @@ class MessageCreate(BaseModel):
     """Request body for sending a message."""
 
     content: str
+    input_mode: str = "typed"  # 'typed' or 'spoken' (speech already transcribed)
 
 
 class MessageResponse(BaseModel):
@@ -229,12 +230,13 @@ async def send_message(
         conversation_id=conversation.id,
         role="user",
         content=data.content,
+        input_mode=data.input_mode if data.input_mode in ("typed", "spoken") else "typed",
     )
     db.add(user_message)
 
     # Generate AI response
     try:
-        ai_content, tokens = await generate_response(
+        ai_content, tokens, model_name = await generate_response(
             db=db,
             conversation=conversation,
             user_message=data.content,
@@ -252,6 +254,7 @@ async def send_message(
         role="assistant",
         content=ai_content,
         token_count=tokens,
+        model_name=model_name,
     )
     db.add(assistant_message)
 

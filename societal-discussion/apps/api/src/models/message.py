@@ -29,6 +29,12 @@ class Message(Base):
         Text, nullable=True
     )  # JSON string for research
     token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    input_mode: Mapped[str] = mapped_column(
+        String(10), nullable=False, default="typed", server_default="typed"
+    )  # 'typed' or 'spoken' for user messages; 'typed' for assistant rows
+    model_name: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )  # model identifier that produced an assistant message
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=lambda: datetime.now(HELSINKI)
     )
