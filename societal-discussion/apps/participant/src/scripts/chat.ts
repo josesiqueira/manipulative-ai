@@ -62,16 +62,42 @@ export async function startChat(): Promise<void> {
   // first tap release anywhere on the page.
   const audio = new AudioManager(() => (soundPrompt.hidden = false));
   const unlock = () => {
-    void audio.unlock().then(() => (soundPrompt.hidden = true));
+    void audio.unlock().then(() => {
+      if (audio.ctx.state === 'running') soundPrompt.hidden = true;
+    });
   };
   document.addEventListener('click', unlock);
   document.addEventListener('touchend', unlock, { passive: true });
   soundPrompt.addEventListener('click', unlock);
 
+  // The leaving buttons work from the first paint, before the head has loaded.
+  let speaker: Speaker | null = null;
+  let speaking = false;
+  const stopSpeaking = () => {
+    if (!speaking) return;
+    speaking = false;
+    speaker?.stop();
+  };
+  let stream: MediaStream | null = null;
+  const stopTracks = () => {
+    stream?.getTracks().forEach((track) => track.stop());
+    stream = null;
+  };
+  const leave = async (to: string) => {
+    stopSpeaking();
+    stopTracks();
+    await endConversation(conversationId);
+    setConversationId(null);
+    window.location.assign(to);
+  };
+  endBtn.addEventListener('click', () => void leave(`/${lang}/survey-entry`));
+  backBtn.addEventListener('click', () => void leave(`/${lang}/`));
+
   stage.dataset.avatarMode = 'loading';
-  const speaker: Speaker = await createSpeaker(avatarEl, stillEl, audio);
+  speaker = await createSpeaker(avatarEl, stillEl, audio);
   stage.dataset.avatarMode = speaker.mode;
   if (speaker.mode === 'still') hint.textContent = t.stillFace;
+  const head: Speaker = speaker;
 
   // 3. Transcript helpers.
   const addBubble = (role: 'user' | 'assistant', text: string): HTMLElement => {
@@ -93,46 +119,49 @@ export async function startChat(): Promise<void> {
   // 4. Speak a reply sentence by sentence, fetching the next clip while the
   // current one plays. The bubble shows the whole reply at once; the words
   // light up as they are spoken when the live head is on.
-  let speaking = false;
-  const speakReply = async (text: string, bubble: HTMLElement) => {
-    const sentences = splitSentences(text);
+  const speakReply = async (rawText: string, bubble: HTMLElement) => {
+    const sentences = splitSentences(rawText);
     if (sentences.length === 0) return;
+    // The highlight counts words, so the shown text uses the same whitespace
+    // as the sentences that are spoken.
+    const words = sentences.join(' ').split(' ');
+    const text = words.join(' ');
     speaking = true;
     status.textContent = t.speaking;
-    let spokenSoFar = '';
+    let spokenWords = 0;
     const spoken = document.createElement('span');
     spoken.className = 'spoken';
     const rest = document.createElement('span');
     rest.textContent = text;
     bubble.textContent = '';
     bubble.append(spoken, rest);
-    let next: Promise<SpeechClip> | null = synthesize(conversationId, sentences[0], lang);
+    const prefetch = (i: number): Promise<SpeechClip> | null => {
+      if (i >= sentences.length) return null;
+      const p = synthesize(conversationId, sentences[i], lang);
+      p.catch(() => undefined); // an unused prefetch must not surface as an unhandled rejection
+      return p;
+    };
+    let next = prefetch(0);
     try {
       for (let i = 0; i < sentences.length && speaking; i++) {
         const clip = await next;
-        next = i + 1 < sentences.length ? synthesize(conversationId, sentences[i + 1], lang) : null;
+        next = prefetch(i + 1);
         if (!clip || !speaking) break;
-        await speaker.speak(clip, lang, (word) => {
-          spokenSoFar += word;
-          spoken.textContent = spokenSoFar;
-          rest.textContent = text.slice(Math.min(spokenSoFar.length, text.length));
+        await head.speak(clip, lang, () => {
+          spokenWords = Math.min(spokenWords + 1, words.length);
+          spoken.textContent = words.slice(0, spokenWords).join(' ') + (spokenWords < words.length ? ' ' : '');
+          rest.textContent = words.slice(spokenWords).join(' ');
         });
       }
     } catch (err) {
       console.warn('speech playback stopped', err);
       hint.textContent = t.speechError;
     } finally {
-      bubble.textContent = text;
+      bubble.textContent = rawText;
       speaking = false;
       if (status.textContent === t.speaking) status.textContent = '';
     }
   };
-  const stopSpeaking = () => {
-    if (!speaking) return;
-    speaking = false;
-    speaker.stop();
-  };
-
   // 5. One turn, typed or spoken.
   let busy = false;
   const turn = async (content: string, mode: InputMode) => {
@@ -142,18 +171,22 @@ export async function startChat(): Promise<void> {
     hint.textContent = '';
     addBubble('user', content.trim());
     setBusy(true, t.thinking);
+    let bubble: HTMLElement | null = null;
+    let replyText = '';
     try {
       const reply = await sendMessage(conversationId, content.trim(), mode);
-      const bubble = addBubble('assistant', reply.content);
-      setBusy(false);
-      await speakReply(reply.content, bubble);
+      replyText = reply.content;
+      bubble = addBubble('assistant', replyText);
     } catch {
-      setBusy(false);
       hint.textContent = t.sendError;
     } finally {
+      setBusy(false);
       busy = false;
       input.focus();
     }
+    // Playback happens with the controls free: typing or pressing the
+    // microphone interrupts the voice (barge-in).
+    if (bubble) await speakReply(replyText, bubble);
   };
 
   form.addEventListener('submit', (event) => {
@@ -165,30 +198,42 @@ export async function startChat(): Promise<void> {
 
   // 6. Push-to-talk: the microphone is open only while the button is held.
   let recorder: MediaRecorder | null = null;
-  let stream: MediaStream | null = null;
   let chunks: Blob[] = [];
+  let held = false; // true between pointerdown and the release
   const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((m) =>
     typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(m),
   );
 
-  const stopTracks = () => {
-    stream?.getTracks().forEach((track) => track.stop());
-    stream = null;
-  };
-
   const startRecording = async (event: Event) => {
     event.preventDefault();
     if (busy || recorder) return;
+    held = true;
     stopSpeaking();
     hint.textContent = '';
+    let granted: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      granted = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
+      held = false;
       hint.textContent = t.micDenied;
       return;
     }
+    if (!held || recorder) {
+      // Released while the permission prompt was open: do not record.
+      granted.getTracks().forEach((track) => track.stop());
+      hint.textContent = t.tapAgain;
+      return;
+    }
+    stream = granted;
     chunks = [];
-    recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    try {
+      recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    } catch {
+      stopTracks();
+      held = false;
+      hint.textContent = t.micDenied;
+      return;
+    }
     recorder.addEventListener('dataavailable', (e) => {
       if (e.data.size > 0) chunks.push(e.data);
     });
@@ -199,17 +244,30 @@ export async function startChat(): Promise<void> {
 
   const stopRecording = async (event: Event) => {
     event.preventDefault();
+    held = false;
     const current = recorder;
     if (!current) return;
     recorder = null;
     micBtn.classList.remove('recording');
-    const stopped = new Promise<void>((resolve) => current.addEventListener('stop', () => resolve(), { once: true }));
-    if (current.state !== 'inactive') current.stop();
-    await stopped;
+    // Wait for the recorder's own stop event, but never hang on it: some
+    // browsers end the stream early and then the event never comes.
+    if (current.state !== 'inactive') {
+      const stopped = new Promise<void>((resolve) => {
+        current.addEventListener('stop', () => resolve(), { once: true });
+        window.setTimeout(resolve, 1500);
+      });
+      try {
+        current.requestData();
+      } catch {
+        /* not all states allow it */
+      }
+      current.stop();
+      await stopped;
+    }
     stopTracks();
     const blob = new Blob(chunks, { type: current.mimeType || mimeType || 'application/octet-stream' });
     chunks = [];
-    if (blob.size < 1000) {
+    if (blob.size < 300) {
       status.textContent = '';
       hint.textContent = `${t.micEmpty} ${t.tapAgain}`;
       return;
@@ -243,14 +301,4 @@ export async function startChat(): Promise<void> {
     if (document.hidden && recorder) void stopRecording(new Event('hidden'));
   });
 
-  // 7. Leaving.
-  const leave = async (to: string) => {
-    stopSpeaking();
-    stopTracks();
-    await endConversation(conversationId);
-    setConversationId(null);
-    window.location.assign(to);
-  };
-  endBtn.addEventListener('click', () => void leave(`/${lang}/survey-entry`));
-  backBtn.addEventListener('click', () => void leave(`/${lang}/`));
 }

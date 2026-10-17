@@ -16,14 +16,19 @@ function silentWavBase64(seconds = 0.4, rate = 16000): string {
 
 interface Call { method: string; path: string; body: unknown; contentType: string; size: number }
 
+const thirdParty: string[] = [];
+test.afterEach(() => {
+  expect(thirdParty, 'requests to hosts other than the test origin').toEqual([]);
+  thirdParty.length = 0;
+});
+
 async function fakeApi(page: Page, reply = 'Hyvää iltaa. Tervetuloa keskustelemaan.') {
   const calls: Call[] = [];
-  const origin = new URL(page.context().browser()?.version() ? 'http://127.0.0.1' : 'http://127.0.0.1').host;
   await page.route('**/*', async (route: Route) => {
     const url = new URL(route.request().url());
     if (url.hostname !== '127.0.0.1') {
-      await route.abort();
-      throw new Error(`request to a third party: ${url.href}`);
+      thirdParty.push(url.href);
+      return route.abort();
     }
     if (!url.pathname.startsWith('/api/')) return route.continue();
     const req = route.request();
@@ -46,7 +51,6 @@ async function fakeApi(page: Page, reply = 'Hyvää iltaa. Tervetuloa keskustele
     }
     return json(500, { detail: `unexpected ${req.method()} ${url.pathname}` });
   });
-  void origin;
   return calls;
 }
 
@@ -80,6 +84,26 @@ test.describe('chat page', () => {
     await expect(page.getByTestId('send')).toBeEnabled();
   });
 
+  test('typing during playback interrupts the voice and sends the new message', async ({ page }) => {
+    const long = Array.from({ length: 8 }, (_, i) => `Lause numero ${i + 1} on tässä.`).join(' ');
+    const calls = await fakeApi(page, long);
+    await openChat(page);
+    await expect(page.getByTestId('stage')).toHaveAttribute('data-avatar-mode', 'live', { timeout: 60_000 });
+    await page.getByTestId('message').fill('Hei');
+    await page.getByTestId('send').click();
+    await expect(page.getByTestId('status')).toHaveText(/Puhun/, { timeout: 20_000 });
+    await expect(page.getByTestId('send')).toBeEnabled();
+    await page.getByTestId('message').fill('Toinen');
+    await page.getByTestId('send').click();
+    await expect(page.locator('.bubble-user').nth(1)).toHaveText('Toinen');
+    await expect(page.locator('.bubble-assistant')).toHaveCount(2, { timeout: 20_000 });
+    const sent = calls.filter((c) => c.path === '/api/conversations/c1/messages').map((c) => (c.body as { content: string }).content);
+    expect(sent).toEqual(['Hei', 'Toinen']);
+    // The first reply was cut short: fewer than its 8 sentences were requested before the second turn.
+    const firstTurnSynth = calls.filter((c) => c.path === '/api/speech/synthesize').length;
+    expect(firstTurnSynth).toBeLessThan(16);
+  });
+
   test('a held microphone button records, transcribes and sends the text as spoken', async ({ page }) => {
     const calls = await fakeApi(page);
     await openChat(page);
@@ -88,7 +112,7 @@ test.describe('chat page', () => {
     if (!box) throw new Error('no mic button');
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
     await page.mouse.down();
-    await expect(mic).toHaveClass(/recording/);
+    await expect(mic).toHaveClass(/recording/, { timeout: 15_000 });
     await page.waitForTimeout(1500);
     await page.mouse.up();
     await expect(page.locator('.bubble-user')).toHaveText('Mitä mieltä olette veroista?', { timeout: 15_000 });

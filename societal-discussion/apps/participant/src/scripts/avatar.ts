@@ -56,17 +56,31 @@ class LiveHead implements Speaker {
   async speak(clip: SpeechClip, lang: 'fi' | 'en', onWord: (word: string) => void): Promise<void> {
     const buffer = await this.audio.decode(clip.audio_base64);
     return new Promise<void>((resolve) => {
-      this.done = resolve;
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        this.done = null;
+        window.clearTimeout(guard);
+        resolve();
+      };
+      this.done = finish;
       this.head.speakAudio(
         { audio: buffer, words: clip.words, wtimes: clip.wtimes, wdurations: clip.wdurations },
         { lipsyncLang: lang },
         (word: string) => onWord(word),
       );
-      // The library has no end-of-clip callback; a marker at the clip's end does it.
-      this.head.speakMarker(() => {
-        this.done = null;
-        resolve();
-      });
+      // The library has no end-of-clip callback; a marker at the clip's end
+      // does it, and a timer guards against a stalled audio clock.
+      this.head.speakMarker(finish);
+      const guard = window.setTimeout(() => {
+        try {
+          this.head.stopSpeaking();
+        } catch {
+          /* nothing queued */
+        }
+        finish();
+      }, buffer.duration * 1000 + 4000);
     });
   }
 
@@ -76,10 +90,7 @@ class LiveHead implements Speaker {
     } catch {
       /* nothing queued */
     }
-    if (this.done) {
-      this.done();
-      this.done = null;
-    }
+    if (this.done) this.done();
   }
 }
 
@@ -103,7 +114,7 @@ class StillFace implements Speaker {
       const t0 = this.audio.ctx.currentTime;
       clip.words.forEach((w, i) => {
         const delay = Math.max(0, clip.wtimes[i] ?? 0);
-        this.timers.push(window.setTimeout(() => onWord(w + ' '), delay));
+        this.timers.push(window.setTimeout(() => onWord(w), delay));
       });
       src.start(t0);
     });

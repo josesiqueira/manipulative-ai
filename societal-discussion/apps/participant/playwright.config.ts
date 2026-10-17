@@ -11,6 +11,8 @@ export default defineConfig({
   testDir: './tests',
   timeout: 30_000,
   fullyParallel: true,
+  // Software WebGL in several browsers at once starves the page scripts; keep the load moderate.
+  workers: 3,
   retries: 0,
   use: {
     baseURL: ORIGIN,

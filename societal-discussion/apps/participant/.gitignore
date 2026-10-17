@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-openai/
+dist-e2e/
 .astro/
 test-results/
 playwright-report/
