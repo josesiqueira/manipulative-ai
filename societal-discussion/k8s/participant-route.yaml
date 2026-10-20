@@ -1,0 +1,16 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: participant
+  namespace: manipulative-ai-2
+spec:
+  host: vaalikeskustelu.2.rahtiapp.fi
+  to:
+    kind: Service
+    name: participant
+    weight: 100
+  port:
+    targetPort: 8080
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

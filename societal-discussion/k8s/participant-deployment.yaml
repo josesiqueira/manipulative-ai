@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: participant
+  namespace: manipulative-ai-2
+  labels:
+    app: participant
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: participant
+  template:
+    metadata:
+      labels:
+        app: participant
+    spec:
+      containers:
+        - name: participant
+          # Built with PUBLIC_API_URL=https://api-vaalikeskustelu.2.rahtiapp.fi
+          # and PUBLIC_PROVIDER_BLOCK=openai (both inlined at build time).
+          image: image-registry.apps.2.rahti.csc.fi/manipulative-ai-2/participant:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /fi/
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /fi/
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10

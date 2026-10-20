@@ -40,6 +40,8 @@ async function fakeApi(page: Page, options: FakeOptions = {}): Promise<Call[]> {
         conversations: [
           { id: 'c1', party_display_name: 'Kokoomus', is_populist: false, framing: 'antipopulist', started_at: '2026-10-23T16:05:00' },
           { id: 'c2', party_display_name: 'Vihreät', is_populist: true, framing: 'populist', started_at: '2026-10-23T16:12:00' },
+          // A former standard condition (earlier data): no framing field at all.
+          { id: 'c3', party_display_name: 'SDP', is_populist: false, started_at: '2026-10-23T16:20:00' },
         ],
       });
     }
@@ -114,10 +116,14 @@ test.describe('survey and debrief', () => {
     // The debrief: one entry per conversation, the framing sentence varies.
     await expect(page.getByTestId('debrief')).toBeVisible();
     await expect(page.getByTestId('thank-you-plain')).toBeHidden();
-    await expect(page.getByTestId('debrief-party')).toHaveText(['Kokoomus', 'Vihreät']);
+    await expect(page.getByTestId('debrief-party')).toHaveText(['Kokoomus', 'Vihreät', 'SDP']);
     const entries = page.getByTestId('debrief-conversation');
     await expect(entries.nth(0).getByTestId('antipopulist-on')).toContainText('antipopulistista');
     await expect(entries.nth(1).getByTestId('populist-on')).toContainText('populistista');
+    await expect(entries.nth(2).getByTestId('populist-off')).toBeVisible();
+    // The technical note names the model; no placeholder reaches the page.
+    await expect(page.locator('body')).toContainText('GPT-6 Astra');
+    await expect(page.locator('body')).not.toContainText('[MALLIN NIMI]');
     await expect(page.getByTestId('session-code')).toHaveText('3F2A-9C11');
     // The party is never requested before the survey row exists.
     const debriefCalls = calls.filter((c) => c.path === '/api/sessions/ok/debrief');
@@ -160,7 +166,7 @@ test.describe('survey and debrief', () => {
     await expect(page.getByTestId('thank-you-plain')).toBeHidden();
     await page.getByTestId('debrief-retry').click();
     await expect(page.getByTestId('debrief')).toBeVisible();
-    await expect(page.getByTestId('debrief-conversation')).toHaveCount(2);
+    await expect(page.getByTestId('debrief-conversation')).toHaveCount(3);
   });
 
   test('copy puts the code on the clipboard', async ({ page, context, browserName }) => {

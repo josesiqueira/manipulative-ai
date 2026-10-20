@@ -19,7 +19,7 @@ Bilingual Finnish/English. The methodology is documented in
 | | |
 |---|---|
 | Participant URL | https://vaalikeskustelu.2.rahtiapp.fi/ |
-| Admin panel | https://vaalikeskustelu.2.rahtiapp.fi/admin (moves to its own hostname with the Metso deploy) |
+| Admin panel | https://admin-vaalikeskustelu.2.rahtiapp.fi/admin |
 | Hosting | CSC Rahti (OpenShift), project `manipulative-ai-2` |
 
 The deploy is paused between events. If the URL returns "Application is not

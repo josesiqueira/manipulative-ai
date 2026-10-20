@@ -121,7 +121,8 @@ export const PARTIES: readonly string[] = [
   ...BASE_PARTIES.map((p) => `${p}${ANTIPOPULIST_SUFFIX}`),
 ];
 
-const KNOWN_PARTIES: readonly string[] = [...PARTIES, ...BASE_PARTIES];
+// For reading and filtering data: the 18 conditions plus the former standard ids.
+export const KNOWN_PARTIES: readonly string[] = [...PARTIES, ...BASE_PARTIES];
 
 export function isAntipopulist(party: string): boolean {
   return party.endsWith(ANTIPOPULIST_SUFFIX);
@@ -156,7 +157,7 @@ export const PARTY_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
       ? `${BASE_DISPLAY_NAMES[baseParty(p)]} Populist`
       : isAntipopulist(p)
         ? `${BASE_DISPLAY_NAMES[baseParty(p)]} Anti-populist`
-        : BASE_DISPLAY_NAMES[p],
+        : `${BASE_DISPLAY_NAMES[p]} Standard (before Oct 2026)`,
   ]),
 );
 

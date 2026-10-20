@@ -6,6 +6,7 @@ test('openai block: three boxes, OpenAI bullet, OpenAI notice texts', async ({ p
   await page.route('**/api/**', (route) => route.fulfill({ status: 500, body: '{}' }));
   await page.goto('/en/consent');
   await expect(page.locator('[data-consent-box]')).toHaveCount(3);
+  await expect(page.locator('body')).not.toContainText('[MODEL NAME]');
   await expect(page.getByTestId('consent-bullets')).toContainText('sends your messages to OpenAI in the United States');
   await expect(page.locator('label[for="cb-transfer"]')).toContainText("processed on OpenAI's servers in the United States");
   const start = page.getByTestId('consent-start');

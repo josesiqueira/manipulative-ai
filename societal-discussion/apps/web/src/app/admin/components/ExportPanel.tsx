@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { getConversationList } from '../lib/api';
-import { PARTIES, PARTY_DISPLAY_NAMES } from '../lib/types';
+import { KNOWN_PARTIES, PARTY_DISPLAY_NAMES } from '../lib/types';
 import type { ConversationFilters } from '../lib/types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
@@ -251,7 +251,7 @@ export default function ExportPanel({ password }: ExportPanelProps) {
               className={SELECT_CLS}
             >
               <option value="">All parties</option>
-              {PARTIES.map((p) => (
+              {KNOWN_PARTIES.map((p) => (
                 <option key={p} value={p}>
                   {PARTY_DISPLAY_NAMES[p]}
                 </option>

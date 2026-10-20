@@ -7,6 +7,9 @@ metadata:
     app: api
 spec:
   replicas: 1
+  # The SQLite volume is RWO: a rollout replaces the pod rather than running two.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: api
@@ -26,7 +29,7 @@ spec:
             - name: DATABASE_URL
               value: "sqlite+aiosqlite:////data/societal_discussion.db"
             - name: CORS_ORIGINS
-              value: "https://vaalikeskustelu.2.rahtiapp.fi,https://api-vaalikeskustelu.2.rahtiapp.fi"
+              value: "https://vaalikeskustelu.2.rahtiapp.fi,https://admin-vaalikeskustelu.2.rahtiapp.fi,https://api-vaalikeskustelu.2.rahtiapp.fi"
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -42,23 +45,22 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: ENCRYPTION_SECRET
-            # HEPP demo: pick uniformly between the listed parties for
-            # every participant conversation. Comma-separated. Set to a
-            # single party to pin all traffic there, or to empty to
-            # restore normal no-repeat random assignment across all
-            # registered parties.
+            # Empty: no-repeat weighted random assignment across the 18
+            # conditions. Comma-separated condition ids pin the traffic to
+            # those conditions (uniform pick).
             - name: FORCED_PARTY
               value: ""
           volumeMounts:
             - name: sqlite-data
               mountPath: /data
+          # Speech recognition and synthesis run inside this container.
           resources:
             requests:
-              memory: "512Mi"
-              cpu: "200m"
-            limits:
               memory: "1Gi"
-              cpu: "1000m"
+              cpu: "500m"
+            limits:
+              memory: "3Gi"
+              cpu: "2000m"
           readinessProbe:
             httpGet:
               path: /api/health

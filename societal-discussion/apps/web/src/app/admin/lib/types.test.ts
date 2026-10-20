@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BASE_PARTIES, PARTIES, PARTY_COLORS, PARTY_DISPLAY_NAMES, baseParty, isAntipopulist, isPopulist } from './types';
+import { BASE_PARTIES, KNOWN_PARTIES, PARTIES, PARTY_COLORS, PARTY_DISPLAY_NAMES, baseParty, isAntipopulist, isPopulist } from './types';
 
 describe('party constants (18 conditions)', () => {
   it('lists 9 populist and 9 anti-populist variants, never the former standard ids', () => {
@@ -17,11 +17,20 @@ describe('party constants (18 conditions)', () => {
 
   it('names every variant after its base party, and keeps names for earlier data', () => {
     for (const p of PARTIES) {
-      const base = PARTY_DISPLAY_NAMES[baseParty(p)];
-      expect(PARTY_DISPLAY_NAMES[p]).toBe(isPopulist(p) ? `${base} Populist` : `${base} Anti-populist`);
+      expect(PARTY_DISPLAY_NAMES[p]).toMatch(/ (Populist|Anti-populist)$/);
     }
     expect(PARTY_DISPLAY_NAMES.perussuomalaiset_populist).toBe('Perussuomalaiset Populist');
-    expect(PARTY_DISPLAY_NAMES.kokoomus).toBe('Kokoomus');
+    expect(PARTY_DISPLAY_NAMES.liikenyt_antipopulist).toBe('Liike Nyt Anti-populist');
+    expect(PARTY_DISPLAY_NAMES.kokoomus).toBe('Kokoomus Standard (before Oct 2026)');
+  });
+
+  it('keeps the former standard ids readable for filters, charts and exports', () => {
+    expect(KNOWN_PARTIES).toHaveLength(27);
+    for (const p of BASE_PARTIES) {
+      expect(KNOWN_PARTIES).toContain(p);
+      expect(PARTY_COLORS[p]).toBe(PARTY_COLORS[`${p}_antipopulist`]);
+      expect(baseParty(`${p}_antipopulist`)).toBe(p);
+    }
   });
 
   it('gives all 18 conditions a unique colour', () => {

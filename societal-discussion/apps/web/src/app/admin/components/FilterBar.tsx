@@ -1,6 +1,6 @@
 'use client';
 
-import { PARTIES, PARTY_DISPLAY_NAMES } from '../lib/types';
+import { KNOWN_PARTIES, PARTY_DISPLAY_NAMES } from '../lib/types';
 import type { ConversationFilters } from '../lib/types';
 
 interface FilterBarProps {
@@ -18,7 +18,7 @@ export default function FilterBar({ filters, onFiltersChange }: FilterBarProps) 
         className="px-3 py-1.5 rounded-lg border border-slate-300 text-sm text-slate-700 bg-white"
       >
         <option value="">All parties</option>
-        {PARTIES.map((p) => (
+        {KNOWN_PARTIES.map((p) => (
           <option key={p} value={p}>{PARTY_DISPLAY_NAMES[p]}</option>
         ))}
       </select>

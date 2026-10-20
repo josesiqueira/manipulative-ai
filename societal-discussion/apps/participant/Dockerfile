@@ -11,7 +11,7 @@ RUN npm install --no-package-lock
 COPY . .
 # Both values are inlined at build time (one provider switch per deploy).
 ARG PUBLIC_API_URL
-ARG PUBLIC_PROVIDER_BLOCK=finnish
+ARG PUBLIC_PROVIDER_BLOCK=openai
 ENV PUBLIC_API_URL=$PUBLIC_API_URL \
     PUBLIC_PROVIDER_BLOCK=$PUBLIC_PROVIDER_BLOCK
 RUN npm run build

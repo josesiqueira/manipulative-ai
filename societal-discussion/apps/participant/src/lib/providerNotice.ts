@@ -1,4 +1,5 @@
 import type { Language } from './strings';
+import { STUDY } from './studyConfig';
 
 // Everything that depends on WHICH model runs WHERE lives here.
 // Two blocks exist: 'finnish' (a model on Tampere University's own servers)
@@ -86,4 +87,21 @@ const BLOCKS: Record<ProviderBlockId, Record<Language, ProviderNotice>> = {
 
 const raw = (import.meta.env.PUBLIC_PROVIDER_BLOCK ?? 'finnish') as string;
 export const PROVIDER_BLOCK_ID: ProviderBlockId = raw === 'openai' ? 'openai' : 'finnish';
-export const PROVIDER_NOTICE: Record<Language, ProviderNotice> = BLOCKS[PROVIDER_BLOCK_ID];
+
+// Every text names the model from studyConfig, so no placeholder reaches a page.
+function withModelName(n: ProviderNotice): ProviderNotice {
+  const fill = (s: string) =>
+    s.replaceAll('[MODEL NAME]', STUDY.modelName.en).replaceAll('[MALLIN NIMI]', STUDY.modelName.fi);
+  return {
+    bullet: fill(n.bullet),
+    checkbox: n.checkbox === null ? null : fill(n.checkbox),
+    notice13: fill(n.notice13),
+    notification3: fill(n.notification3),
+    debriefNote: fill(n.debriefNote),
+  };
+}
+
+export const PROVIDER_NOTICE: Record<Language, ProviderNotice> = {
+  fi: withModelName(BLOCKS[PROVIDER_BLOCK_ID].fi),
+  en: withModelName(BLOCKS[PROVIDER_BLOCK_ID].en),
+};

@@ -21,7 +21,7 @@ Browser tests need Playwright's Chromium once: `npx playwright install chromium`
 ## Build-time values
 
 - `PUBLIC_API_URL`: the FastAPI origin the browser calls. Inlined by `astro build`, so a change means a rebuild (the Dockerfile takes it as a build argument).
-- `PUBLIC_PROVIDER_BLOCK`: `finnish` (default; the model runs on Tampere University servers, two consent checkboxes) or `openai` (three checkboxes and the OpenAI texts in the notices). Also inlined at build time; this is the provider switch and it is applied per image build.
+- `PUBLIC_PROVIDER_BLOCK`: `openai` (the Metso build and the Dockerfile default: three checkboxes and the OpenAI texts in the notices) or `finnish` (the model runs on Tampere University servers, two consent checkboxes; also what `npm run dev` uses when the variable is unset). Inlined at build time; this is the provider switch and it is applied per image build.
 
 ## Content
 

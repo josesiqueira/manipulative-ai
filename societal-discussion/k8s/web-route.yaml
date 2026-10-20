@@ -4,7 +4,7 @@ metadata:
   name: web
   namespace: manipulative-ai-2
 spec:
-  host: vaalikeskustelu.2.rahtiapp.fi
+  host: admin-vaalikeskustelu.2.rahtiapp.fi
   to:
     kind: Service
     name: web

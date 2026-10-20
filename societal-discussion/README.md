@@ -109,7 +109,7 @@ societal-discussion/
 │   └── web/                       Next.js admin app
 ├── docker/                        HEPP2026-era Dockerfiles and compose file, superseded by apps/api/Dockerfile
 │                                  and apps/participant/Dockerfile (Dockerfile.web still builds the admin app)
-├── k8s/                           OpenShift manifests (api, web, PVC; the participant manifests come with the Metso deploy)
+├── k8s/                           OpenShift manifests (api, participant app, admin app, PVC)
 ├── METHODS.md                     research methodology reference
 └── package.json                   npm workspaces: apps/web and apps/participant (one lock file here)
 ```
@@ -177,14 +177,15 @@ Manifests in `k8s/`:
 
 | File | Resource |
 |---|---|
-| `api-deployment.yaml` | API Deployment (`FORCED_PARTY` empty; the volume is RWO, so a rollout must replace the pod rather than run two, so the deploy sets the `Recreate` strategy) |
+| `api-deployment.yaml` | API Deployment (`FORCED_PARTY` empty; `Recreate` strategy because the volume is RWO; speech runs in this container, so it has 1 to 3 GiB of memory) |
 | `api-service.yaml`, `api-route.yaml` | Service and Route for the API |
-| `web-deployment.yaml`, `web-service.yaml`, `web-route.yaml` | Same for the admin app |
+| `participant-deployment.yaml`, `participant-service.yaml`, `participant-route.yaml` | The participant app on https://vaalikeskustelu.2.rahtiapp.fi |
+| `web-deployment.yaml`, `web-service.yaml`, `web-route.yaml` | The admin app on https://admin-vaalikeskustelu.2.rahtiapp.fi/admin |
 | `sqlite-pvc.yaml` | 1 Gi PersistentVolumeClaim mounted at `/data` in the API pod |
 
-The participant app's Deployment, Service and Route on the public hostname,
-and the move of the admin app to its own hostname, come with the Metso
-deploy.
+A route's host cannot be changed in place on Rahti: to move a host, delete
+the route and create it again (`oc delete route web && oc apply -f
+k8s/web-route.yaml`).
 
 Images:
 
@@ -199,7 +200,7 @@ docker build --platform linux/amd64 -t image-registry.apps.2.rahti.csc.fi/manipu
 cd ../participant
 docker build --platform linux/amd64 \
   --build-arg PUBLIC_API_URL=https://api-vaalikeskustelu.2.rahtiapp.fi \
-  --build-arg PUBLIC_PROVIDER_BLOCK=finnish \
+  --build-arg PUBLIC_PROVIDER_BLOCK=openai \
   -t image-registry.apps.2.rahti.csc.fi/manipulative-ai-2/participant:latest .
 
 # Admin app: docker/Dockerfile.web from this folder
@@ -213,7 +214,7 @@ docker push image-registry.apps.2.rahti.csc.fi/manipulative-ai-2/api:latest
 docker push image-registry.apps.2.rahti.csc.fi/manipulative-ai-2/participant:latest
 docker push image-registry.apps.2.rahti.csc.fi/manipulative-ai-2/web:latest
 oc apply -f k8s/
-oc rollout restart deploy/api deploy/web -n manipulative-ai-2
+oc rollout restart deploy/api deploy/web deploy/participant -n manipulative-ai-2
 ```
 
 The API image runs `alembic upgrade head` before the server starts
@@ -239,7 +240,7 @@ created in the cluster with `oc create secret generic app-secrets
   research data.
 - The consent texts are in `apps/participant/src/lib/strings.ts` and the
   privacy notice and research notification in
-  `apps/participant/src/content/notices/`; the values still
-  to be confirmed by the research team (retention end, controllers, closing date,
-  model name) are constants in `apps/participant/src/lib/studyConfig.ts`.
+  `apps/participant/src/content/notices/`; the study facts they use
+  (retention end, controllers, closing date, model name) are constants in
+  `apps/participant/src/lib/studyConfig.ts`.
 - See `METHODS.md` for the full methodological framing.

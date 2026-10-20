@@ -18,7 +18,7 @@
  */
 
 import type { DailyStatsResponse } from '../lib/types';
-import { PARTIES, PARTY_COLORS, PARTY_DISPLAY_NAMES } from '../lib/types';
+import { KNOWN_PARTIES, PARTY_COLORS, PARTY_DISPLAY_NAMES } from '../lib/types';
 
 interface DailyChartProps {
   data: DailyStatsResponse;
@@ -69,7 +69,7 @@ export default function DailyChart({ data }: DailyChartProps) {
   const todayIso = isoDate(today);
   const yesterdayIso = isoDate(yesterday);
 
-  const activeParties = PARTIES.filter((p) =>
+  const activeParties = KNOWN_PARTIES.filter((p) =>
     days.some((d) => (d.by_party?.[p] ?? 0) > 0),
   );
 
@@ -148,7 +148,7 @@ export default function DailyChart({ data }: DailyChartProps) {
                     className="relative h-full rounded overflow-hidden flex"
                     style={{ width: `${Math.max(2, widthPct)}%` }}
                   >
-                    {PARTIES.map((party) => {
+                    {KNOWN_PARTIES.map((party) => {
                       const count = day.by_party?.[party] ?? 0;
                       if (count <= 0) return null;
                       const segPct = (count / day.total) * 100;

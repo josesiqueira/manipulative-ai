@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: participant
+  namespace: manipulative-ai-2
+spec:
+  selector:
+    app: participant
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
