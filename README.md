@@ -37,7 +37,7 @@ Each conference / workshop where this work is presented is tagged.
 | Release | Date | What it represents |
 |---|---|---|
 | [**HEPP2026**](https://github.com/josesiqueira/manipulative-ai/releases/tag/HEPP2026) (latest) | May 2026 | manipulative-ai2 era. 9 Finnish parties + 1 populism-augmented variant, full-corpus grounding, OpenAI GPT-5.4, bilingual FI/EN, deployed on CSC Rahti. HEPP demo compared `perussuomalaiset` vs `perussuomalaiset_populist`. |
-| [**VAKKI2026**](https://github.com/josesiqueira/manipulative-ai/releases/tag/conference) | April 2026 | manipulative-ai1 era. 4 abstract political blocks, curated 261-statement dataset, few-shot prompting, Claude API. Original codebase before the rewrite. |
+| [**VAKKI2026**](https://github.com/josesiqueira/manipulative-ai/releases/tag/VAKKI2026) | April 2026 | manipulative-ai1 era. 4 abstract political blocs, OpenAI GPT-4o at temperature 0.1. Few-shot prompting from a curated 261-statement dataset was built but never reached the model (the dataset table in the deployed database was empty), so the bots ran on the bloc system prompts alone; the prompts are at the root of the tag. Original codebase before the rewrite. |
 
 To reproduce a specific release: `git checkout <tag>` (e.g. `git checkout HEPP2026`).
 
