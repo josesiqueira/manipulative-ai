@@ -232,14 +232,16 @@ async def send_message(
             detail="Conversation has been completed",
         )
 
-    # Save user message
+    # The user message is built now (its time is the send time) but added to
+    # the session only after the reply: nothing is written during the model
+    # call, so the SQLite write lock is free for other participants.
     user_message = Message(
         conversation_id=conversation.id,
         role="user",
         content=data.content,
         input_mode=data.input_mode if data.input_mode in ("typed", "spoken") else "typed",
+        created_at=datetime.now(HELSINKI),
     )
-    db.add(user_message)
 
     # Generate AI response
     try:
@@ -255,7 +257,7 @@ async def send_message(
             detail="Vastauksen generointi epäonnistui. Yritä uudelleen.",
         )
 
-    # Save assistant message
+    db.add(user_message)
     assistant_message = Message(
         conversation_id=conversation.id,
         role="assistant",

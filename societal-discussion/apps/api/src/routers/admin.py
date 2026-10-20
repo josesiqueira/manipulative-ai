@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from fastapi.responses import StreamingResponse, JSONResponse, Response
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select, func, cast, or_, Date as SADate
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -32,7 +32,7 @@ from ..models import (
 )
 from ..services.encryption import encrypt_api_key, decrypt_api_key, generate_key_preview
 from ..services.llm_models import AVAILABLE_MODELS, get_models_for_provider
-from ..services.party_grounding import ALL_PARTIES, PARTY_DISPLAY_NAMES
+from ..services.party_grounding import ALL_PARTIES, PARTY_DISPLAY_NAMES, base_party, framing
 from ..services.session_code import format_session_code, session_id_prefix_from_code
 
 router = APIRouter()
@@ -825,10 +825,12 @@ async def export_data(
         filters.append(Conversation.is_test_mode == False)
     if assigned_party:
         filters.append(Conversation.assigned_party == assigned_party)
+    # func.date() as in get_daily_stats: CAST(col AS DATE) gives SQLite a
+    # number (the year), so a date comparison never matched.
     if date_from:
-        filters.append(cast(Conversation.started_at, SADate) >= date_from)
+        filters.append(func.date(Conversation.started_at) >= date_from.isoformat())
     if date_to:
-        filters.append(cast(Conversation.started_at, SADate) <= date_to)
+        filters.append(func.date(Conversation.started_at) <= date_to.isoformat())
 
     query = (
         select(Conversation)
@@ -851,6 +853,9 @@ async def export_data(
                 message_rows.append({
                     "session_id": conv.session_id,
                     "conversation_id": conv.id,
+                    "assigned_party": conv.assigned_party,
+                    "base_party": base_party(conv.assigned_party),
+                    "framing": framing(conv.assigned_party) or "",
                     "message_id": m.id,
                     "role": m.role,
                     "content": m.content,
@@ -874,8 +879,8 @@ async def export_data(
         # messages-csv
         output = io.StringIO()
         fieldnames = [
-            "session_id", "conversation_id", "message_id",
-            "role", "content", "token_count", "input_mode", "model_name",
+            "session_id", "conversation_id", "assigned_party", "base_party",
+            "framing", "message_id", "role", "content", "token_count", "input_mode", "model_name",
             "language", "created_at",
         ]
         writer = csv.DictWriter(output, fieldnames=fieldnames)
@@ -910,6 +915,9 @@ async def export_data(
             "conversation_id": conv.id,
             "session_id": conv.session_id,
             "assigned_party": conv.assigned_party,
+            "base_party": base_party(conv.assigned_party),
+            "framing": framing(conv.assigned_party) or "",
+            "models_used": ";".join(sorted({m.model_name for m in assistant_messages if m.model_name})),
             "language": conv.language,
             "starter_topic": conv.starter_topic or "",
             "is_complete": conv.is_complete,
@@ -958,8 +966,8 @@ async def export_data(
     else:
         # Default CSV — ensure stable header even when there are no rows
         fieldnames = [
-            "conversation_id", "session_id", "assigned_party", "language",
-            "starter_topic", "is_complete", "message_count",
+            "conversation_id", "session_id", "assigned_party", "base_party",
+            "framing", "models_used", "language", "starter_topic", "is_complete", "message_count",
             "user_message_count", "assistant_message_count",
             "is_test_mode", "is_flagged", "flag_notes",
             "started_at", "ended_at", "session_code", "consent_version",
@@ -1014,6 +1022,21 @@ async def export_surveys(
     )
     surveys = result.scalars().all()
 
+    # The conditions the participant met before the survey, in order, so the
+    # survey rows can be analysed by framing without a join.
+    conv_result = await db.execute(
+        select(Conversation.session_id, Conversation.assigned_party)
+        .where(Conversation.session_id.in_([s.session_id for s in surveys]))
+        .order_by(Conversation.started_at.asc())
+    )
+    conditions_by_session: dict[str, list[str]] = {}
+    for session_id, party in conv_result.all():
+        conditions_by_session.setdefault(session_id, []).append(party)
+
+    def conditions_of(session_id: str) -> tuple[str, str]:
+        parties = conditions_by_session.get(session_id, [])
+        return ";".join(parties), ";".join(framing(p) or "" for p in parties)
+
     def flatten(value) -> str:
         """Coerce a JSON value into a CSV-safe string."""
         if value is None:
@@ -1026,9 +1049,12 @@ async def export_surveys(
     rows = []
     for s in surveys:
         responses = s.responses if isinstance(s.responses, dict) else {}
+        conditions, framings = conditions_of(s.session_id)
         row = {
             "session_id": s.session_id,
             "submitted_at": s.submitted_at.isoformat() if s.submitted_at else "",
+            "conditions": conditions,
+            "framings": framings,
         }
         for key in SURVEY_RESPONSE_KEYS:
             row[key] = flatten(responses.get(key))
@@ -1041,9 +1067,12 @@ async def export_surveys(
         json_rows = []
         for s in surveys:
             responses = s.responses if isinstance(s.responses, dict) else {}
+            conditions, framings = conditions_of(s.session_id)
             record = {
                 "session_id": s.session_id,
                 "submitted_at": s.submitted_at.isoformat() if s.submitted_at else None,
+                "conditions": conditions,
+                "framings": framings,
             }
             for key in SURVEY_RESPONSE_KEYS:
                 record[key] = responses.get(key, "")
@@ -1057,7 +1086,7 @@ async def export_surveys(
         )
 
     # CSV
-    fieldnames = ["session_id", "submitted_at"] + SURVEY_RESPONSE_KEYS
+    fieldnames = ["session_id", "submitted_at", "conditions", "framings"] + SURVEY_RESPONSE_KEYS
     output = io.StringIO()
     writer = csv.DictWriter(output, fieldnames=fieldnames)
     writer.writeheader()
