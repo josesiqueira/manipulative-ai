@@ -73,9 +73,8 @@ To reproduce a specific release: `git checkout <tag>`.
 - **Participant app**: Astro 7 with the Node adapter, TypeScript, Tailwind
   CSS 4, TalkingHead for the avatar; Playwright browser tests.
 - **Admin app**: Next.js 14 (App Router), TypeScript, Tailwind CSS.
-- **Language model**: OpenAI GPT-5.4 in the code at this commit; the Metso
-  run uses a model hosted on Tampere University hardware once it
-  is chosen, with OpenAI as the fallback.
+- **Language model**: OpenAI GPT-6 Astra for the Metso run (GPT-5.4 for
+  HEPP2026).
 - **Deployment**: CSC Rahti (OpenShift); container images for the API, the
   participant app and the admin app; manifests in
   [`societal-discussion/k8s/`](societal-discussion/k8s/).

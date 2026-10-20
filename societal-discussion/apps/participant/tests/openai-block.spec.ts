@@ -19,5 +19,6 @@ test('openai block: three boxes, OpenAI bullet, OpenAI notice texts', async ({ p
   await page.goto('/fi/info/research-notification');
   const fi = await page.getByTestId('notice').innerText();
   expect(fi).toContain('OpenAI:n palvelimille Yhdysvaltoihin');
-  expect(fi).toContain('[MALLIN NIMI]');
+  expect(fi).toContain('GPT-6 Astra');
+  expect(fi).not.toContain('[MALLIN NIMI]');
 });

@@ -17,6 +17,5 @@ export const STUDY = {
   responsibleResearcherEmail: 'rebekah.rousi@uwasa.fi',
   dpoEmail: 'tietosuojavastaava@uwasa.fi',
   pohtivaUrl: 'https://www.fsd.tuni.fi/pohtiva/',
-  // Filled when the model is chosen; until then the notices show the bracket.
-  modelName: { fi: '[MALLIN NIMI]', en: '[MODEL NAME]' },
+  modelName: { fi: 'GPT-6 Astra', en: 'GPT-6 Astra' },
 } as const;

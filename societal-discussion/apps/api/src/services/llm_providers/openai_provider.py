@@ -7,12 +7,12 @@ from openai import OpenAI
 from .base import LLMProvider
 
 
-# GPT-5.5 reasoning-family models reject any temperature other than the
-# default (1.0) with HTTP 400. Older GPT-5.x (5.4 family) and the GPT-4.x
+# GPT-5.5 reasoning-family and GPT-6 models reject any temperature other
+# than the default (1.0) with HTTP 400. Older GPT-5.x (5.4 family) and the GPT-4.x
 # family accept arbitrary temperatures. We block-list the known-restrictive
 # prefixes so everything else (including GPT-5.4, GPT-4.x, o-series) keeps
 # receiving the configured temperature.
-_TEMPERATURE_INCOMPATIBLE_PREFIXES = ("gpt-5.5",)
+_TEMPERATURE_INCOMPATIBLE_PREFIXES = ("gpt-5.5", "gpt-6")
 
 
 def _supports_custom_temperature(model: str) -> bool:

@@ -174,18 +174,16 @@ survey entry page and from there to the survey.
 
 ## 8. Language model
 
-- **Model in the code at this commit**: OpenAI `gpt-5.4` through
-  `apps/api/src/services/llm_providers/openai_provider.py`, selected in the
-  admin panel (`apps/api/src/services/llm_models.py` lists the choices).
-  Temperature 0.1 for the models that accept one; model families that
-  reject a custom temperature get none (`_supports_custom_temperature`).
-- **Model for the Metso run**: a model served on Tampere University
-  hardware (the TSCS AI Cluster or GPT Lab GPU farm 004), chosen by the
-  research team before the run. A new provider class in
-  `services/llm_providers/` is added when the endpoint is known; OpenAI
-  stays selectable as the fallback. Until the model is chosen, the consent
-  texts carry a placeholder for the model name (`[MALLIN NIMI]` in
-  `apps/participant/src/lib/studyConfig.ts`).
+- **Model for the Metso run**: OpenAI `gpt-6-astra`, the default in
+  `apps/api/src/services/llm_models.py`, through
+  `apps/api/src/services/llm_providers/openai_provider.py`; the admin panel
+  can select another model. The participant app is built with the OpenAI
+  provider texts (`PUBLIC_PROVIDER_BLOCK=openai`) and names the model in the
+  notices (`apps/participant/src/lib/studyConfig.ts`).
+- **Temperature**: 0.1 for the models that accept one; GPT-5.5 and GPT-6
+  models accept only the default (1.0) and get none
+  (`_supports_custom_temperature`). GPT-6 Astra therefore runs at its default
+  temperature.
 - **The model is on the record**: every assistant message stores the model
   identifier the request was made with (the model selected in the admin
   panel, or the provider's default: `messages.model_name`, written in
@@ -193,10 +191,10 @@ survey entry page and from there to the survey.
   `generate_response` in `services/llm_client.py` returns), so the analysis
   knows which model produced each reply even if the model changes during
   the day.
-- **Context**: the largest corpus (Vihreät, roughly 220 K tokens by
-  estimate) plus the instruction, the history and the output budget must
-  fit the model's context window; a self-hosted model must accept the same
-  prompt length, or the corpus must be shortened.
+- **Context**: the largest corpus (Vihreät) plus the instruction, the
+  history and the output budget must fit the model's context window. With
+  GPT-6 Astra the first Vihreät request measured 207,766 prompt tokens and
+  answered in 16.6 s (20 October 2026).
 
 HEPP2026 data was collected with GPT-5.4 at temperature 0.1.
 

@@ -117,11 +117,14 @@ test.describe('chat page', () => {
     await page.getByTestId('message').fill('Mitä mieltä olette maahanmuutosta?');
     await page.getByTestId('send').click();
     await expect(page.locator('.bubble-assistant')).toContainText('numero 12', { timeout: 20_000 });
-    const box = async (selector: string) => (await page.locator(selector).boundingBox())!;
-    const stage = await box('[data-testid=stage]');
-    const transcript = await box('[data-testid=transcript]');
-    const question = await box('.bubble-user');
-    const reply = await box('.bubble-assistant');
+    // All four boxes in one read, so a scroll between reads cannot mix two layouts.
+    const { stage, transcript, question, reply } = await page.evaluate(() => {
+      const r = (s: string) => {
+        const b = document.querySelector(s)!.getBoundingClientRect();
+        return { y: b.y, height: b.height };
+      };
+      return { stage: r('[data-testid=stage]'), transcript: r('[data-testid=transcript]'), question: r('.bubble-user'), reply: r('.bubble-assistant') };
+    });
     // The avatar card ends above the transcript, with a gap.
     expect(stage.y + stage.height).toBeLessThanOrEqual(transcript.y);
     // The question stays fully inside the visible transcript when the reply arrives.

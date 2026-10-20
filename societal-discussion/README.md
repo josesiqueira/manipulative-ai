@@ -39,10 +39,9 @@ them for the Metso demo.
   MIT) for the avatar; Playwright tests. Details in
   [`apps/participant/README.md`](apps/participant/README.md).
 - **Admin app**: Next.js 14 (App Router), TypeScript, Tailwind CSS, vitest.
-- **Language model**: OpenAI GPT-5.4 in the code at this commit, selected in
-  the admin panel; a model on Tampere University hardware replaces it once
-  it is chosen (OpenAI stays as the fallback). The model
-  that answered is stored on every assistant message.
+- **Language model**: OpenAI GPT-6 Astra by default (GPT-5.4 for
+  HEPP2026); the admin panel can select another model. The model that
+  answered is stored on every assistant message.
 - **Deployment**: CSC Rahti (OpenShift); one image per app; manifests in
   `k8s/`.
 
