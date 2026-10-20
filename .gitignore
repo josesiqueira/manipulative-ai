@@ -32,9 +32,7 @@ backups/
 reports/
 research_notes/
 
-# Project management and working documents, kept locally only (Jose,
-# 2026-10-20: the public repository shows only what is needed to run,
-# reproduce and replicate the experiment)
+# Local working files, not part of the published experiment
 board/
 tools/board/
 hooks/
