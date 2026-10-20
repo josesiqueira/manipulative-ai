@@ -2,10 +2,11 @@
 
 A research chatbot experiment from Tampere University. Participants chat
 with a language model about politics; the bot is aligned, without saying
-so, with one of nine Finnish political parties in a standard or a populist
-variant (18 conditions), grounded in the party's own programme documents
-from Pohtiva. The research question: can participants detect that the bot
-is aligned with a specific party, and do they notice a populist framing?
+so, with one of nine Finnish political parties in a populist or an
+anti-populist variant (18 conditions), grounded in the party's own programme
+documents from Pohtiva. The research question: can participants detect that
+the bot is aligned with a specific party, and do they notice the populist or
+anti-populist framing?
 
 Bilingual Finnish/English. See [`METHODS.md`](METHODS.md) for the
 methodology and the [repository README](../README.md) for the overview and

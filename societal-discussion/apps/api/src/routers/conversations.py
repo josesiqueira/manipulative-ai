@@ -109,8 +109,8 @@ async def create_conversation(
 
     # Assign party. FORCED_PARTY can be:
     #   - empty                               → normal no-repeat weighted random
-    #   - "perussuomalaiset"                  → every conversation goes there
-    #   - "perussuomalaiset,perussuomalaiset_populist"
+    #   - "perussuomalaiset_populist"         → every conversation goes there
+    #   - "perussuomalaiset_populist,perussuomalaiset_antipopulist"
     #                                         → random pick between the listed
     #                                           parties (uniform; ignores
     #                                           per-session no-repeat)

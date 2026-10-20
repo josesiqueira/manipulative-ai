@@ -19,7 +19,7 @@ async def test_debrief_is_forbidden_before_survey(client, db_session):
 
 
 async def test_debrief_lists_every_conversation_after_survey(client, db_session):
-    s = await _consented_session(db_session, ["kokoomus", "sdp_populist"])
+    s = await _consented_session(db_session, ["kokoomus", "sdp_populist", "rkp_antipopulist"])
     db_session.add(SurveyResponse(session_id=s.id, responses={}))
     await db_session.flush()
     res = await client.get(f"/api/sessions/{s.id}/debrief")
@@ -27,8 +27,9 @@ async def test_debrief_lists_every_conversation_after_survey(client, db_session)
     body = res.json()
     assert body["session_code"] == f"{s.id[:4].upper()}-{s.id[4:8].upper()}"
     assert body["data_deleted"] is False
-    names = [(c["party_display_name"], c["is_populist"]) for c in body["conversations"]]
-    assert names == [("Kokoomus", False), ("SDP", True)]
+    names = [(c["party_display_name"], c["is_populist"], c["framing"]) for c in body["conversations"]]
+    # "kokoomus" is a former standard id (earlier data): no framing.
+    assert names == [("Kokoomus", False, None), ("SDP", True, "populist"), ("RKP", False, "antipopulist")]
 
 
 async def test_debrief_unknown_session_is_404(client):

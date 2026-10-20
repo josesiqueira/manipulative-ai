@@ -19,18 +19,24 @@ model that answered). The survey questions are unchanged.
 
 The project tests **whether participants can detect that a chatbot's
 responses are aligned with a specific Finnish political party**, and whether
-a populist framing on top of the party line is noticed. The bias is hidden:
+a populist or an anti-populist framing on top of the party line is noticed. The bias is hidden:
 the participant is told they are talking to a chatbot about politics and
 the coming elections, but the bot's political alignment is the experimental
 manipulation.
 
-There are **18 conditions**: each of the 9 parties in a standard variant
-(`<party>`) and a populist variant (`<party>_populist`). The populist variant
-reads the identical party corpus and adds one fixed markers section to the
-behavioural instruction (section 3), so the populist treatment is the same
-for every party. The list is generated from one base list of nine parties
-in `apps/api/src/services/party_grounding.py` (`BASE_PARTIES`, `ALL_PARTIES`,
-`is_populist()`, `base_party()`).
+There are **18 conditions**: each of the 9 parties in a populist variant
+(`<party>_populist`) and an anti-populist variant (`<party>_antipopulist`).
+Both variants read the identical party corpus and add one fixed markers
+section to the behavioural instruction (section 3), so each treatment is the
+same for every party and the two differ only in that section. The list is
+generated from one base list of nine parties in
+`apps/api/src/services/party_grounding.py` (`BASE_PARTIES`, `ALL_PARTIES`,
+`is_populist()`, `is_antipopulist()`, `framing()`, `base_party()`).
+
+Until October 2026 (HEPP2026 data) the second variant was a standard one
+without any framing section, under the bare id `<party>`. Those ids still
+resolve (display name, corpus, the plain instruction, `framing()` returns
+none) so earlier data can be read, but they are no longer assigned.
 
 A participant's session can contain several conversations, each assigned
 to a different condition (no repeat within the session until all 18 have
@@ -68,20 +74,35 @@ Each model request is built from three layers, concatenated in order
 [1. Behavioural instruction in Finnish]   from the prompt_configs table
                                           (admin override per condition),
                                           else DEFAULT_SYSTEM_INSTRUCTION,
-                                          with POPULISM_MARKERS_SECTION
-                                          inserted for a populist condition
+                                          with POPULISM_MARKERS_SECTION or
+                                          ANTIPOPULISM_MARKERS_SECTION
+                                          inserted for the condition
 [2. Full party programme (Finnish)]       from apps/api/src/party_data/
 [3. Language directive]                   appended last:
                                           FI "Vastaa aina suomeksi ..."
                                           EN "... respond ALWAYS in English"
 ```
 
-The populist markers section (`POPULISM_MARKERS_SECTION`) is inserted
-before the heading "Poliittiset ohjelmasi ja näkemyksesi" of the default
-instruction by `_default_instruction_for()`, for every id that
-`is_populist()` accepts. It asks the model to internalise three populism
-features: us versus them, people-centrism and anti-elitism (Cranmer 2011),
-without naming the theory. The admin panel can store a different
+The markers section is inserted before the heading "Poliittiset ohjelmasi
+ja näkemyksesi" of the default instruction by `_default_instruction_for()`:
+`POPULISM_MARKERS_SECTION` for every id that `is_populist()` accepts,
+`ANTIPOPULISM_MARKERS_SECTION` for every id that `is_antipopulist()` accepts.
+Both ask the model to internalise three features without naming the theory,
+in the same structure (three dimensions, the middle one with the triad of
+advocacy, accountability and legitimacy):
+
+| Populist (Cranmer 2011) | Anti-populist |
+|---|---|
+| Us versus them | Pluralism: opponents and their voters are legitimate participants, not enemies |
+| People-centrism: the will, the interest and the authority of "the people" | Pluralist democracy: fundamental and group rights, accountability to citizens and kept commitments, legitimacy from the constitution and democratic procedures instead of a single "will of the people" (Mudde 2004, pp. 543-544) |
+| Anti-elitism: common sense; against international institutions, high culture and mainstream media | Defending institutions: research evidence and expertise, decisions still made democratically; independent courts, the central bank, free media, the EU and international cooperation, changed only through agreed procedures; criticism of power without labelling people |
+
+The anti-populist condition is a pluralist, liberal-democratic counter-framing
+written for this study from the pluralist pole of the populism literature
+(Mudde 2004) and the institutional-defence and civility features of
+anti-populist discourse; it is not a published validated scale. Its wording
+lets every party keep its programme positions, including proposals to reform
+or leave institutions, while changing how it argues for them. The admin panel can store a different
 instruction per condition (all 18) in the `prompt_configs` table; a stored
 instruction replaces the default including the markers section.
 
@@ -262,7 +283,7 @@ After the survey the thank-you page (`apps/participant/src/pages/[lang]/thank-yo
 calls `GET /api/sessions/{id}/debrief`, the one participant endpoint that
 discloses the condition, and only once a survey row exists for the session
 (403 before that). It shows, per conversation, the party's display name and
-whether the populist framing was on; what the replies were (a model's text
+which framing was used (populist or anti-populist); what the replies were (a model's text
 from public programmes, not the party's statements); why the study did not
 say so beforehand; the session code; "Delete my data"; the provider note;
 and the contacts and notice links.
@@ -342,10 +363,12 @@ removed from the notice unless message encryption is implemented.
   conversation (typically 5 to 10 turns) sits before the drift cliff.
 - **Grounding over retrieval**: the corpus is static and bounded, the
   textbook case for putting the whole text in the prompt.
-- **One identical populist treatment** across nine parties lets the
-  populist effect be separated from the party effect.
+- **One identical treatment per framing** across nine parties lets the
+  framing effect be separated from the party effect. Because the
+  anti-populist register is close to how some parties already talk and far
+  from others, the analysis should include a party by framing interaction.
 - **Manipulation simplicity**: the intervention is "system prompt + party
-  corpus + optional populist markers + language directive + turn-1 anchor";
+  corpus + populist or anti-populist markers + language directive + turn-1 anchor";
   the avatar and the voice are constant across conditions and therefore not
   part of the manipulation.
 

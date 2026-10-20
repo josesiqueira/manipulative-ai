@@ -122,6 +122,8 @@ export interface DebriefConversation {
   id: string;
   party_display_name: string;
   is_populist: boolean;
+  // 'populist', 'antipopulist', or null for the former standard condition
+  framing?: 'populist' | 'antipopulist' | null;
   started_at: string;
 }
 

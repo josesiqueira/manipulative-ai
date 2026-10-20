@@ -17,7 +17,7 @@ from sqlalchemy.orm import selectinload
 
 from ..database import get_db
 from ..models import Message, Session, SurveyResponse
-from ..services.party_grounding import PARTY_DISPLAY_NAMES, base_party, is_populist
+from ..services.party_grounding import PARTY_DISPLAY_NAMES, base_party, framing, is_populist
 from ..services.session_code import format_session_code
 
 HELSINKI = ZoneInfo("Europe/Helsinki")
@@ -97,6 +97,8 @@ class DebriefConversation(BaseModel):
     id: str
     party_display_name: str
     is_populist: bool
+    # 'populist', 'antipopulist', or None for the former standard condition
+    framing: str | None = None
     started_at: datetime
 
 
@@ -137,6 +139,7 @@ async def get_debrief(
                 id=c.id,
                 party_display_name=PARTY_DISPLAY_NAMES[base_party(c.assigned_party)],
                 is_populist=is_populist(c.assigned_party),
+                framing=framing(c.assigned_party),
                 started_at=c.started_at,
             )
             for c in conversations

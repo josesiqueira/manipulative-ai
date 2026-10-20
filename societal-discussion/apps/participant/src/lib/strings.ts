@@ -90,7 +90,8 @@ export interface Strings {
     setupIntro: string;
     conversationLabel: string; // contains {{N}}
     populistOn: string;
-    populistOff: string;
+    antipopulistOn: string;
+    populistOff: string; // the former standard condition (earlier data)
     repliesTitle: string;
     repliesBody: string; // contains {{POHTIVA}}
     whyTitle: string;
@@ -228,6 +229,8 @@ export const STRINGS: Record<Language, Strings> = {
       conversationLabel: 'Keskustelu {{N}}',
       populistOn:
         'Lisäksi chatbottia ohjeistettiin käyttämään populistista puhetapaa, esimerkiksi asettamaan vastakkain "tavallinen kansa" ja "eliitti".',
+      antipopulistOn:
+        'Lisäksi chatbottia ohjeistettiin käyttämään antipopulistista puhetapaa, esimerkiksi korostamaan moniarvoisuutta ja puolustamaan demokraattisia instituutioita.',
       populistOff: 'Chatbottia ei ohjeistettu käyttämään erityistä puhetapaa puolueen ohjelman lisäksi.',
       repliesTitle: 'Mitä vastaukset olivat',
       repliesBody:
@@ -367,6 +370,8 @@ export const STRINGS: Record<Language, Strings> = {
       conversationLabel: 'Conversation {{N}}',
       populistOn:
         'In addition, it was instructed to use a populist style, for example setting "ordinary people" against "the elite".',
+      antipopulistOn:
+        'In addition, it was instructed to use an anti-populist style, for example stressing pluralism and defending democratic institutions.',
       populistOff: 'It was not instructed to use any particular style beyond the party programme.',
       repliesTitle: 'What the replies were',
       repliesBody:

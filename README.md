@@ -3,11 +3,11 @@
 A research chatbot experiment from **Tampere University**.
 
 Participants chat with a language model about politics; the bot is aligned,
-without saying so, with one of nine Finnish political parties, in a standard
-or a populist variant, grounded in the party's own programme documents from
+without saying so, with one of nine Finnish political parties, in a populist
+or an anti-populist variant, grounded in the party's own programme documents from
 [Pohtiva](https://www.fsd.tuni.fi/pohtiva/). The research question: **can
 participants detect that the bot's responses are aligned with a specific
-party, and do they notice a populist framing?**
+party, and do they notice the populist or anti-populist framing?**
 
 Bilingual Finnish/English. The methodology is documented in
 [`societal-discussion/METHODS.md`](societal-discussion/METHODS.md).
@@ -33,7 +33,7 @@ available", that is expected.
    reads a short research summary on a consent page. Nothing is stored until
    every box is ticked and Start is pressed.
 2. The backend assigns one of **18 conditions** to the conversation: nine
-   parties, each standard or populism-augmented. The assignment never
+   parties, each in a populist or an anti-populist variant. The assignment never
    reaches the browser.
 3. The bot reads the entire party programme for that party (full-corpus
    grounding, no retrieval, no few-shot) and replies in character. The

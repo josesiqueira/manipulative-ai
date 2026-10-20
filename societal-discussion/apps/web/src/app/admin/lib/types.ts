@@ -98,7 +98,9 @@ export interface FlagConversationRequest {
 }
 
 // Domain constants. Keep in sync with apps/api/src/services/party_grounding.py:
-// 9 base parties plus a "<party>_populist" twin for each (18 conditions).
+// each of the 9 base parties has a "<party>_populist" and a "<party>_antipopulist"
+// variant (18 conditions). The bare "<party>" ids were the standard condition
+// until October 2026: still named and coloured for earlier data, never assigned.
 export const BASE_PARTIES = [
   'sdp',
   'vasemmistoliitto',
@@ -112,18 +114,27 @@ export const BASE_PARTIES = [
 ] as const;
 
 export const POPULIST_SUFFIX = '_populist';
+export const ANTIPOPULIST_SUFFIX = '_antipopulist';
 
 export const PARTIES: readonly string[] = [
-  ...BASE_PARTIES,
   ...BASE_PARTIES.map((p) => `${p}${POPULIST_SUFFIX}`),
+  ...BASE_PARTIES.map((p) => `${p}${ANTIPOPULIST_SUFFIX}`),
 ];
 
+const KNOWN_PARTIES: readonly string[] = [...PARTIES, ...BASE_PARTIES];
+
+export function isAntipopulist(party: string): boolean {
+  return party.endsWith(ANTIPOPULIST_SUFFIX);
+}
+
 export function isPopulist(party: string): boolean {
-  return party.endsWith(POPULIST_SUFFIX);
+  return party.endsWith(POPULIST_SUFFIX) && !isAntipopulist(party);
 }
 
 export function baseParty(party: string): string {
-  return isPopulist(party) ? party.slice(0, -POPULIST_SUFFIX.length) : party;
+  if (isAntipopulist(party)) return party.slice(0, -ANTIPOPULIST_SUFFIX.length);
+  if (isPopulist(party)) return party.slice(0, -POPULIST_SUFFIX.length);
+  return party;
 }
 
 const BASE_DISPLAY_NAMES: Record<string, string> = {
@@ -139,16 +150,21 @@ const BASE_DISPLAY_NAMES: Record<string, string> = {
 };
 
 export const PARTY_DISPLAY_NAMES: Record<string, string> = Object.fromEntries(
-  PARTIES.map((p) => [
+  KNOWN_PARTIES.map((p) => [
     p,
-    isPopulist(p) ? `${BASE_DISPLAY_NAMES[baseParty(p)]} Populist` : BASE_DISPLAY_NAMES[p],
+    isPopulist(p)
+      ? `${BASE_DISPLAY_NAMES[baseParty(p)]} Populist`
+      : isAntipopulist(p)
+        ? `${BASE_DISPLAY_NAMES[baseParty(p)]} Anti-populist`
+        : BASE_DISPLAY_NAMES[p],
   ]),
 );
 
 // Base colors loosely match each party's brand identity while staying
-// visually distinct in charts and badges. The populist twin uses a darker
-// shade of the same hue so the pair reads as related but separate. All 18
-// values are unique.
+// visually distinct in charts and badges. The anti-populist variant (and the
+// former standard id) uses the base colour, the populist variant a darker
+// shade of the same hue, so the pair reads as related but separate. The 18
+// assignable conditions have unique values.
 const BASE_COLORS: Record<string, string> = {
   sdp: '#DC2626',                   // red
   vasemmistoliitto: '#9333EA',      // purple (brand red would clash with SDP)
@@ -174,5 +190,5 @@ const POPULIST_COLORS: Record<string, string> = {
 };
 
 export const PARTY_COLORS: Record<string, string> = Object.fromEntries(
-  PARTIES.map((p) => [p, isPopulist(p) ? POPULIST_COLORS[baseParty(p)] : BASE_COLORS[p]]),
+  KNOWN_PARTIES.map((p) => [p, isPopulist(p) ? POPULIST_COLORS[baseParty(p)] : BASE_COLORS[baseParty(p)]]),
 );

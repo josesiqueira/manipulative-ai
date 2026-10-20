@@ -9,7 +9,7 @@ via the admin panel. The party program text is always appended at the end.
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .party_grounding import load_party_program, is_populist
+from .party_grounding import is_antipopulist, is_populist, load_party_program
 from ..models import PromptConfig
 
 LANGUAGE_INSTRUCTIONS = {
@@ -40,6 +40,25 @@ Puolusta "kansan" tahtoa (edunvalvonta), ole vastuussa "kansalle" (vastuullisuus
 - Ei välttämättä tiedevastaista, mutta keskittyy "terveeseen järkeen".
 - Vastusta YK:ta ja muita kansainvälisiä instituutioita, korkeakulttuuria ja valtamediaa.
 - Media, instituutiot ja eliitit ovat mädäntyneitä — ilmaise tämä luottamuspula.
+
+"""
+
+
+ANTIPOPULISM_MARKERS_SECTION = """\
+## Antipopulistinen kehys (TÄRKEÄ: sisäistä myös nämä piirteet)
+
+Sisäistä omaan ajatteluusi ja ilmaisuusi seuraavat antipopulismin teoreettiset piirteet: kerro näkemyksesi näiden kehysten kautta, mutta luonnollisesti, ilman että viittaat teorioihin nimeltä.
+
+**Moniarvoisuus**
+- Ihmisillä on erilaisia etuja ja näkemyksiä; vastustajat ja heidän äänestäjänsä ovat oikeutettuja osallistujia, eivät vihollisia.
+
+**Moniarvoinen kansanvalta**
+Puolusta perusoikeuksia ja eri ryhmien oikeuksia (edunvalvonta), vastaa ratkaisuistasi kansalaisille ja pidä tehdyt sitoumukset (vastuullisuus), ja oikeuta vaatimuksesi perustuslailla ja demokraattisilla menettelyillä, älä yhdellä "kansan tahdolla" (legitimiteetti) (Mudde, 2004, s. 543-544).
+
+**Instituutioita puolustava**
+- Nojaa tutkittuun tietoon ja asiantuntemukseen; päätökset tehdään silti demokraattisesti.
+- Puolusta riippumattomia tuomioistuimia, keskuspankkia, vapaata mediaa sekä EU:ta ja muuta kansainvälistä yhteistyötä; niitä muutetaan vain sovituin menettelyin.
+- Arvostele vallankäyttöä asiallisesti, leimaamatta päättäjiä tai kansalaisia.
 
 """
 
@@ -90,17 +109,22 @@ keskustellaan mieluummin itse aiheesta")
 def _default_instruction_for(party: str) -> str:
     """Resolve the in-code default instruction for a party.
 
-    Populist twins (`<party>_populist`) get the academic populism-markers
-    section inserted just before the 'Poliittiset ohjelmasi ja näkemyksesi'
-    heading. Base parties get the plain DEFAULT_SYSTEM_INSTRUCTION, so the
-    markers never leak into the standard conditions.
+    Populist variants (`<party>_populist`) get the populism-markers section
+    and anti-populist variants (`<party>_antipopulist`) the anti-populism
+    markers, each inserted just before the 'Poliittiset ohjelmasi ja
+    näkemyksesi' heading. A former standard id (`<party>`) gets the plain
+    DEFAULT_SYSTEM_INSTRUCTION.
     """
-    if not is_populist(party):
+    if is_antipopulist(party):
+        section = ANTIPOPULISM_MARKERS_SECTION
+    elif is_populist(party):
+        section = POPULISM_MARKERS_SECTION
+    else:
         return DEFAULT_SYSTEM_INSTRUCTION
     anchor = "## Poliittiset ohjelmasi ja näkemyksesi"
     if anchor in DEFAULT_SYSTEM_INSTRUCTION:
-        return DEFAULT_SYSTEM_INSTRUCTION.replace(anchor, POPULISM_MARKERS_SECTION + anchor, 1)
-    return DEFAULT_SYSTEM_INSTRUCTION + "\n\n" + POPULISM_MARKERS_SECTION
+        return DEFAULT_SYSTEM_INSTRUCTION.replace(anchor, section + anchor, 1)
+    return DEFAULT_SYSTEM_INSTRUCTION + "\n\n" + section
 
 
 async def get_system_instruction(db: AsyncSession, party: str) -> str:
