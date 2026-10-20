@@ -23,7 +23,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv venv /app/.venv && \
     uv sync --frozen --no-dev --no-install-project
 
-# Local speech models (spec V8, V9 emergency tier): faster-whisper small and
+# Local speech models (emergency tier): faster-whisper small and
 # the two Piper voices, fetched at build time so the container never
 # downloads at run time. World-readable: OpenShift runs an arbitrary UID.
 ENV SPEECH_MODELS_DIR=/app/models \

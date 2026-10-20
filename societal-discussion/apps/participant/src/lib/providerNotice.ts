@@ -1,9 +1,8 @@
 import type { Language } from './strings';
 
-// Everything that depends on WHICH model runs WHERE lives here (spec V6,
-// package C12). Two blocks exist: 'finnish' (package 4f: a model on Tampere
-// University's own servers) and 'openai' (package 4a section 13, 4b section 3,
-// 4c fence). PUBLIC_PROVIDER_BLOCK picks one at build time (spec V11a).
+// Everything that depends on WHICH model runs WHERE lives here.
+// Two blocks exist: 'finnish' (a model on Tampere University's own servers)
+// and 'openai'. PUBLIC_PROVIDER_BLOCK picks one at build time.
 
 export interface ProviderNotice {
   // Consent screen bullet 5.
@@ -14,7 +13,7 @@ export interface ProviderNotice {
   notice13: string;
   // Research notification section 3 paragraph.
   notification3: string;
-  // Thank-you page technical note (used by M8).
+  // Thank-you page technical note.
   debriefNote: string;
 }
 

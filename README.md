@@ -74,8 +74,8 @@ To reproduce a specific release: `git checkout <tag>`.
   CSS 4, TalkingHead for the avatar; Playwright browser tests.
 - **Admin app**: Next.js 14 (App Router), TypeScript, Tailwind CSS.
 - **Language model**: OpenAI GPT-5.4 in the code at this commit; the Metso
-  run uses a model hosted on Tampere University hardware once the owner
-  settles it (board card M9), with OpenAI as the fallback.
+  run uses a model hosted on Tampere University hardware once it
+  is chosen, with OpenAI as the fallback.
 - **Deployment**: CSC Rahti (OpenShift); container images for the API, the
   participant app and the admin app; manifests in
   [`societal-discussion/k8s/`](societal-discussion/k8s/).
@@ -92,13 +92,6 @@ embeddings, no vector store.
 ```
 .
 ├── README.md                       you are here
-├── RAHTI-RUNBOOK.md                how the Rahti deployment is run and paused
-├── board/                          the work board (tools/board/README.md)
-├── docs/
-│   ├── consent/                    consent package: notices and consent texts
-│   ├── research/                   research notes (avatar and voice, 2026-10)
-│   ├── records/                    execution logs per board card
-│   └── superpowers/specs, plans/   design and plans
 ├── Party Program dataset/          source corpora from Pohtiva (PDF and text)
 ├── tampere/                        Tampere University logo files and rules
 └── societal-discussion/            the application

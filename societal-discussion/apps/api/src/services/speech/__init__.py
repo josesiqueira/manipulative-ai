@@ -1,5 +1,5 @@
 """
-Speech in both directions for the chat page (spec V8, V9).
+Speech in both directions for the chat page.
 
 transcribe(): phone recording bytes to text.
 synthesize(): one sentence to WAV bytes plus word timings for lip-sync.

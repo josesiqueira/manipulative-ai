@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-// Built with PUBLIC_PROVIDER_BLOCK=openai (spec V11a): three checkboxes and the
+// Built with PUBLIC_PROVIDER_BLOCK=openai: three checkboxes and the
 // OpenAI texts on the consent page and in both notices.
 test('openai block: three boxes, OpenAI bullet, OpenAI notice texts', async ({ page }) => {
   await page.route('**/api/**', (route) => route.fulfill({ status: 500, body: '{}' }));

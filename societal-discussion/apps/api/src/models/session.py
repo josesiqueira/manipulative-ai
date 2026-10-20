@@ -29,8 +29,7 @@ class Session(Base):
     )
 
     # Consent (participant flow only; try-bot sessions leave these empty).
-    # The checkboxes are TENK ethics consent, not the GDPR legal basis; see
-    # docs/consent/2026-10-23-metso-consent-package.md section 1.3.
+    # The checkboxes are TENK ethics consent, not the GDPR legal basis.
     consent_accepted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

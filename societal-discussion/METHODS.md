@@ -145,8 +145,8 @@ participant lands on the chat page and opens with their own words, typed or
 spoken (the conversation is created with `starter_topic: null`,
 `apps/participant/src/lib/participantApi.ts`). The Vaalikone-derived topic
 list that the HEPP2026 landing page offered still exists in the admin app's
-translations (`apps/web/src/lib/translations.ts`) and in
-`../VAALIKONE-QUESTIONS-FINAL.md`, but no participant page shows it. "Back to
+translations (`apps/web/src/lib/translations.ts`), but no participant page
+shows it. "Back to
 start" on the chat page ends the conversation and the landing page's Start
 creates a new one for the same session; "End conversation" leads to the
 survey entry page and from there to the survey.
@@ -160,9 +160,9 @@ survey entry page and from there to the survey.
   reject a custom temperature get none (`_supports_custom_temperature`).
 - **Model for the Metso run**: a model served on Tampere University
   hardware (the TSCS AI Cluster or GPT Lab GPU farm 004), chosen by the
-  owner on board card M9 (spec decision V11). A new provider class in
+  research team before the run. A new provider class in
   `services/llm_providers/` is added when the endpoint is known; OpenAI
-  stays selectable as the fallback (V11a). Until M9 lands, the consent
+  stays selectable as the fallback. Until the model is chosen, the consent
   texts carry a placeholder for the model name (`[MALLIN NIMI]` in
   `apps/participant/src/lib/studyConfig.ts`).
 - **The model is on the record**: every assistant message stores the model
@@ -175,7 +175,7 @@ survey entry page and from there to the survey.
 - **Context**: the largest corpus (Vihreät, roughly 220 K tokens by
   estimate) plus the instruction, the history and the output budget must
   fit the model's context window; a self-hosted model must accept the same
-  prompt length or M9 decides how the corpus is shortened.
+  prompt length, or the corpus must be shortened.
 
 HEPP2026 data was collected with GPT-5.4 at temperature 0.1.
 
@@ -215,14 +215,13 @@ session.
 ## 10. Avatar, voice and speech input
 
 One avatar and one voice for all 18 conditions, so nothing on the chat page
-differs by condition (spec V7). The head is a male sample head (the
+differs by condition. The head is a male sample head (the
 AvatarSDK example from the TalkingHead repository, as recorded in
-`src/scripts/avatar.ts` and the M7 execution log), stored as
+`src/scripts/avatar.ts`), stored as
 `apps/participant/public/avatar/man.glb`, with a male Finnish and English
 voice to match, and a still image fallback. It belongs to no party and no
-person; it is not gender-neutral, which V7 asked for, and the head and
-voice pair is an open choice for the owner (M7 log: a woman's head with a
-woman's voice is the alternative).
+person; it is not gender-neutral, and the head and voice pair is still an
+open choice (a woman's head with a woman's voice is the alternative).
 
 - **Rendering and lip-sync**: TalkingHead (met4citizen, MIT), vendored in
   `apps/participant/src/vendor/talkinghead/` with its Finnish and English
@@ -244,7 +243,7 @@ woman's voice is the alternative).
 - **Two engine tiers** (`apps/api/src/services/speech/`): remote servers
   with an OpenAI-compatible API (`SPEECH_STT_URL`, `SPEECH_TTS_URL`; the
   defaults name faster-whisper large-v3-turbo and VoxCPM2, the models the
-  M5 research chose for the university cluster), or local engines inside
+  research chose for the university cluster), or local engines inside
   the API container: faster-whisper `small` (int8) for recognition and
   Piper voices `fi_FI-harri-medium` and `en_GB-alan-medium` for speech,
   fetched at image build from pinned Hugging Face revisions, the Piper
@@ -279,8 +278,9 @@ and the contacts and notice links.
   refuses new conversations (403), the debrief still answers for it marked
   `data_deleted`, and the conversation exports carry `data_deleted_at`.
 
-Consent texts, privacy notice and research notification:
-`docs/consent/2026-10-23-metso-consent-package.md` (repository root `docs/`).
+Consent texts, privacy notice and research notification: the consent page
+and UI strings in `apps/participant/src/lib/strings.ts`, the notices in
+`apps/participant/src/content/notices/`.
 
 ## 12. Survey
 
@@ -314,13 +314,12 @@ carries one row per message with `session_id`, `input_mode` and
 `session_id`, the submission time and the eleven response keys.
 
 Message text is stored as plain text in SQLite on the Rahti volume. The
-consent summary (package section 4c, `apps/participant/src/lib/strings.ts`)
+consent summary (`apps/participant/src/lib/strings.ts`)
 says "stored on CSC servers in Finland" and never "encrypted". The full
-privacy notice (`src/content/notices/privacy-notice.*.md`, package 4a) still
-carries the package's sentence that message text is encrypted at rest; that
-sentence does not match the system and is an open decision for the owner on
-card M10 (recorded on the M6 execution log), to be removed from the notice
-unless message encryption is implemented.
+privacy notice (`src/content/notices/privacy-notice.*.md`) still carries a
+sentence that message text is encrypted at rest; that sentence does not
+match the system and is an open decision for the research team, to be
+removed from the notice unless message encryption is implemented.
 
 ## 14. What is deliberately not used
 
@@ -361,8 +360,8 @@ unless message encryption is implemented.
 | Populism markers | Cranmer 2011: us versus them, people-centrism, anti-elitism |
 | Debriefing | TENK 2019 (Finnish National Board on Research Integrity): disclosure of the true nature of the study |
 | Source corpus | Pohtiva (Finnish political programme archive, FSD) |
-| Talking avatar | TalkingHead (met4citizen), MIT licence (`apps/participant/src/vendor/talkinghead/LICENSE`); the head file is the AvatarSDK example from the same repository as recorded in `avatar.ts`, with its licence question open on card M7's log |
-| Speech | faster-whisper (Systran), Piper (Rhasspy); VoxCPM2 and whisper large-v3-turbo for the cluster tier (research card M5, `docs/research/2026-10-avatar-and-voice.md`) |
+| Talking avatar | TalkingHead (met4citizen), MIT licence (`apps/participant/src/vendor/talkinghead/LICENSE`); the head file is the AvatarSDK example from the same repository as recorded in `avatar.ts`; its licence is still to be confirmed |
+| Speech | faster-whisper (Systran), Piper (Rhasspy); VoxCPM2 and whisper large-v3-turbo for the cluster tier |
 
 ---
 
@@ -390,5 +389,3 @@ unless message encryption is implemented.
 | Participant strings (FI, EN) | `apps/participant/src/lib/strings.ts` |
 | Browser tests, including the real-API flow | `apps/participant/tests/` |
 | Admin app (Next.js) | `apps/web/src/app/admin/` (18 conditions in `admin/lib/types.ts`) |
-| Consent package and notices (source texts) | `../docs/consent/2026-10-23-metso-consent-package.md` |
-| Design decisions for version 3 | `../docs/superpowers/specs/2026-10-16-metso-v3-design.md` |

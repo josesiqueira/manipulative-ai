@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     # Next.js admin (3000), Astro participant app dev (4321) and preview (8080).
     cors_origins: str = "http://localhost:3000,http://localhost:4321,http://127.0.0.1:4321,http://localhost:8080,http://127.0.0.1:8080"
 
-    # Speech (spec V8, V9). Remote engines are OpenAI-compatible servers on the
+    # Speech. Remote engines are OpenAI-compatible servers on the
     # university cluster; when a URL is empty the local engine in this
     # container is used (faster-whisper small, Piper). Audio is never stored.
     speech_stt_url: str = ""            # e.g. http://speaches:8000 (POST /v1/audio/transcriptions)

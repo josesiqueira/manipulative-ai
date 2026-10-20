@@ -106,7 +106,7 @@ test.describe('chat page', () => {
   });
 
   test('a long reply leaves the question in view and never slides under the avatar', async ({ page }) => {
-    // Jose on his Android phone, 2026-10-17: the spoken question "did not
+    // Seen on an Android phone, 2026-10-17: the spoken question "did not
     // appear"; it had scrolled under the avatar card, which has no visible
     // boundary against the transcript.
     const long = Array.from({ length: 12 }, (_, i) => `Pitkä vastauslause numero ${i + 1} kertoo kannastani perusteellisesti.`).join(' ');

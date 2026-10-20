@@ -91,7 +91,7 @@ export async function synthesize(conversationId: string, text: string, language:
   return res.json();
 }
 
-// Survey (spec V14): every answer optional; the keys are the ones the
+// Survey: every answer optional; the keys are the ones the
 // researchers' export already knows.
 export interface SurveyResponses {
   chatbot_usage: string;
@@ -116,7 +116,7 @@ export async function submitSurvey(sessionId: string, responses: SurveyResponses
   if (!res.ok) throw new Error('survey-failed');
 }
 
-// Debrief (spec V13): the one participant call that reveals the condition,
+// Debrief: the one participant call that reveals the condition,
 // and only after the survey row exists.
 export interface DebriefConversation {
   id: string;

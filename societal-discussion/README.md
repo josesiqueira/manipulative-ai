@@ -39,8 +39,8 @@ them for the Metso demo.
   [`apps/participant/README.md`](apps/participant/README.md).
 - **Admin app**: Next.js 14 (App Router), TypeScript, Tailwind CSS, vitest.
 - **Language model**: OpenAI GPT-5.4 in the code at this commit, selected in
-  the admin panel; a model on Tampere University hardware replaces it when
-  the owner settles board card M9 (OpenAI stays as the fallback). The model
+  the admin panel; a model on Tampere University hardware replaces it once
+  it is chosen (OpenAI stays as the fallback). The model
   that answered is stored on every assistant message.
 - **Deployment**: CSC Rahti (OpenShift); one image per app; manifests in
   `k8s/`.
@@ -51,7 +51,7 @@ system prompt at every request (no retrieval, no few-shot).
 ## Quick start (local development)
 
 Prerequisites: [uv](https://docs.astral.sh/uv/), Node.js 22, an OpenAI API
-key (until M9 lands).
+key (or another OpenAI-compatible endpoint).
 
 ```bash
 ./run.sh                    # first run creates .env from .env.example; set OPENAI_API_KEY
@@ -83,7 +83,6 @@ cd apps/participant && npm run check && npm test   # astro check, Playwright (fa
 cd apps/participant && REAL_API=1 ADMIN_PASSWORD=... npx playwright test tests/real-flow.spec.ts --project=desktop
                                              # the whole flow against a running API, no fakes (see the file)
 cd apps/web && npm run build && npx vitest run    # admin app
-python3 ../tools/board/board.py --board ../board check   # the work board
 ```
 
 To test the chat page on a phone from a laptop (the microphone needs
@@ -110,7 +109,7 @@ societal-discussion/
 │   └── web/                       Next.js admin app
 ├── docker/                        HEPP2026-era Dockerfiles and compose file, superseded by apps/api/Dockerfile
 │                                  and apps/participant/Dockerfile (Dockerfile.web still builds the admin app)
-├── k8s/                           OpenShift manifests (api, web, PVC; the participant manifests arrive with the deploy card M11)
+├── k8s/                           OpenShift manifests (api, web, PVC; the participant manifests come with the Metso deploy)
 ├── METHODS.md                     research methodology reference
 └── package.json                   npm workspaces: apps/web and apps/participant (one lock file here)
 ```
@@ -151,7 +150,7 @@ API (`apps/api/src/config.py`; local values in `.env` at this folder's root):
 | Variable | Description | Required |
 |---|---|---|
 | `DATABASE_URL` | SQLAlchemy URL (defaults to local SQLite) | No |
-| `OPENAI_API_KEY` | OpenAI API key (until the M9 model replaces it) | Yes for OpenAI |
+| `OPENAI_API_KEY` | OpenAI API key | Yes for OpenAI |
 | `ADMIN_PASSWORD` | Admin password (header `X-Admin-Password`) | Yes |
 | `ENCRYPTION_SECRET` | Fernet key for the API keys stored by the admin panel | Yes |
 | `CORS_ORIGINS` | Comma-separated allowed origins (the defaults include the local ports 3000, 4321, 8080) | Yes in production |
@@ -174,19 +173,18 @@ checkboxes). Admin app (build time): `NEXT_PUBLIC_API_URL`.
 ## Deployment
 
 The live deploy is on CSC Rahti (OpenShift), project `manipulative-ai-2`.
-The day-to-day runbook (bringing the demo up, pausing, backups, secrets) is
-`../RAHTI-RUNBOOK.md`. Manifests in `k8s/`:
+Manifests in `k8s/`:
 
 | File | Resource |
 |---|---|
-| `api-deployment.yaml` | API Deployment (`FORCED_PARTY` empty; the volume is RWO, so a rollout must replace the pod rather than run two, which the deploy card M11 sets as the `Recreate` strategy) |
+| `api-deployment.yaml` | API Deployment (`FORCED_PARTY` empty; the volume is RWO, so a rollout must replace the pod rather than run two, so the deploy sets the `Recreate` strategy) |
 | `api-service.yaml`, `api-route.yaml` | Service and Route for the API |
 | `web-deployment.yaml`, `web-service.yaml`, `web-route.yaml` | Same for the admin app |
 | `sqlite-pvc.yaml` | 1 Gi PersistentVolumeClaim mounted at `/data` in the API pod |
 
 The participant app's Deployment, Service and Route on the public hostname,
-and the move of the admin app to its own hostname, are part of the deploy
-card M11.
+and the move of the admin app to its own hostname, come with the Metso
+deploy.
 
 Images:
 
@@ -239,8 +237,9 @@ created in the cluster with `oc create secret generic app-secrets
   text is kept, marked as typed or spoken.
 - Test-mode conversations made with the admin Try-bot are excluded from the
   research data.
-- The consent texts, privacy notice and research notification are in
-  `../docs/consent/2026-10-23-metso-consent-package.md`; the values still
-  to be confirmed by the owner (retention end, controllers, closing date,
+- The consent texts are in `apps/participant/src/lib/strings.ts` and the
+  privacy notice and research notification in
+  `apps/participant/src/content/notices/`; the values still
+  to be confirmed by the research team (retention end, controllers, closing date,
   model name) are constants in `apps/participant/src/lib/studyConfig.ts`.
 - See `METHODS.md` for the full methodological framing.

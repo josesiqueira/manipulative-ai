@@ -9,7 +9,7 @@ WORKDIR /app
 COPY package.json ./
 RUN npm install --no-package-lock
 COPY . .
-# Both values are inlined at build time (spec V11a: one switch per deploy).
+# Both values are inlined at build time (one provider switch per deploy).
 ARG PUBLIC_API_URL
 ARG PUBLIC_PROVIDER_BLOCK=finnish
 ENV PUBLIC_API_URL=$PUBLIC_API_URL \

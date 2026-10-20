@@ -1,5 +1,5 @@
 """
-Speech endpoints for the chat page (spec V8, V9).
+Speech endpoints for the chat page.
 
 POST /api/speech/transcribe?conversation_id=..&language=..  body: the recording as
     recorded (Content-Type audio/webm or audio/mp4) -> {text}

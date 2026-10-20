@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test';
 
 // The whole participant flow against a real API, nothing faked: consent, one
 // typed turn, End, survey, debrief, delete; then the admin lookup by code
-// shows the tombstone with no messages. This is the M8 acceptance run and the
-// V17 data-saving check for the deploy (M11).
+// shows the tombstone with no messages. Also the data-saving check after a
+// deploy.
 //
 //   REAL_API=1 REAL_APP_URL=http://127.0.0.1:4321 REAL_API_URL=http://127.0.0.1:8000 \
 //   ADMIN_PASSWORD=... npx playwright test tests/real-flow.spec.ts --project=desktop
@@ -62,7 +62,7 @@ test.describe('real flow', () => {
     expect(before.ok()).toBeTruthy();
     const detail = await before.json();
     expect(detail.messages.length).toBeGreaterThanOrEqual(2);
-    // Input mode and model name live in the message export (M4), not in the detail view.
+    // Input mode and model name live in the message export, not in the detail view.
     const messages = await request.get(`${API}/api/admin/export?format=messages-json`, { headers });
     expect(messages.ok()).toBeTruthy();
     const ours = (await messages.json()).filter((m: { conversation_id: string }) => m.conversation_id === conversationId);

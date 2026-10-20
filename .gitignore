@@ -31,3 +31,20 @@ backups/
 # Research reports and notes kept locally only
 reports/
 research_notes/
+
+# Project management and working documents, kept locally only (Jose,
+# 2026-10-20: the public repository shows only what is needed to run,
+# reproduce and replicate the experiment)
+board/
+tools/board/
+hooks/
+CLAUDE.md
+.claude/
+societal-discussion/.claude/
+docs/
+spikes/
+societal-discussion/ADMIN-IMPROVEMENTS-PLAN.md
+VAALIKONE-QUESTIONS-FINAL.md
+
+# Build output
+*.tsbuildinfo

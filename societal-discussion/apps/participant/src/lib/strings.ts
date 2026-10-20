@@ -1,7 +1,6 @@
 // Participant-facing UI strings for the institutional pages, FI and EN.
-// Consent wording comes from docs/consent/2026-10-23-metso-consent-package.md
-// section 4c; the storage bullet says "stored on CSC servers in Finland" and
-// never "encrypted" (spec section 5). The bullets carry two tokens that the
+// The storage bullet says "stored on CSC servers in Finland" and never
+// "encrypted". The bullets carry two tokens that the
 // consent page fills: {{PROVIDER_BULLET}} and {{RETENTION_END}}.
 
 export type Language = 'fi' | 'en';
@@ -31,7 +30,6 @@ export interface Strings {
   info: { back: string; privacyTitle: string; researchTitle: string };
   chat: {
     placeholderTitle: string;
-    placeholderBody: string;
     backToStart: string;
     endConversation: string;
     inputPlaceholder: string;
@@ -158,7 +156,6 @@ export const STRINGS: Record<Language, Strings> = {
     info: { back: 'Takaisin', privacyTitle: 'Tietosuojailmoitus', researchTitle: 'Tutkimustiedote' },
     chat: {
       placeholderTitle: 'Keskustelu',
-      placeholderBody: 'Keskustelusivu rakennetaan seuraavaksi (kortti M7). Istuntosi on tallessa.',
       backToStart: 'Takaisin alkuun',
       endConversation: 'Lopeta keskustelu',
       inputPlaceholder: 'Kirjoita viestisi...',
@@ -178,7 +175,7 @@ export const STRINGS: Record<Language, Strings> = {
       speechError: 'Puheen käsittely epäonnistui. Voit kirjoittaa viestisi.',
       stillFace: 'Kasvot eivät latautuneet tälle laitteelle; ääni ja teksti toimivat silti.',
     },
-    // Survey texts unchanged from the Next.js app (spec V14).
+    // Survey texts unchanged from the Next.js app.
     surveyEntry: {
       thanks: 'Kiitos keskustelusta!',
       description: 'Vastaa seuraavaksi lyhyeen kyselyyn kokemuksestasi. Kysely kestää noin 2-3 minuuttia.',
@@ -299,7 +296,6 @@ export const STRINGS: Record<Language, Strings> = {
     info: { back: 'Back', privacyTitle: 'Privacy notice', researchTitle: 'Research notification' },
     chat: {
       placeholderTitle: 'Conversation',
-      placeholderBody: 'The chat page is built next (card M7). Your session is kept.',
       backToStart: 'Back to start',
       endConversation: 'End conversation',
       inputPlaceholder: 'Type your message...',

@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
 // so the tests answer /api/* with page.route handlers (no backend needed) and
 // no cross-origin preflight gets in the way.
 const ORIGIN = 'http://127.0.0.1:4321';
-// A second build with PUBLIC_PROVIDER_BLOCK=openai proves the V11a fallback screen.
+// A second build with PUBLIC_PROVIDER_BLOCK=openai proves the OpenAI fallback screen.
 const OPENAI_ORIGIN = 'http://127.0.0.1:4322';
 // REAL_API=1 runs tests/real-flow.spec.ts against servers already running
 // (see that file); no build and no fake.

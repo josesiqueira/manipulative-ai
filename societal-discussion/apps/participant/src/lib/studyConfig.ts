@@ -1,7 +1,6 @@
 // Facts that appear in participant-facing texts and that the DPOs or the
-// ethics committee may still change. Values are the recommended ones from
-// docs/consent/2026-10-23-metso-consent-package.md section 2 (spec V15);
-// Jose confirms or replaces each on board card M10 before the deploy.
+// ethics committee may still change. The research team confirms or
+// replaces each value before the deploy.
 export const STUDY = {
   // Bump whenever the consent screen, research notification or privacy
   // notice wording changes; stored on every session.
@@ -18,6 +17,6 @@ export const STUDY = {
   responsibleResearcherEmail: 'rebekah.rousi@uwasa.fi',
   dpoEmail: 'tietosuojavastaava@uwasa.fi',
   pohtivaUrl: 'https://www.fsd.tuni.fi/pohtiva/',
-  // Filled when M9 names the model; until then the notices show the bracket.
+  // Filled when the model is chosen; until then the notices show the bracket.
   modelName: { fi: '[MALLIN NIMI]', en: '[MODEL NAME]' },
 } as const;
