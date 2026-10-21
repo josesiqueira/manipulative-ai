@@ -12,7 +12,7 @@ Tampereen yliopisto (Tampereen korkeakoulusäätiö sr), Kalevantie 4, 33100 Tam
 
 ja
 
-Vaasan yliopisto, Wolffintie 34, 65200 Vaasa. Y-tunnus 0209599-8. Tietosuoja-asiat: tietosuoja@uwasa.fi.
+Vaasan yliopisto, PL 700, 65101 Vaasa (käyntiosoite Wolffintie 32, 65200 Vaasa). Y-tunnus 0209599-8. Tietosuoja-asiat: tietosuojavastaava@uwasa.fi.
 
 Yliopistot ovat yhteisrekisterinpitäjiä (26 artikla). Tampereen yliopisto toimii rekisteröityjen yhteyspisteenä. Voit käyttää oikeuksiasi suhteessa kumpaan tahansa rekisterinpitäjään (26 artiklan 3 kohta).
 
@@ -82,7 +82,7 @@ Vaalikeskustelu-sovelluksen keräämät ja CSC:n Rahti-alustalle Suomeen tallent
 
 Sovellus ei kerää: nimeä, sähköpostiosoitetta, puhelinnumeroa, IP-osoitetta, laitetunnisteita, sijaintia eikä käyttäjätiliä. Evästeitä ei käytetä. Selaimen paikallinen tallennustila säilyttää kielivalintasi, satunnaiset istunto- ja keskustelutunnisteet sekä tiedon siitä, että olet vastannut kyselyyn, jotta sivut toimivat. Ne säilyvät selaimessasi, kunnes tyhjennät sivuston tiedot. Kun vastaat kyselyyn, siihenastiset vastauksesi säilyvät lisäksi selaimen välilehdellä, jotta kielen vaihtaminen ei hävitä niitä; ne poistetaan, kun lähetät kyselyn.
 
-Alustan lokit: CSC:n Rahti-alustan reititystaso voi tallentaa laitteesi IP-osoitteen lyhytaikaisiin teknisiin lokeihin [säilytysaika tarkistettava CSC:ltä]. Tutkijat eivät käytä näitä lokeja eivätkä voi yhdistää niitä tutkimusaineistoon.
+Alustan lokit: CSC:n Rahti-alustan reititystaso käsittelee laitteesi IP-osoitetta sivujen välittämiseksi, ja CSC voi tallentaa sen alustan ylläpidon ja tietoturvan teknisiin lokeihin. Tutkijat eivät käytä näitä lokeja eivätkä voi yhdistää niitä tutkimusaineistoon.
 
 Tutkimusaineisto on pseudonymisoitua: tutkijat eivät voi tunnistaa sinua aineistosta, ellet anna meille istuntokoodiasi (kohta 17) tai ole kirjoittanut tunnistetietoja. Vapaaseen tekstiin kirjoitetut tunnistetiedot poistetaan dokumentoidussa seulontavaiheessa ennen analyysiä.
 
@@ -93,7 +93,7 @@ Kaikki tiedot kerätään suoraan sinulta sovelluksen kautta istuntosi aikana.
 ## 12. Tietojen siirto tai luovuttaminen kolmansille osapuolille
 
 Henkilötietojen käsittelijät (28 artikla), jotka käsittelevät tietoja vain dokumentoitujen ohjeiden mukaan:
-- CSC - Tieteen tietotekniikan keskus Oy, Suomi: sovelluksen ja tietokannan ylläpito (Rahti), konesali Suomessa; CSC:n palvelu- ja tietojenkäsittelyehdot yliopiston asiakassopimuksen nojalla [tarkistettava].
+- CSC - Tieteen tietotekniikan keskus Oy, Suomi: sovelluksen ja tietokannan ylläpito (Rahti) CSC:n konesaleissa Suomessa CSC:n yleisten käyttöehtojen ja henkilötietojen käsittelysopimuksen mukaisesti.
 - Microsoft: viedyn aineiston tallennus tutkimusryhmän rajatussa Microsoft 365 (Teams) -työtilassa [Tampereen yliopistossa] yliopiston Microsoft-sopimuksen nojalla [EU Data Boundary tarkistettava].
 - Chatbotin vastausten tuottaminen: ks. kohta 13 (malli- ja tarjoajalohko).
 
@@ -113,7 +113,7 @@ Sinusta ei tehdä päätöksiä, joilla on oikeusvaikutuksia tai jotka vaikuttav
 
 Tiedot ovat salassa pidettäviä. Paperiaineistoa ei synny; osallistumisen vahvistus tallennetaan sähköisesti istuntotietoihin.
 
-Tietojärjestelmien suojatoimet: käyttäjätunnus ja salasana; monivaiheinen tunnistautuminen yliopiston ja CSC:n tunnuksissa [tarkistettava]; käytön lokitus [tarkistettava]; pääsynhallinta (Rahti-projekti on rajattu Tampereen yliopiston nimettyihin tutkijoihin, jotka luetellaan vaikutustenarvioinnissa); salaus tiedonsiirrossa (TLS selaimesi ja sovelluksen välillä sekä sovelluksen ja kielimallin tarjoajan välillä); tallennus CSC:n tallennuspalveluun Suomessa, ja pääsy on rajattu Rahti-projektin jäseniin; pseudonymisointi lähtökohtaisesti (suoria tunnisteita ei kerätä); CSC:n henkilöstö käyttää alustaa vain teknisen ylläpidon vuoksi; viety aineisto säilytetään rajatussa Teams-työtilassa, johon on pääsy vain kohdan 2 tutkijoilla; Rahti-alustan tietokanta poistetaan todennetun viennin jälkeen [päivämäärä, D3].
+Tietojärjestelmien suojatoimet: yliopiston ja CSC:n tunnukset on suojattu monivaiheisella tunnistautumisella; tutkimuksen hallintaliittymä, josta aineisto viedään, on suojattu salasanalla, jonka tietävät vain kohdan 2 tutkijat; pääsynhallinta (Rahti-projekti on rajattu Tampereen yliopiston nimettyihin tutkijoihin, jotka luetellaan vaikutustenarvioinnissa); salaus tiedonsiirrossa (TLS selaimesi ja CSC:n alustan välillä sekä sovelluksen ja kielimallin tarjoajan välillä); tallennus CSC:n tallennuspalveluun Suomessa, ja pääsy on rajattu Rahti-projektin jäseniin; pseudonymisointi lähtökohtaisesti (suoria tunnisteita ei kerätä); CSC:n henkilöstö käyttää alustaa vain teknisen ylläpidon vuoksi; viety aineisto säilytetään rajatussa Teams-työtilassa, johon on pääsy vain kohdan 2 tutkijoilla; Rahti-alustan tietokanta poistetaan todennetun viennin jälkeen [päivämäärä, D3].
 
 Suorat tunnistetiedot: niitä ei kerätä. Vapaaseen tekstiin kirjoitetut tunnistetiedot poistetaan dokumentoidussa seulontavaiheessa ennen analyysiä.
 

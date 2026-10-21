@@ -7,19 +7,21 @@ test('openai block: three boxes, OpenAI bullet, OpenAI notice texts', async ({ p
   await page.goto('/en/consent');
   await expect(page.locator('[data-consent-box]')).toHaveCount(3);
   await expect(page.locator('body')).not.toContainText('[MODEL NAME]');
-  await expect(page.getByTestId('consent-bullets')).toContainText('sends your messages to OpenAI in the United States');
-  await expect(page.locator('label[for="cb-transfer"]')).toContainText("processed on OpenAI's servers in the United States");
+  await expect(page.getByTestId('consent-bullets')).toContainText('sends your messages to OpenAI, which processes them outside the EU, including in the United States');
+  await expect(page.locator('label[for="cb-transfer"]')).toContainText("processed on OpenAI's servers outside the EU, including in the United States");
   const start = page.getByTestId('consent-start');
   for (const box of (await page.locator('[data-consent-box]').all()).slice(0, 2)) await box.check();
   await expect(start).toBeDisabled();
 
   await page.goto('/en/info/privacy-notice');
   const notice = await page.getByTestId('notice').innerText();
-  expect(notice).toContain('Personal data are transferred to the United States');
+  expect(notice).toContain('Personal data are transferred outside the EU/EEA, including to the United States');
+  expect(notice).toContain('OpenAI is not certified under the EU-US Data Privacy Framework');
+  expect(notice).not.toContain('Data Privacy Framework; the data importer');
   expect(notice).not.toContain('{{');
   await page.goto('/fi/info/research-notification');
   const fi = await page.getByTestId('notice').innerText();
-  expect(fi).toContain('OpenAI:n palvelimille Yhdysvaltoihin');
+  expect(fi).toContain('käsitellään palvelimilla EU:n ulkopuolella, muun muassa Yhdysvalloissa');
   expect(fi).toContain('GPT-6 Astra');
   expect(fi).not.toContain('[MALLIN NIMI]');
 });

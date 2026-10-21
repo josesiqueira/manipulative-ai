@@ -15,7 +15,7 @@ We study how people experience conversations with AI chatbots about Finnish poli
 
 Taking part is voluntary. Nobody checks whether you scan the code, and you can follow the whole lecture whether or not you take part. You can stop at any time by closing the page, without giving a reason and without consequences. You may leave any survey question unanswered.
 
-You take part without giving your name. We cannot connect you to your conversation afterwards unless you give us the session code shown at the end. If you close the page during the conversation, the messages sent so far remain in the research data, which do not contain your name. At the end you can delete your own data with one button, or keep the session code and ask us later to delete the session. Without the code we cannot find your data. Once results have been published in summarised form, deletion removes your data from the dataset but cannot change what has been published.
+You take part without giving your name. We cannot connect you to your conversation afterwards unless you give us your session code, shown on the chat page and at the end. If you close the page during the conversation, the messages sent so far remain in the research data, which do not contain your name. At the end you can delete your own data with one button, or keep the session code and ask us later to delete the session. Without the code we cannot find your data. Once results have been published in summarised form, deletion removes your data from the dataset but cannot change what has been published.
 
 ## 3. Progress of the study
 

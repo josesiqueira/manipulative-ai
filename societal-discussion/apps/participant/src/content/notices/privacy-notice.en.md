@@ -12,7 +12,7 @@ Tampere University (Tampere University Foundation sr), Kalevantie 4, 33100 Tampe
 
 and
 
-University of Vaasa, Wolffintie 34, 65200 Vaasa, Finland. Business ID 0209599-8. Data protection matters: tietosuoja@uwasa.fi.
+University of Vaasa, PO Box 700, 65101 Vaasa, Finland (visiting address Wolffintie 32, 65200 Vaasa). Business ID 0209599-8. Data protection matters: tietosuojavastaava@uwasa.fi.
 
 The universities are joint controllers (Article 26). Tampere University is the contact point for data subjects. You may exercise your rights against either controller (Article 26(3)).
 
@@ -82,7 +82,7 @@ Collected by the Vaalikeskustelu application and stored on the CSC Rahti platfor
 
 Not collected by the application: name, email, telephone, IP address, device identifiers, location, account. No cookies. Your browser's local storage keeps your language choice, the random session and conversation identifiers, and a note that you have answered the survey, so that the pages work. They stay in your browser until you clear its site data. While you answer the survey, your answers so far are also kept in the browser tab, so that switching the language does not lose them; they are removed when you submit.
 
-Platform logs: the CSC Rahti routing layer may record your device's IP address in short-lived technical logs [verify retention with CSC]. The researchers do not use these logs and cannot link them to research data.
+Platform logs: the routing layer of CSC's Rahti platform processes your device's IP address to deliver the pages, and CSC may record it in technical logs used to operate and secure the platform. The researchers do not use these logs and cannot link them to research data.
 
 The research data are pseudonymous: the researchers cannot identify you from them unless you give us your session code (section 17) or you have typed identifying information. Identifying details volunteered in free text are removed in a documented screening step before analysis.
 
@@ -93,7 +93,7 @@ All data are collected directly from you through the application during your ses
 ## 12. Transfer or disclosure of personal data to third parties
 
 Processors (Article 28), acting only on documented instructions:
-- CSC - IT Center for Science Ltd, Finland: hosting of the application and database (Rahti), data centre in Finland; CSC's service and data processing terms under the university's customer agreement [verify].
+- CSC - IT Center for Science Ltd, Finland: hosting of the application and database (Rahti) in CSC's data centres in Finland, under CSC's General Terms of Use and its Personal Data Processing Agreement.
 - Microsoft: storage of the exported dataset in the research team's restricted Microsoft 365 (Teams) workspace of [Tampere University] under the university's Microsoft agreement [verify EU Data Boundary].
 - Generation of chatbot replies: see section 13 (model and provider block).
 
@@ -113,7 +113,7 @@ No decisions producing legal effects or similarly significantly affecting you ar
 
 The data are confidential. No paper material is produced; confirmation of participation is recorded electronically in the session record.
 
-IT safeguards: username and password; multi-factor authentication for university and CSC accounts [verify]; access logging [verify]; access control (Rahti project limited to named Tampere University researchers, listed in the DPIA); encryption in transit (TLS between your browser and the application and between the application and the language-model provider); storage on CSC's storage service in Finland, with access limited to the members of the Rahti project; pseudonymisation by design (no direct identifiers collected); CSC personnel access the platform only for technical operation; the exported dataset is held in a restricted Teams workspace accessible only to the researchers in section 2; the Rahti database is deleted after verified export [date, D3].
+IT safeguards: university and CSC accounts protected by multi-factor authentication; the study's administration interface, from which the dataset is exported, is protected by a password known only to the researchers in section 2; access control (Rahti project limited to named Tampere University researchers, listed in the DPIA); encryption in transit (TLS between your browser and the CSC platform, and between the application and the language-model provider); storage on CSC's storage service in Finland, with access limited to the members of the Rahti project; pseudonymisation by design (no direct identifiers collected); CSC personnel access the platform only for technical operation; the exported dataset is held in a restricted Teams workspace accessible only to the researchers in section 2; the Rahti database is deleted after verified export [date, D3].
 
 Direct identifiers: none are collected. Identifying details volunteered in free text are removed in a documented screening step before analysis.
 
@@ -125,7 +125,7 @@ The raw research material (full transcripts, survey free text, session metadata)
 
 ## 17. Rights of the data subject and their restrictions
 
-Identification: the research data do not contain your name or contact details and the controller cannot identify you from them (Article 11). To exercise your rights you need the session code shown on the final page of your session (Article 11(2)). Please keep it. Without the code we cannot find your data.
+Identification: the research data do not contain your name or contact details and the controller cannot identify you from them (Article 11). To exercise your rights you need your session code (Article 11(2)), shown on the chat page and on the final page of your session. Please keep it. Without the code we cannot find your data.
 
 Your rights: access (Article 15: a copy of your conversation and survey answers); rectification (Article 16); erasure (Article 17: we delete your session on request while the raw data exist; you can also delete it yourself on the final page; erasure may be refused only where it would seriously impair the research, Article 17(3)(d), for example after anonymisation and aggregation for publication); restriction (Article 18); objection (Article 21, on grounds relating to your particular situation, to processing under Article 6(1)(e)); stopping participation at any time by closing the page (data recorded until then remain in the research data unless you delete them or request erasure with your code); lodging a complaint with the Office of the Data Protection Ombudsman (tietosuoja.fi).
 

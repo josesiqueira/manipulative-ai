@@ -15,7 +15,7 @@ Tutkimme, miten ihmiset kokevat keskustelun tekoälychatbotin kanssa, kun aiheen
 
 Osallistuminen on vapaaehtoista. Kukaan ei valvo, skannaatko koodin, ja voit seurata luennon kokonaan riippumatta siitä, osallistutko tutkimukseen. Voit keskeyttää milloin tahansa sulkemalla sivun, syytä ilmoittamatta ja ilman seurauksia. Voit jättää vastaamatta mihin tahansa kyselyn kysymykseen.
 
-Osallistut nimettömänä. Emme voi jälkikäteen yhdistää sinua keskusteluusi, ellet anna meille lopussa näytettävää istuntokoodia. Jos suljet sivun kesken keskustelun, siihen mennessä lähetetyt viestit jäävät tutkimusaineistoon, joka ei sisällä nimeäsi. Lopussa voit poistaa omat tietosi yhdellä painikkeella tai tallentaa istuntokoodin ja pyytää meitä myöhemmin poistamaan istunnon. Ilman koodia emme löydä tietojasi. Kun tulokset on julkaistu yhteenvetona, poisto poistaa tietosi aineistosta mutta ei voi muuttaa jo julkaistua.
+Osallistut nimettömänä. Emme voi jälkikäteen yhdistää sinua keskusteluusi, ellet anna meille istuntokoodiasi, joka näkyy keskustelusivulla ja lopussa. Jos suljet sivun kesken keskustelun, siihen mennessä lähetetyt viestit jäävät tutkimusaineistoon, joka ei sisällä nimeäsi. Lopussa voit poistaa omat tietosi yhdellä painikkeella tai tallentaa istuntokoodin ja pyytää meitä myöhemmin poistamaan istunnon. Ilman koodia emme löydä tietojasi. Kun tulokset on julkaistu yhteenvetona, poisto poistaa tietosi aineistosta mutta ei voi muuttaa jo julkaistua.
 
 ## 3. Tutkimuksen kulku
 
