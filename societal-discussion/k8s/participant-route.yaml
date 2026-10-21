@@ -4,6 +4,9 @@ metadata:
   name: participant
   namespace: manipulative-ai-2
   annotations:
+    # The privacy notice says no cookies: the router's sticky-session cookie
+    # is off (one pod, nothing to stick to).
+    haproxy.router.openshift.io/disable_cookies: "true"
     haproxy.router.openshift.io/timeout: 60s
 spec:
   host: vaalikeskustelu.2.rahtiapp.fi

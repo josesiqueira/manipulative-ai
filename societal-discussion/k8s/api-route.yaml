@@ -4,6 +4,9 @@ metadata:
   name: api
   namespace: manipulative-ai-2
   annotations:
+    # The privacy notice says no cookies: the router's sticky-session cookie
+    # is off (one pod, nothing to stick to).
+    haproxy.router.openshift.io/disable_cookies: "true"
     # The default 30 s cut long model replies off (largest party: 25 to 35 s).
     haproxy.router.openshift.io/timeout: 180s
 spec:
