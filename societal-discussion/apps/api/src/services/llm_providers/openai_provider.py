@@ -68,12 +68,17 @@ class OpenAIProvider(LLMProvider):
             "max_completion_tokens": max_tokens,
             "messages": openai_messages,
             "stream": True,
+            "stream_options": {"include_usage": True},
         }
         if _supports_custom_temperature(model):
             kwargs["temperature"] = temperature
 
         stream = self.client.chat.completions.create(**kwargs)
 
+        self.last_token_count = 0
         for chunk in stream:
-            if chunk.choices[0].delta.content:
+            # The last chunk carries the usage and no choices.
+            if chunk.usage is not None:
+                self.last_token_count = chunk.usage.total_tokens
+            if chunk.choices and chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content

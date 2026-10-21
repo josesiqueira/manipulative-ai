@@ -4,6 +4,8 @@ LLM client for generating AI responses.
 Uses the OpenAI API with GPT-6 Astra by default (llm_models.py). Party program grounding is handled
 by prompt_builder.py which injects the full party text into the system prompt.
 """
+import asyncio
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
 from sqlalchemy import select
@@ -100,3 +102,39 @@ async def generate_reply(prepared: PreparedReply) -> tuple[str, int, str]:
             return response_text.strip(), total_tokens, prepared.model
         print(f"LLM empty reply from {prepared.model} ({token_count} tokens), retrying")
     raise EmptyReplyError(f"{prepared.model} returned an empty reply twice")
+
+
+async def stream_reply(prepared: PreparedReply) -> AsyncIterator[str]:
+    """Yield the reply in pieces as the model writes it. The provider's
+    streaming call is blocking, so it runs in a thread and hands each piece
+    to the event loop. Afterwards prepared.provider.last_token_count holds
+    the call's token count when the provider reports it."""
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue = asyncio.Queue()
+    done = object()
+
+    def produce() -> None:
+        try:
+            for piece in prepared.provider.generate_streaming(
+                messages=prepared.messages,
+                model=prepared.model,
+                max_tokens=MAX_COMPLETION_TOKENS,
+                temperature=0.1,
+            ):
+                loop.call_soon_threadsafe(queue.put_nowait, piece)
+        except Exception as exc:  # noqa: BLE001
+            loop.call_soon_threadsafe(queue.put_nowait, exc)
+        finally:
+            loop.call_soon_threadsafe(queue.put_nowait, done)
+
+    worker = asyncio.create_task(asyncio.to_thread(produce))
+    try:
+        while True:
+            item = await queue.get()
+            if item is done:
+                break
+            if isinstance(item, Exception):
+                raise item
+            yield item
+    finally:
+        await asyncio.shield(worker)

@@ -60,6 +60,12 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             raise
 
 
+def get_sessionmaker() -> async_sessionmaker:
+    """Dependency for work that outlives the request's own session: a
+    streamed reply is saved after the response has started."""
+    return async_session_maker
+
+
 async def init_db() -> None:
     """Initialize database tables."""
     async with engine.begin() as conn:

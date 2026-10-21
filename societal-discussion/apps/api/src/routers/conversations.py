@@ -5,6 +5,8 @@ Handles creating conversations (with party assignment), sending messages,
 and ending conversations.
 """
 
+import asyncio
+import json
 import random
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -12,17 +14,18 @@ from zoneinfo import ZoneInfo
 HELSINKI = ZoneInfo("Europe/Helsinki")
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import selectinload
 
 from ..config import get_settings
-from ..database import get_db
+from ..database import get_db, get_sessionmaker
 from ..models import Session, Conversation, Message, SurveyResponse
 from ..services.party_assignment import assign_party
 from ..services.party_grounding import ALL_PARTIES
-from ..services.llm_client import generate_reply, prepare_reply
+from ..services.llm_client import generate_reply, prepare_reply, stream_reply
 from ..services.conversation_logger import save_conversation_log
 
 router = APIRouter()
@@ -225,6 +228,39 @@ async def get_messages(
     ]
 
 
+async def _open_conversation_for_message(
+    db: AsyncSession, conversation_id: str, data: MessageCreate
+) -> Conversation:
+    result = await db.execute(
+        select(Conversation)
+        .options(selectinload(Conversation.messages))
+        .where(Conversation.id == conversation_id)
+    )
+    conversation = result.scalar_one_or_none()
+    if not conversation:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Conversation not found",
+        )
+    if conversation.is_complete:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Conversation has been completed",
+        )
+    if not data.content.strip():
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Empty message")
+    if sum(1 for m in conversation.messages if m.role == "user") >= MAX_USER_MESSAGES_PER_CONVERSATION:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many messages",
+        )
+    return conversation
+
+
+def _input_mode(data: MessageCreate) -> str:
+    return data.input_mode if data.input_mode in ("typed", "spoken") else "typed"
+
+
 @router.post("/{conversation_id}/messages", response_model=MessageResponse)
 async def send_message(
     conversation_id: str,
@@ -237,33 +273,7 @@ async def send_message(
     The AI response is generated using the full party program text
     injected into the system prompt.
     """
-    # Get conversation with messages
-    result = await db.execute(
-        select(Conversation)
-        .options(selectinload(Conversation.messages))
-        .where(Conversation.id == conversation_id)
-    )
-    conversation = result.scalar_one_or_none()
-
-    if not conversation:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Conversation not found",
-        )
-
-    if conversation.is_complete:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Conversation has been completed",
-        )
-
-    if not data.content.strip():
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Empty message")
-    if sum(1 for m in conversation.messages if m.role == "user") >= MAX_USER_MESSAGES_PER_CONVERSATION:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="Too many messages",
-        )
+    conversation = await _open_conversation_for_message(db, conversation_id, data)
 
     # The user message is built now (its time is the send time) but added to
     # the session only after the reply: nothing is written during the model
@@ -272,7 +282,7 @@ async def send_message(
         conversation_id=conversation.id,
         role="user",
         content=data.content,
-        input_mode=data.input_mode if data.input_mode in ("typed", "spoken") else "typed",
+        input_mode=_input_mode(data),
         created_at=datetime.now(HELSINKI),
     )
 
@@ -317,6 +327,119 @@ async def send_message(
         role=assistant_message.role,
         content=assistant_message.content,
         created_at=assistant_message.created_at,
+    )
+
+
+# Streamed replies keep a reference here until they are saved: the work
+# goes on even if the phone disconnects, so the conversation is complete in
+# the data.
+_reply_tasks: set[asyncio.Task] = set()
+_PING_SECONDS = 10.0
+
+
+def _event(name: str, payload: dict) -> str:
+    return f"event: {name}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+
+
+async def _produce_reply(
+    prepared,
+    maker: async_sessionmaker,
+    conversation_id: str,
+    content: str,
+    input_mode: str,
+    sent_at: datetime,
+    queue: asyncio.Queue,
+) -> None:
+    """Stream the model's reply into the queue as 'delta' events, then save
+    the user message and the reply together and send 'done'."""
+    pieces: list[str] = []
+    try:
+        async for piece in stream_reply(prepared):
+            pieces.append(piece)
+            queue.put_nowait(("delta", {"text": piece}))
+        reply = "".join(pieces).strip()
+        tokens = getattr(prepared.provider, "last_token_count", 0) or 0
+        model_name = prepared.model
+        if not reply:
+            # Nothing came through the stream: one plain call (with its own
+            # retry) before giving up; the phone gets the text in one piece.
+            print(f"LLM empty streamed reply from {prepared.model}, falling back")
+            reply, more, model_name = await generate_reply(prepared)
+            tokens += more
+            queue.put_nowait(("delta", {"text": reply}))
+        async with maker() as db:
+            db.add(
+                Message(
+                    conversation_id=conversation_id,
+                    role="user",
+                    content=content,
+                    input_mode=input_mode,
+                    created_at=sent_at,
+                )
+            )
+            assistant = Message(
+                conversation_id=conversation_id,
+                role="assistant",
+                content=reply,
+                token_count=tokens,
+                model_name=model_name,
+            )
+            db.add(assistant)
+            await db.commit()
+            await db.refresh(assistant)
+        queue.put_nowait(
+            ("done", {"id": assistant.id, "content": reply, "created_at": assistant.created_at.isoformat()})
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"LLM stream error: {type(e).__name__}: {e}")
+        queue.put_nowait(("error", {"detail": "Vastauksen generointi epäonnistui. Yritä uudelleen."}))
+
+
+@router.post("/{conversation_id}/messages/stream")
+async def send_message_stream(
+    conversation_id: str,
+    data: MessageCreate,
+    db: AsyncSession = Depends(get_db, scope="function"),
+    maker: async_sessionmaker = Depends(get_sessionmaker),
+):
+    """Send a message and receive the reply as server-sent events while the
+    model writes it: 'delta' {text} pieces, then 'done' {id, content,
+    created_at} once both messages are saved, or 'error' {detail}. A comment
+    line every 10 s keeps the connection alive before the first piece."""
+    conversation = await _open_conversation_for_message(db, conversation_id, data)
+    sent_at = datetime.now(HELSINKI)
+    try:
+        prepared = await prepare_reply(db, conversation, data.content)
+    except Exception as e:
+        print(f"LLM setup error: {type(e).__name__}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Vastauksen generointi epäonnistui. Yritä uudelleen.",
+        )
+    await db.commit()
+
+    queue: asyncio.Queue = asyncio.Queue()
+    task = asyncio.create_task(
+        _produce_reply(prepared, maker, conversation.id, data.content, _input_mode(data), sent_at, queue)
+    )
+    _reply_tasks.add(task)
+    task.add_done_callback(_reply_tasks.discard)
+
+    async def events():
+        while True:
+            try:
+                name, payload = await asyncio.wait_for(queue.get(), timeout=_PING_SECONDS)
+            except asyncio.TimeoutError:
+                yield ": ping\n\n"
+                continue
+            yield _event(name, payload)
+            if name in ("done", "error"):
+                return
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 

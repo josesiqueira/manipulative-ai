@@ -11,7 +11,13 @@ class _FakeCompletions:
     def create(self, **kwargs):
         self.calls.append(kwargs)
         if kwargs.get("stream"):
-            return iter([SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="Hei"))])])
+            return iter(
+                [
+                    SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content="Hei"))], usage=None),
+                    # With include_usage the last chunk has no choices, only the usage.
+                    SimpleNamespace(choices=[], usage=SimpleNamespace(total_tokens=5)),
+                ]
+            )
         return SimpleNamespace(
             choices=[SimpleNamespace(message=SimpleNamespace(content="Hei"))],
             usage=SimpleNamespace(total_tokens=3),
@@ -38,3 +44,5 @@ async def test_gpt_6_gets_no_temperature_and_gpt_5_4_keeps_it():
     list(provider.generate_streaming(messages, model="gpt-5.4"))
     assert ["temperature" in c for c in fake.calls] == [False, False, True, True]
     assert fake.calls[2]["temperature"] == 0.1
+    assert fake.calls[1]["stream_options"] == {"include_usage": True}
+    assert provider.last_token_count == 5
