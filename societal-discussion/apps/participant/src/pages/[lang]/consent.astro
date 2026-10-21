@@ -70,7 +70,7 @@ const boxes = [
     // The session is created only here, only after every box is ticked. A
     // reload starts from unticked boxes (the browser is told not to restore).
     import { createConversation, createSession } from '../../lib/participantApi';
-    import { getSessionId, setConversationId, setSessionId } from '../../lib/session';
+    import { clearSession, getSessionId, isSurveySubmitted, setConversationId, setSessionId } from '../../lib/session';
     import { STUDY } from '../../lib/studyConfig';
     import type { Language } from '../../lib/strings';
 
@@ -80,6 +80,8 @@ const boxes = [
     const start = document.getElementById('start') as HTMLButtonElement;
     const error = document.getElementById('error') as HTMLParagraphElement;
 
+    // A finished session (survey done) is never reused: this is a new participant.
+    if (isSurveySubmitted()) clearSession();
     form.setAttribute('autocomplete', 'off');
     const update = () => (start.disabled = !boxes.every((b) => b.checked));
     const reset = () => {
@@ -98,7 +100,7 @@ const boxes = [
       if (!boxes.every((b) => b.checked)) return;
       start.disabled = true;
       error.hidden = true;
-      try {
+      const begin = async () => {
         // A retry after a failed conversation call reuses the session already created.
         let sessionId = getSessionId();
         if (!sessionId) {
@@ -109,6 +111,17 @@ const boxes = [
         const conversationId = await createConversation(sessionId, lang);
         setConversationId(conversationId);
         window.location.assign(`/${lang}/chat`);
+      };
+      try {
+        try {
+          await begin();
+        } catch (err) {
+          // A stored session the server has closed (survey done, data deleted):
+          // forget it and start once more with a new one.
+          if (!(err instanceof Error && err.message === 'session-finished')) throw err;
+          clearSession();
+          await begin();
+        }
       } catch {
         error.hidden = false;
         start.disabled = false;

@@ -21,7 +21,7 @@ You take part without giving your name. We cannot connect you to your conversati
 
 1. You scan the QR code with your own phone. The page opens in your browser in Finnish or English. No app is installed and no account is created.
 2. You read the summary on the consent page and confirm that you wish to take part and that you are 18 or older. This notification and the privacy notice are linked from that page.
-3. You chat with the chatbot about Finnish politics for as long as you like, typically 10 to 15 minutes [confirm]. You can pick a suggested topic or ask your own questions. You do not need to reveal your own opinions: you can ask neutral questions or play the role of any party's supporter. The chatbot may be designed to express a particular political viewpoint. We do not tell you in advance whether this is the case for your conversation or which viewpoint it would be, because the study asks whether people notice this on their own.
+3. You chat with the chatbot about Finnish politics for as long as you like, typically 10-15 minutes [confirm]. You can ask about any topic you like. You do not need to reveal your own opinions: you can ask neutral questions or play the role of any party's supporter. The chatbot may be designed to express a particular political viewpoint. We do not tell you in advance whether this is the case for your conversation or which viewpoint it would be, because the study asks whether people notice this on their own.
 4. You answer a short survey (about 3 minutes) about your use of chatbots and your experience of the conversation.
 5. On the final page we explain how the chatbot was set up for your conversation and what the study is about. You also get a session code and a button to delete your data.
 
@@ -29,7 +29,7 @@ You take part without giving your name. We cannot connect you to your conversati
 {{PROVIDER_NOTIFICATION_3}}
 <!-- MODEL-PROVIDER-BLOCK END -->
 
-Please do not write your name, contact details, or other details you would not want stored. The research data (your messages, the chatbot's replies, your survey answers, the time, the language and the setting given to the chatbot) are stored encrypted on servers of CSC, the Finnish national research IT centre, in Finland. We do not collect your name, email address, phone number, IP address or party preference. We do not ask your age, gender or occupation.
+Please do not write your name, contact details, or other details you would not want stored. The research data (your messages, the chatbot's replies, your survey answers, the time, the language and the setting given to the chatbot) are stored on servers of CSC, the Finnish national research IT centre, in Finland. Only the research team has access to them. If you use the microphone, your recording is sent to the study's own server at CSC in Finland only to turn it into text, and it is not stored; the text is stored like a typed message. The chatbot's replies are read aloud by the study's own speech server. We do not collect your name, email address, phone number, IP address or party preference. We do not ask your age, gender or occupation.
 
 ## 4. Possible benefits of the study
 

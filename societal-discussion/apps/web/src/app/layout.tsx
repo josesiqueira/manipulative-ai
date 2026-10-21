@@ -4,8 +4,8 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata = {
-  title: 'Vaalikeskustelu',
-  description: 'Keskustele politiikasta ja tulevista vaaleista chatbotin kanssa',
+  title: 'Vaalikeskustelu admin',
+  description: 'Research administration for the Vaalikeskustelu study',
   other: {
     google: 'notranslate',
   },

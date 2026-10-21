@@ -3,7 +3,8 @@
 // conversation and whether the populist framing was on, the session code
 // with a copy button, "Delete my data", the provider note and the contacts.
 // Shown only when the server has a survey row for the session; otherwise the
-// plain thank-you text.
+// plain thank-you text. At the end, a way to start over as a new participant
+// (another person on the same device): the finished session is never reused.
 import Institutional from '../../layouts/Institutional.astro';
 import { LANGUAGES, STRINGS, type Language } from '../../lib/strings';
 import { STUDY } from '../../lib/studyConfig';
@@ -34,6 +35,7 @@ const section = 'mt-8 max-w-prose';
   <div id="plain" data-testid="thank-you-plain" hidden>
     <h1 class="text-2xl font-bold">{t.thankYou.title}</h1>
     <p class="mt-2 max-w-prose">{t.thankYou.description}</p>
+    <a href={`/${lang}/`} class="mt-6 inline-block rounded border border-[var(--tau)] px-5 py-3 font-semibold text-[var(--tau)]" data-testid="thank-you-front">{t.thankYou.toFront}</a>
   </div>
 
   <article id="debrief" data-testid="debrief" hidden>
@@ -99,12 +101,17 @@ const section = 'mt-8 max-w-prose';
         {' '}<span class="text-sm text-[var(--muted)]">{t.consent.linksHint}</span>
       </p>
     </section>
+
+    <section class={`${section} border-t border-[var(--rule)] pt-6`}>
+      <p class="text-sm text-[var(--muted)]">{d.startOverNote}</p>
+      <button id="start-over" type="button" class="mt-3 w-full rounded border border-[var(--rule)] px-6 py-3 sm:w-auto" data-testid="start-over">{d.startOver}</button>
+    </section>
   </article>
 
   <script>
     import { deleteSessionData, getDebrief, type Debrief } from '../../lib/participantApi';
-    import { getSessionId } from '../../lib/session';
-    import { STRINGS, type Language } from '../../lib/strings';
+    import { clearSession, getSessionId } from '../../lib/session';
+    import { PARTY_NAMES_EN, STRINGS, type Language } from '../../lib/strings';
 
     const lang = document.documentElement.lang as Language;
     const d = STRINGS[lang].debrief;
@@ -126,7 +133,7 @@ const section = 'mt-8 max-w-prose';
         label.className = 'text-[var(--muted)]';
         label.textContent = `${d.conversationLabel.split('{{N}}').join(String(i + 1))}: `;
         const party = document.createElement('strong');
-        party.textContent = c.party_display_name;
+        party.textContent = lang === 'en' ? (PARTY_NAMES_EN[c.party_display_name] ?? c.party_display_name) : c.party_display_name;
         party.dataset.testid = 'debrief-party';
         const style = document.createElement('p');
         const framing = c.framing ?? (c.is_populist ? 'populist' : null);
@@ -165,6 +172,10 @@ const section = 'mt-8 max-w-prose';
       }
     };
     $('retry').addEventListener('click', () => void load());
+    $('start-over').addEventListener('click', () => {
+      clearSession();
+      window.location.assign(`/${lang}/`);
+    });
     void load();
 
     $('copy').addEventListener('click', async () => {

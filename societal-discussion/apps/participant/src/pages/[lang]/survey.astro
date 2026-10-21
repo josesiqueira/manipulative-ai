@@ -22,7 +22,7 @@ const section3Scales: Scale[] = [
   { name: 'topic_variety', label: s.topicVarietyLabel, ends: s.onesidedVaried },
   { name: 'detected_bias', label: s.detectedBiasLabel, ends: s.notAtAllClearly },
   { name: 'detected_terminology', label: s.detectedTerminologyLabel, ends: s.notNoticedClearly },
-  { name: 'detected_persuasion', label: s.detectedPersuasionLabel, ends: s.notAtAllClearly },
+  { name: 'detected_persuasion', label: s.detectedPersuasionLabel, ends: s.chatbotNotAtAllClearly },
 ];
 const textarea = 'mt-2 w-full rounded border border-[var(--rule)] px-3 py-2.5 placeholder:text-[var(--muted)]';
 ---
@@ -127,6 +127,48 @@ const textarea = 'mt-2 w-full rounded border border-[var(--rule)] px-3 py-2.5 pl
     const button = document.getElementById('submit') as HTMLButtonElement;
     const error = document.getElementById('error') as HTMLParagraphElement;
 
+    // Answers given so far survive a language switch (or a reload) in this
+    // tab. Radio answers are kept by position, since the yes/no labels are
+    // stored as the visible text, which differs between the languages.
+    interface Draft { text: Record<string, string>; choice: Record<string, number> }
+    const draftKey = `surveyDraft:${sessionId}`;
+    const saveDraft = () => {
+      const draft: Draft = { text: {}, choice: {} };
+      form.querySelectorAll<HTMLInputElement | HTMLTextAreaElement>('textarea, input[type="text"]').forEach((el) => {
+        if (el.value) draft.text[el.name] = el.value;
+      });
+      form.querySelectorAll<HTMLInputElement>('input[type="radio"]:checked').forEach((el) => {
+        draft.choice[el.name] = Array.from(form.querySelectorAll(`input[name="${el.name}"]`)).indexOf(el);
+      });
+      try {
+        sessionStorage.setItem(draftKey, JSON.stringify(draft));
+      } catch {
+        // Storage blocked: the answers live only on this page.
+      }
+    };
+    const restoreDraft = () => {
+      let draft: Draft | null = null;
+      try {
+        draft = JSON.parse(sessionStorage.getItem(draftKey) ?? 'null');
+      } catch {
+        draft = null;
+      }
+      if (!draft) return;
+      Object.entries(draft.text ?? {}).forEach(([name, value]) => {
+        const el = form.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[name="${name}"]`);
+        if (el) el.value = value;
+      });
+      Object.entries(draft.choice ?? {}).forEach(([name, index]) => {
+        const el = form.querySelectorAll<HTMLInputElement>(`input[name="${name}"]`)[index];
+        if (el) el.checked = true;
+      });
+    };
+    if (sessionId) {
+      restoreDraft();
+      form.addEventListener('input', saveDraft);
+      form.addEventListener('change', saveDraft);
+    }
+
     const text = (data: FormData, name: string) => ((data.get(name) as string | null) ?? '').trim();
     const number = (data: FormData, name: string) => {
       const v = data.get(name);
@@ -158,6 +200,11 @@ const textarea = 'mt-2 w-full rounded border border-[var(--rule)] px-3 py-2.5 pl
       try {
         await submitSurvey(sessionId, responses);
         setSurveySubmitted();
+        try {
+          sessionStorage.removeItem(draftKey);
+        } catch {
+          // Nothing to clean up.
+        }
         window.location.replace(`/${lang}/thank-you`);
       } catch {
         error.hidden = false;

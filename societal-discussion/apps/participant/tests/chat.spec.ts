@@ -22,7 +22,15 @@ test.afterEach(() => {
   thirdParty.length = 0;
 });
 
-async function fakeApi(page: Page, reply = 'Hyvää iltaa. Tervetuloa keskustelemaan.', synthesizeDelayMs = 0) {
+interface FakeOptions {
+  history?: { role: string; content: string }[]; // earlier messages of c1
+  complete?: boolean; // c1 has ended on the server
+  messageStatus?: number; // the answer to a message, when not 200
+  messageDelayMs?: number; // how long the model "thinks"
+  finished?: boolean; // the survey is done: no new conversation
+}
+
+async function fakeApi(page: Page, reply = 'Hyvää iltaa. Tervetuloa keskustelemaan.', synthesizeDelayMs = 0, options: FakeOptions = {}) {
   const calls: Call[] = [];
   await page.route('**/*', async (route: Route) => {
     const url = new URL(route.request().url());
@@ -39,9 +47,21 @@ async function fakeApi(page: Page, reply = 'Hyvää iltaa. Tervetuloa keskustele
     calls.push({ method: req.method(), path: url.pathname + url.search, body, contentType: ct, size: raw?.length ?? 0 });
     const json = (status: number, data: unknown) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) });
 
-    if (req.method() === 'GET' && url.pathname === '/api/sessions/ok') return json(200, { id: 'ok', created_at: 'x', consent_accepted_at: '2026-10-23T16:00:00+03:00' });
-    if (req.method() === 'POST' && url.pathname === '/api/conversations') return json(201, { id: 'c1', starter_topic: null, is_complete: false });
-    if (req.method() === 'POST' && url.pathname === '/api/conversations/c1/messages') return json(200, { id: 'm2', role: 'assistant', content: reply, created_at: 'x' });
+    const session = url.pathname.match(/^\/api\/sessions\/([^/]+)$/);
+    if (req.method() === 'GET' && session) return json(200, { id: session[1], created_at: 'x', consent_accepted_at: '2026-10-23T16:00:00+03:00' });
+    if (req.method() === 'POST' && url.pathname === '/api/conversations') {
+      if (options.finished) return json(403, { detail: 'Session finished' });
+      return json(201, { id: 'c1', starter_topic: null, is_complete: false });
+    }
+    if (req.method() === 'GET' && url.pathname === '/api/conversations/c1') return json(200, { id: 'c1', starter_topic: null, is_complete: options.complete ?? false });
+    if (req.method() === 'GET' && url.pathname === '/api/conversations/c1/messages') {
+      return json(200, (options.history ?? []).map((m, i) => ({ id: `h${i}`, created_at: 'x', ...m })));
+    }
+    if (req.method() === 'POST' && url.pathname === '/api/conversations/c1/messages') {
+      if (options.messageDelayMs) await new Promise((resolve) => setTimeout(resolve, options.messageDelayMs));
+      if (options.messageStatus) return json(options.messageStatus, { detail: 'refused' });
+      return json(200, { id: 'm2', role: 'assistant', content: reply, created_at: 'x' });
+    }
     if (req.method() === 'PUT' && url.pathname === '/api/conversations/c1/end') return json(200, { status: 'ok' });
     if (req.method() === 'POST' && url.pathname === '/api/speech/transcribe') return json(200, { text: 'Mitä mieltä olette veroista?' });
     if (req.method() === 'POST' && url.pathname === '/api/speech/synthesize') {
@@ -76,7 +96,7 @@ test.describe('chat page', () => {
     await expect(page.locator('.bubble-user')).toHaveText('Hei');
     await expect(page.locator('.bubble-assistant')).toContainText('Tervetuloa keskustelemaan.');
     await expect.poll(() => calls.filter((c) => c.path === '/api/speech/synthesize').length, { timeout: 20_000 }).toBe(2);
-    const message = calls.find((c) => c.path === '/api/conversations/c1/messages');
+    const message = calls.find((c) => c.method === 'POST' && c.path === '/api/conversations/c1/messages');
     expect(message?.body).toEqual({ content: 'Hei', input_mode: 'typed' });
     expect(calls.filter((c) => c.path === '/api/speech/synthesize').map((c) => (c.body as { text: string; language: string }))).toEqual([
       { conversation_id: 'c1', text: 'Hyvää iltaa.', language: 'fi' },
@@ -98,7 +118,7 @@ test.describe('chat page', () => {
     await page.getByTestId('send').click();
     await expect(page.locator('.bubble-user').nth(1)).toHaveText('Toinen');
     await expect(page.locator('.bubble-assistant')).toHaveCount(2, { timeout: 20_000 });
-    const sent = calls.filter((c) => c.path === '/api/conversations/c1/messages').map((c) => (c.body as { content: string }).content);
+    const sent = calls.filter((c) => c.method === 'POST' && c.path === '/api/conversations/c1/messages').map((c) => (c.body as { content: string }).content);
     expect(sent).toEqual(['Hei', 'Toinen']);
     // The first reply was cut short: fewer than its 8 sentences were requested before the second turn.
     const firstTurnSynth = calls.filter((c) => c.path === '/api/speech/synthesize').length;
@@ -160,7 +180,7 @@ test.describe('chat page', () => {
     expect(upload?.path).toBe('/api/speech/transcribe?conversation_id=c1&language=fi');
     expect(upload?.contentType).toMatch(/^audio\/webm/);
     expect(upload?.size ?? 0).toBeGreaterThan(1000);
-    const message = calls.find((c) => c.path === '/api/conversations/c1/messages');
+    const message = calls.find((c) => c.method === 'POST' && c.path === '/api/conversations/c1/messages');
     expect(message?.body).toEqual({ content: 'Mitä mieltä olette veroista?', input_mode: 'spoken' });
     await expect(page.locator('.bubble-assistant')).toBeVisible();
   });
@@ -193,5 +213,120 @@ test.describe('chat page', () => {
     await expect(page.getByTestId('transcript')).toBeVisible();
     expect(calls.some((c) => c.method === 'POST' && c.path === '/api/conversations')).toBe(true);
     expect(await page.evaluate(() => localStorage.getItem('conversationId'))).toBe('c1');
+  });
+
+  test('a reload shows the earlier messages again, in plain text and without speaking them', async ({ page }) => {
+    const calls = await fakeApi(page, undefined, 0, {
+      history: [
+        { role: 'user', content: 'Mitä mieltä olette veroista?' },
+        { role: 'assistant', content: '## Verot\n**Verotuksen pitää olla reilua.** Se on *selvä* asia.\n- Palkkaveroa kevennetään\n- Arvonlisävero pysyy' },
+      ],
+    });
+    await openChat(page);
+    // The page loads the history while three browsers render the head: allow time.
+    await expect(page.locator('.bubble-user')).toHaveText('Mitä mieltä olette veroista?', { timeout: 20_000 });
+    const reply = page.locator('.bubble-assistant');
+    // textContent, not toHaveText: the line breaks themselves are checked.
+    await expect.poll(() => reply.evaluate((el) => el.textContent), { timeout: 20_000 }).toBe('Verot\nVerotuksen pitää olla reilua. Se on selvä asia.\n• Palkkaveroa kevennetään\n• Arvonlisävero pysyy');
+    await expect(page.getByTestId('stage')).toHaveAttribute('data-avatar-mode', /live|still/, { timeout: 60_000 });
+    expect(calls.some((c) => c.path === '/api/speech/synthesize')).toBe(false);
+    expect(calls.some((c) => c.method === 'POST' && c.path === '/api/conversations')).toBe(false);
+  });
+
+  test('a stored conversation that has ended is replaced by a new one', async ({ page }) => {
+    const calls = await fakeApi(page, undefined, 0, { complete: true, history: [{ role: 'user', content: 'Vanha viesti' }] });
+    await openChat(page);
+    await expect.poll(() => calls.some((c) => c.method === 'POST' && c.path === '/api/conversations')).toBe(true);
+    await expect(page.locator('.bubble')).toHaveCount(0);
+  });
+
+  test('Markdown in a reply is shown and spoken as plain text, the highlight keeps working', async ({ page }) => {
+    const reply = '**Koulutus on oikeus.** Se on *selvä* asia.\n\n- Ensimmäinen kohta\n- Toinen kohta';
+    const calls = await fakeApi(page, reply, 300);
+    await openChat(page);
+    await expect(page.getByTestId('stage')).toHaveAttribute('data-avatar-mode', 'live', { timeout: 60_000 });
+    await page.getByTestId('message').fill('Hei');
+    await page.getByTestId('send').click();
+    const bubble = page.locator('.bubble-assistant');
+    await expect(bubble).toContainText('Koulutus on oikeus.');
+    // While speaking, the spoken words are lit up word by word.
+    await expect(bubble.locator('.spoken')).not.toHaveText('', { timeout: 20_000 });
+    await expect.poll(() => calls.filter((c) => c.path === '/api/speech/synthesize').length, { timeout: 20_000 }).toBe(4);
+    await expect(page.getByTestId('status')).toHaveText('', { timeout: 20_000 });
+    expect(await bubble.evaluate((el) => el.textContent)).toBe('Koulutus on oikeus. Se on selvä asia.\n\n• Ensimmäinen kohta\n• Toinen kohta');
+    const spoken = calls.filter((c) => c.path === '/api/speech/synthesize').map((c) => (c.body as { text: string }).text);
+    expect(spoken).toEqual(['Koulutus on oikeus.', 'Se on selvä asia.', 'Ensimmäinen kohta', 'Toinen kohta']);
+  });
+
+  test('while the reply is on its way a waiting bubble shows, with a note after a while', async ({ page }) => {
+    await fakeApi(page, undefined, 0, { messageDelayMs: 14_000 });
+    await openChat(page);
+    await page.getByTestId('message').fill('Hei');
+    await page.getByTestId('send').click();
+    const waiting = page.getByTestId('waiting');
+    await expect(waiting).toBeVisible();
+    await expect(waiting).toHaveAttribute('aria-label', 'Mietin...');
+    await expect(page.getByTestId('status')).toHaveText('Mietin...');
+    await expect(waiting).toContainText('Vastaus voi viedä puoli minuuttia.', { timeout: 12_000 });
+    await expect(page.locator('.bubble-assistant:not(.bubble-waiting)')).toContainText('Tervetuloa', { timeout: 15_000 });
+    await expect(waiting).toHaveCount(0);
+  });
+
+  test('a failed send puts the text back into the input and says why', async ({ page }) => {
+    await fakeApi(page, undefined, 0, { messageStatus: 504 });
+    await openChat(page);
+    await page.getByTestId('message').fill('Kerro verotuksesta');
+    await page.getByTestId('send').click();
+    await expect(page.getByTestId('hint')).toHaveText('Viestin lähetys epäonnistui. Viestisi on yhä kentässä: yritä uudelleen.');
+    await expect(page.getByTestId('hint')).toHaveClass(/is-error/);
+    await expect(page.getByTestId('message')).toHaveValue('Kerro verotuksesta');
+    await expect(page.locator('.bubble')).toHaveCount(0);
+    await expect(page.getByTestId('waiting')).toHaveCount(0);
+    await expect(page.getByTestId('send')).toBeEnabled();
+  });
+
+  test('the message limit gets its own message', async ({ page }) => {
+    await fakeApi(page, undefined, 0, { messageStatus: 429 });
+    await openChat(page);
+    await page.getByTestId('message').fill('Vielä yksi');
+    await page.getByTestId('send').click();
+    await expect(page.getByTestId('hint')).toContainText('enimmäismäärä viestejä');
+    await expect(page.getByTestId('message')).toHaveValue('Vielä yksi');
+  });
+
+  test('an ended conversation offers a new one', async ({ page }) => {
+    const calls = await fakeApi(page, undefined, 0, { messageStatus: 400 });
+    await openChat(page);
+    await page.getByTestId('message').fill('Hei');
+    await page.getByTestId('send').click();
+    await expect(page.getByTestId('hint')).toContainText('Tämä keskustelu on jo päättynyt.');
+    await page.getByRole('button', { name: 'Aloita uusi keskustelu' }).click();
+    await expect.poll(() => calls.some((c) => c.method === 'POST' && c.path === '/api/conversations')).toBe(true);
+  });
+
+  test('a finished session is sent to consent as a new participant', async ({ page }) => {
+    await fakeApi(page, undefined, 0, { finished: true });
+    await page.goto('/fi/');
+    await page.evaluate(() => localStorage.setItem('sessionId', 'ok'));
+    await page.goto('/fi/chat');
+    await expect(page).toHaveURL(/\/fi\/consent$/);
+    expect(await page.evaluate(() => localStorage.getItem('sessionId'))).toBeNull();
+  });
+
+  test('the session code is shown on the chat page and can be copied', async ({ page, context, browserName }) => {
+    await fakeApi(page);
+    await page.goto('/en/');
+    await page.evaluate(() => {
+      localStorage.setItem('sessionId', '3f2a9c11-1234-4abc-8def-000000000000');
+      localStorage.setItem('conversationId', 'c1');
+    });
+    await page.goto('/en/chat');
+    await expect(page.getByTestId('chat-session')).toContainText('Your session code for data requests:');
+    await expect(page.getByTestId('chat-session-code')).toHaveText('3F2A-9C11');
+    if (browserName !== 'chromium') return;
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.getByTestId('chat-copy-code').click();
+    await expect(page.getByTestId('chat-copy-code')).toHaveText('Copied');
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('3F2A-9C11');
   });
 });

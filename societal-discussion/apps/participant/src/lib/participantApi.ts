@@ -28,6 +28,19 @@ export async function getSession(id: string): Promise<SessionInfo | null> {
   return res.json();
 }
 
+// The server's reason text, or '' when the body is not the usual JSON.
+async function detail(res: Response): Promise<string> {
+  try {
+    const data = await res.json();
+    return typeof data?.detail === 'string' ? data.detail : '';
+  } catch {
+    return '';
+  }
+}
+
+// The error codes the pages act on. 'session-finished' means the survey is
+// done or the data deleted: that session takes no new conversation, and the
+// browser starts again through consent.
 export async function createConversation(sessionId: string, language: Language): Promise<string> {
   const res = await fetch(`${API_URL}/api/conversations`, {
     method: 'POST',
@@ -35,27 +48,50 @@ export async function createConversation(sessionId: string, language: Language):
     body: JSON.stringify({ session_id: sessionId, starter_topic: null, language }),
   });
   if (res.status === 404) throw new Error('session-missing');
-  if (res.status === 403) throw new Error('consent-required');
+  if (res.status === 403) throw new Error((await detail(res)) === 'Consent required' ? 'consent-required' : 'session-finished');
+  if (res.status === 429) throw new Error('too-many-conversations');
   if (!res.ok) throw new Error('conversation-create-failed');
   const data = await res.json();
   return data.id as string;
 }
 
-export type InputMode = 'typed' | 'spoken';
+// null when the server does not know the conversation (404).
+export async function getConversation(conversationId: string): Promise<{ id: string; is_complete: boolean } | null> {
+  const res = await fetch(`${API_URL}/api/conversations/${encodeURIComponent(conversationId)}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error('conversation-get-failed');
+  return res.json();
+}
 
-export interface AssistantMessage {
+export interface ChatMessage {
   id: string;
   role: string;
   content: string;
   created_at: string;
 }
 
+// The earlier turns, oldest first, so a reload shows the conversation again.
+export async function getMessages(conversationId: string): Promise<ChatMessage[]> {
+  const res = await fetch(`${API_URL}/api/conversations/${encodeURIComponent(conversationId)}/messages`);
+  if (!res.ok) throw new Error('messages-get-failed');
+  return res.json();
+}
+
+export type InputMode = 'typed' | 'spoken';
+
+export type AssistantMessage = ChatMessage;
+
+// Error codes: 'conversation-closed' (ended, or unknown to the server),
+// 'too-many-messages' (the per-conversation limit), 'message-failed' (anything
+// else, including a timeout: the participant may simply try again).
 export async function sendMessage(conversationId: string, content: string, inputMode: InputMode): Promise<AssistantMessage> {
   const res = await fetch(`${API_URL}/api/conversations/${encodeURIComponent(conversationId)}/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content, input_mode: inputMode }),
   });
+  if (res.status === 400 || res.status === 403 || res.status === 404) throw new Error('conversation-closed');
+  if (res.status === 429) throw new Error('too-many-messages');
   if (!res.ok) throw new Error('message-failed');
   return res.json();
 }
@@ -113,6 +149,9 @@ export async function submitSurvey(sessionId: string, responses: SurveyResponses
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_id: sessionId, responses }),
   });
+  // 409: the row is already stored (a second tab, or a retry after a lost
+  // response), so the survey is done.
+  if (res.status === 409) return;
   if (!res.ok) throw new Error('survey-failed');
 }
 

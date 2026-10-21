@@ -38,6 +38,7 @@ export interface Strings {
     listening: string;
     transcribing: string;
     thinking: string;
+    thinkingSlow: string;
     speaking: string;
     micDenied: string;
     micEmpty: string;
@@ -46,8 +47,16 @@ export interface Strings {
     enableSound: string;
     privacyHint: string;
     sendError: string;
+    conversationClosed: string;
+    newConversation: string;
+    tooManyMessages: string;
+    tooManyConversations: string;
+    toSurvey: string;
     speechError: string;
     stillFace: string;
+    sessionCode: string;
+    copy: string;
+    copied: string;
   };
   surveyEntry: { thanks: string; description: string; startSurvey: string; backToChat: string };
   survey: {
@@ -72,6 +81,8 @@ export interface Strings {
     onesidedVaried: { low: string; high: string };
     detectedBiasLabel: string;
     notAtAllClearly: { low: string; high: string };
+    // The persuasion item asks about the chatbot, not the participant.
+    chatbotNotAtAllClearly: { low: string; high: string };
     detectedTerminologyLabel: string;
     notNoticedClearly: { low: string; high: string };
     detectedPersuasionLabel: string;
@@ -82,7 +93,7 @@ export interface Strings {
     submitting: string;
     submitError: string;
   };
-  thankYou: { title: string; description: string; loading: string };
+  thankYou: { title: string; description: string; toFront: string; loading: string };
   debrief: {
     title: string;
     intro: string;
@@ -112,6 +123,8 @@ export interface Strings {
     retry: string;
     contactTitle: string;
     contactBody: string; // contains {{EMAIL}}, {{RESEARCHER}}, {{RESEARCHER_EMAIL}}, {{DPO}}
+    startOverNote: string;
+    startOver: string;
   };
   footer: { contact: string };
 }
@@ -138,6 +151,7 @@ export const STRINGS: Record<Language, Strings> = {
         'Keskustelet niin kauan kuin haluat ja vastaat sitten lyhyeen kyselyyn (noin 3 minuuttia). Lopuksi kerromme, miten chatbot oli asetettu.',
         'Chatbot voi olla ohjeistettu esittämään tietyn puolueen näkökantaa. Emme kerro sitä etukäteen. Vastaukset tuottaa tekoäly, eivätkä ne ole minkään puolueen lausuntoja.',
         'Emme kerää nimeäsi, sähköpostiasi, IP-osoitettasi emmekä puoluekantaasi. Sinun ei tarvitse kertoa omia mielipiteitäsi: kysy neutraalisti tai esitä minkä tahansa puolueen kannattajaa. Älä kirjoita nimiä tai muita henkilötietoja.',
+        'Voit myös puhua mikrofonilla. Jos käytät sitä, äänitallenne lähetetään tutkimuksen omalle palvelimelle CSC:lle Suomeen vain tekstiksi muuntamista varten, eikä sitä tallenneta. Teksti tallennetaan ja käsitellään kuten kirjoitettu viesti, ja siihen merkitään, että se oli puhuttu. Chatbotin vastaukset luetaan ääneen tutkimuksen omalla puhepalvelimella.',
         '{{PROVIDER_BULLET}}',
         'Keskustelusi ja kyselyvastauksesi tallennetaan CSC:n palvelimille Suomeen. Vain tutkimusryhmä pääsee niihin, niitä käytetään vain tutkimukseen ja ne hävitetään viimeistään {{RETENTION_END}}.',
         'Voit lopettaa milloin tahansa sulkemalla sivun. Lopussa saat istuntokoodin ja voit poistaa omat tietosi yhdellä painikkeella.',
@@ -165,6 +179,7 @@ export const STRINGS: Record<Language, Strings> = {
       listening: 'Kuuntelen... päästä irti, kun olet valmis',
       transcribing: 'Tunnistan puhetta...',
       thinking: 'Mietin...',
+      thinkingSlow: 'Vastaus voi viedä puoli minuuttia.',
       speaking: 'Puhun...',
       micDenied: 'Mikrofonia ei saatu käyttöön. Voit kirjoittaa viestisi.',
       micEmpty: 'Tallenne jäi tyhjäksi.',
@@ -172,16 +187,24 @@ export const STRINGS: Record<Language, Strings> = {
       noSound: 'Ei ääntä? Ota puhelimen äänetön tila pois päältä.',
       enableSound: 'Napauta ottaaksesi äänen käyttöön',
       privacyHint: 'Älä kirjoita tai sano nimiä tai muita henkilötietoja.',
-      sendError: 'Viestin lähetys epäonnistui. Yritä uudelleen.',
+      sendError: 'Viestin lähetys epäonnistui. Viestisi on yhä kentässä: yritä uudelleen.',
+      conversationClosed: 'Tämä keskustelu on jo päättynyt.',
+      newConversation: 'Aloita uusi keskustelu',
+      tooManyMessages: 'Tässä keskustelussa on jo enimmäismäärä viestejä. Paina "Lopeta keskustelu" ja siirry kyselyyn.',
+      tooManyConversations: 'Olet jo käynyt enimmäismäärän keskusteluja.',
+      toSurvey: 'Siirry kyselyyn',
       speechError: 'Puheen käsittely epäonnistui. Voit kirjoittaa viestisi.',
       stillFace: 'Kasvot eivät latautuneet tälle laitteelle; ääni ja teksti toimivat silti.',
+      sessionCode: 'Istuntokoodisi tietopyyntöjä varten:',
+      copy: 'Kopioi',
+      copied: 'Kopioitu',
     },
     // Survey texts unchanged from the Next.js app.
     surveyEntry: {
       thanks: 'Kiitos keskustelusta!',
       description: 'Vastaa seuraavaksi lyhyeen kyselyyn kokemuksestasi. Kysely kestää noin 2-3 minuuttia.',
       startSurvey: 'Aloita kysely',
-      backToChat: 'Takaisin keskusteluun',
+      backToChat: 'Aloita uusi keskustelu',
     },
     survey: {
       pageTitle: 'Kysely',
@@ -203,8 +226,9 @@ export const STRINGS: Record<Language, Strings> = {
       slowFast: { low: 'Hidas', high: 'Nopea' },
       topicVarietyLabel: 'Miten monipuolisesti chatbot käsitteli aiheita? (1 = yksipuolisesti, 5 = monipuolisesti)',
       onesidedVaried: { low: 'Yksipuolisesti', high: 'Monipuolisesti' },
-      detectedBiasLabel: 'Havaitko chatbotin vastauksissa puolueellisuutta? (1 = en lainkaan, 5 = selvästi)',
+      detectedBiasLabel: 'Havaitsitko chatbotin vastauksissa puolueellisuutta? (1 = en lainkaan, 5 = selvästi)',
       notAtAllClearly: { low: 'En lainkaan', high: 'Selvästi' },
+      chatbotNotAtAllClearly: { low: 'Ei lainkaan', high: 'Selvästi' },
       detectedTerminologyLabel: 'Käyttikö chatbot tietynlaista sanastoa tai termejä? (1 = en huomannut, 5 = selvästi)',
       notNoticedClearly: { low: 'En huomannut', high: 'Selvästi' },
       detectedPersuasionLabel: 'Yrittikö chatbot mielestäsi vaikuttaa mielipiteeseesi? (1 = ei lainkaan, 5 = selvästi)',
@@ -216,8 +240,9 @@ export const STRINGS: Record<Language, Strings> = {
       submitError: 'Kyselyn lähetys epäonnistui. Yritä uudelleen.',
     },
     thankYou: {
-      title: 'Kiitos osallistumisesta!',
-      description: 'Vastauksesi on tallennettu. Voit nyt sulkea tämän sivun.',
+      title: 'Kiitos kiinnostuksestasi',
+      description: 'Tällä laitteella ei ole valmista osallistumista, jonka tiedot voisimme näyttää. Voit aloittaa etusivulta.',
+      toFront: 'Etusivulle',
       loading: 'Haetaan...',
     },
     debrief: {
@@ -228,7 +253,7 @@ export const STRINGS: Record<Language, Strings> = {
         'Chatbot, jonka kanssa keskustelit, oli ohjeistettu noudattamaan yhden suomalaisen puolueen ohjelmaa. Keskusteluissasi puolue oli:',
       conversationLabel: 'Keskustelu {{N}}',
       populistOn:
-        'Lisäksi chatbottia ohjeistettiin käyttämään populistista puhetapaa, esimerkiksi asettamaan vastakkain "tavallinen kansa" ja "eliitti".',
+        'Lisäksi chatbottia ohjeistettiin käyttämään populistista puhetapaa, esimerkiksi asettamaan vastakkain "tavallisen kansan" ja "eliitin".',
       antipopulistOn:
         'Lisäksi chatbottia ohjeistettiin käyttämään antipopulistista puhetapaa, esimerkiksi korostamaan moniarvoisuutta ja puolustamaan demokraattisia instituutioita.',
       populistOff: 'Chatbottia ei ohjeistettu käyttämään erityistä puhetapaa puolueen ohjelman lisäksi.',
@@ -255,7 +280,10 @@ export const STRINGS: Record<Language, Strings> = {
       retry: 'Yritä uudelleen',
       contactTitle: 'Kysymykset ja palaute',
       contactBody:
-        'José Siqueira de Cerqueira, Tampereen yliopisto, {{EMAIL}} (paikalla tänään). Vastuullinen tutkija: {{RESEARCHER}}, Vaasan yliopisto, {{RESEARCHER_EMAIL}}. Tietosuoja: {{DPO}}.',
+        'José Siqueira de Cerqueira, Tampereen yliopisto, {{EMAIL}} (paikalla Metsossa 23.10.2026). Vastuullinen tutkija: {{RESEARCHER}}, Vaasan yliopisto, {{RESEARCHER_EMAIL}}. Tietosuoja: {{DPO}}.',
+      startOverNote:
+        'Jos joku toinen haluaa osallistua tällä laitteella, aloita alusta. Tämä sivu ei sen jälkeen enää näy tällä laitteella, joten tallenna istuntokoodisi ensin.',
+      startOver: 'Aloita alusta uutena osallistujana',
     },
     footer: { contact: 'Yhteydenotot:' },
   },
@@ -280,6 +308,7 @@ export const STRINGS: Record<Language, Strings> = {
         'You chat for as long as you like, then answer a short survey (about 3 minutes). At the end we tell you how the chatbot was set up.',
         "The chatbot may be instructed to express a particular party's viewpoint. We do not tell you in advance. Its replies are generated by an AI and are not statements by any party.",
         'We do not collect your name, email, IP address or party preference. You never have to state your own opinions: ask neutral questions or play the supporter of any party. Do not type names or other personal details.',
+        "You can also speak using the microphone. If you do, the recording is sent to the study's own server at CSC in Finland only to turn it into text, and it is not stored. The text is stored and processed like a typed message, marked as spoken. The chatbot's replies are read aloud by the study's own speech server.",
         '{{PROVIDER_BULLET}}',
         'Your conversation and survey answers are stored on CSC servers in Finland. Only the research team has access, they are used only for research, and they are deleted by {{RETENTION_END}}.',
         'You can stop at any time by closing the page. At the end you get a session code and can delete your own data with one button.',
@@ -307,6 +336,7 @@ export const STRINGS: Record<Language, Strings> = {
       listening: 'Listening... release when you are done',
       transcribing: 'Recognising speech...',
       thinking: 'Thinking...',
+      thinkingSlow: 'A reply can take up to half a minute.',
       speaking: 'Speaking...',
       micDenied: 'The microphone could not be used. You can type your message.',
       micEmpty: 'The recording was empty.',
@@ -314,15 +344,23 @@ export const STRINGS: Record<Language, Strings> = {
       noSound: 'No sound? Turn off silent mode on your phone.',
       enableSound: 'Tap to enable sound',
       privacyHint: 'Do not type or say names or other personal details.',
-      sendError: 'Failed to send the message. Please try again.',
+      sendError: 'The message could not be sent. Your text is still in the box: please try again.',
+      conversationClosed: 'This conversation has already ended.',
+      newConversation: 'Start a new conversation',
+      tooManyMessages: 'This conversation has reached the maximum number of messages. Press "End conversation" to go on to the survey.',
+      tooManyConversations: 'You have already had the maximum number of conversations.',
+      toSurvey: 'Go to the survey',
       speechError: 'Speech processing failed. You can type your message.',
       stillFace: 'The face did not load on this device; voice and text still work.',
+      sessionCode: 'Your session code for data requests:',
+      copy: 'Copy',
+      copied: 'Copied',
     },
     surveyEntry: {
       thanks: 'Thank you for the conversation!',
       description: 'Next, please answer a short survey about your experience. The survey takes about 2 to 3 minutes.',
       startSurvey: 'Start the survey',
-      backToChat: 'Back to chat',
+      backToChat: 'Start a new conversation',
     },
     survey: {
       pageTitle: 'Survey',
@@ -346,6 +384,7 @@ export const STRINGS: Record<Language, Strings> = {
       onesidedVaried: { low: 'One-sided', high: 'Varied' },
       detectedBiasLabel: "Did you notice bias in the chatbot's responses? (1 = not at all, 5 = clearly)",
       notAtAllClearly: { low: 'Not at all', high: 'Clearly' },
+      chatbotNotAtAllClearly: { low: 'Not at all', high: 'Clearly' },
       detectedTerminologyLabel: 'Did the chatbot use particular vocabulary or terminology? (1 = did not notice, 5 = clearly)',
       notNoticedClearly: { low: 'Did not notice', high: 'Clearly' },
       detectedPersuasionLabel: 'Did the chatbot try to influence your opinion? (1 = not at all, 5 = clearly)',
@@ -357,8 +396,9 @@ export const STRINGS: Record<Language, Strings> = {
       submitError: 'Failed to submit the survey. Please try again.',
     },
     thankYou: {
-      title: 'Thank you for participating!',
-      description: 'Your responses have been recorded. You can now close this page.',
+      title: 'Thank you for your interest',
+      description: 'There is no finished participation on this device to show. You can start from the front page.',
+      toFront: 'Front page',
       loading: 'Loading...',
     },
     debrief: {
@@ -396,8 +436,25 @@ export const STRINGS: Record<Language, Strings> = {
       retry: 'Try again',
       contactTitle: 'Questions and feedback',
       contactBody:
-        'José Siqueira de Cerqueira, Tampere University, {{EMAIL}} (on site today). Responsible researcher: {{RESEARCHER}}, University of Vaasa, {{RESEARCHER_EMAIL}}. Data protection: {{DPO}}.',
+        'José Siqueira de Cerqueira, Tampere University, {{EMAIL}} (on site at Metso on 23 October 2026). Responsible researcher: {{RESEARCHER}}, University of Vaasa, {{RESEARCHER_EMAIL}}. Data protection: {{DPO}}.',
+      startOverNote:
+        'If someone else wants to take part on this device, start over. This page will then no longer be shown on this device, so save your session code first.',
+      startOver: 'Start over as a new participant',
     },
     footer: { contact: 'Contact:' },
   },
+};
+
+// The debrief names the party as the API gives it (the Finnish name). The
+// English page shows the official English name with the Finnish one after it.
+export const PARTY_NAMES_EN: Record<string, string> = {
+  Perussuomalaiset: 'Finns Party (Perussuomalaiset)',
+  Kokoomus: 'National Coalition Party (Kokoomus)',
+  SDP: 'Social Democratic Party (SDP)',
+  Keskusta: 'Centre Party (Keskusta)',
+  Vihreät: 'Green League (Vihreät)',
+  Vasemmistoliitto: 'Left Alliance (Vasemmistoliitto)',
+  RKP: "Swedish People's Party (RKP)",
+  Kristillisdemokraatit: 'Christian Democrats (KD)',
+  'Liike Nyt': 'Movement Now (Liike Nyt)',
 };

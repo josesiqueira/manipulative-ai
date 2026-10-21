@@ -1,11 +1,16 @@
-// Split a reply into sentences for sentence-by-sentence speech. Long sentences
-// are cut at commas so no request exceeds the server's text cap.
+import { BULLET } from './plainText';
+
+// Split a reply (already plain text, see plainText.ts) into sentences for
+// sentence-by-sentence speech. A line break ends a sentence too, since list
+// items and headings often have no full stop; the list bullet is not spoken.
+// Long sentences are cut at commas so no request exceeds the server's text cap.
 export function splitSentences(text: string, maxLength = 280): string[] {
   const out: string[] = [];
   const parts = text
-    .replace(/\s+/g, ' ')
-    .trim()
-    .split(/(?<=[.!?…])\s+(?=\S)/u)
+    .split(/\n+/)
+    .map((line) => line.replace(new RegExp(`^\\s*${BULLET}\\s*`), '').replace(/\s+/g, ' ').trim())
+    // No cut after a number with a full stop ("1. Ensin", "23. lokakuuta").
+    .flatMap((line) => line.split(/(?<=[!?…]|(?<!\d)\.)\s+(?=\S)/u))
     .filter((p) => p.length > 0);
   for (const part of parts) {
     if (part.length <= maxLength) {

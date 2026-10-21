@@ -48,7 +48,7 @@ José Siqueira de Cerqueira, Tampere University, Kalevantie 4, 33100 Tampere [co
 Name: "Vaalikeskustelu political chatbot study, public demonstration 23.10.2026".
 One-time research: yes. Longitudinal study: no.
 Duration of processing: data are collected on 23 October 2026 during the public lecture (from 16.00, about two hours) and until the link is closed on [24.10.2026, D12]. Personal data are processed for analysis and publication until {{RETENTION_END}}. Processing after that date is described in section 16.
-The study is intended for adults. Participants confirm before starting that they are at least [18] years old.
+The study is intended for adults. Participants confirm before starting that they are at least 18 years old.
 
 ## 8. Purpose of the processing of personal data
 
@@ -74,12 +74,13 @@ Collected by the Vaalikeskustelu application and stored on the CSC Rahti platfor
 - a random session identifier (UUID);
 - timestamps (start, confirmation of participation, each message, survey submission);
 - your language choice; your confirmation that you are at least 18 (yes);
-- the experimental condition assigned to your session (the party the chatbot was instructed to represent and the framing variant) and the starter topic you chose;
-- every message you type and every chatbot reply (message text encrypted at rest);
-- technical metadata of the language-model calls (token counts [and model identifier, if stored]);
+- the experimental condition (the party the chatbot was instructed to represent and the framing variant), for each conversation;
+- every message you type or speak and every chatbot reply;
+- if you use the microphone: whether each message was typed or spoken. The recording itself is converted to text on the study's own server at CSC in Finland and is not stored; the chatbot's replies are read aloud by the study's own speech server;
+- technical metadata of the language-model calls (token counts and the model identifier);
 - your survey answers (chatbot usage, which chatbots you use, prior political chats, attitude to chatbots on a 1 to 5 scale, free reflection, ratings of speed, topic variety, detected bias, terminology and persuasion on a 1 to 5 scale, free-text observations).
 
-Not collected by the application: name, email, telephone, IP address, device identifiers, location, account. No cookies; the browser's local storage holds only your language choice and the event access code.
+Not collected by the application: name, email, telephone, IP address, device identifiers, location, account. No cookies. Your browser's local storage keeps your language choice, the random session and conversation identifiers, and a note that you have answered the survey, so that the pages work. They stay in your browser until you clear its site data. While you answer the survey, your answers so far are also kept in the browser tab, so that switching the language does not lose them; they are removed when you submit.
 
 Platform logs: the CSC Rahti routing layer may record your device's IP address in short-lived technical logs [verify retention with CSC]. The researchers do not use these logs and cannot link them to research data.
 
@@ -112,7 +113,7 @@ No decisions producing legal effects or similarly significantly affecting you ar
 
 The data are confidential. No paper material is produced; confirmation of participation is recorded electronically in the session record.
 
-IT safeguards: username and password; multi-factor authentication for university and CSC accounts [verify]; access logging [verify]; access control (Rahti project limited to named Tampere University researchers, listed in the DPIA); encryption in transit (TLS between your browser and the application and between the application and the language-model provider); encryption at rest (message text encrypted in the database; the key is held as a platform secret outside the source code [verify]); pseudonymisation by design (no direct identifiers collected); CSC personnel access the platform only for technical operation; the exported dataset is held in a restricted Teams workspace accessible only to the researchers in section 2; the Rahti database is deleted after verified export [date, D3].
+IT safeguards: username and password; multi-factor authentication for university and CSC accounts [verify]; access logging [verify]; access control (Rahti project limited to named Tampere University researchers, listed in the DPIA); encryption in transit (TLS between your browser and the application and between the application and the language-model provider); storage on CSC's storage service in Finland, with access limited to the members of the Rahti project; pseudonymisation by design (no direct identifiers collected); CSC personnel access the platform only for technical operation; the exported dataset is held in a restricted Teams workspace accessible only to the researchers in section 2; the Rahti database is deleted after verified export [date, D3].
 
 Direct identifiers: none are collected. Identifying details volunteered in free text are removed in a documented screening step before analysis.
 

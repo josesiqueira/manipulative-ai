@@ -21,7 +21,7 @@ Osallistut nimettömänä. Emme voi jälkikäteen yhdistää sinua keskusteluusi
 
 1. Skannaat QR-koodin omalla puhelimellasi. Sivu avautuu selaimeesi suomeksi tai englanniksi. Sovellusta ei asenneta eikä käyttäjätiliä luoda.
 2. Luet suostumussivun yhteenvedon ja vahvistat, että haluat osallistua ja että olet täyttänyt 18 vuotta. Tämä tiedote ja tietosuojailmoitus ovat linkitettyinä samalla sivulla.
-3. Keskustelet chatbotin kanssa suomalaisesta politiikasta niin kauan kuin haluat, tyypillisesti 10 tai 15 minuuttia [vahvistettava]. Voit valita ehdotetun aiheen tai kysyä omia kysymyksiäsi. Sinun ei tarvitse kertoa omia mielipiteitäsi: voit kysyä neutraaleja kysymyksiä tai esittää minkä tahansa puolueen kannattajaa. Chatbot voi olla suunniteltu ilmaisemaan tiettyä poliittista näkökantaa. Emme kerro etukäteen, koskeeko tämä sinun keskusteluasi tai mikä näkökanta olisi kyseessä, koska tutkimus selvittää, huomaavatko ihmiset tämän itse.
+3. Keskustelet chatbotin kanssa suomalaisesta politiikasta niin kauan kuin haluat, tyypillisesti 10-15 minuuttia [vahvistettava]. Voit kysyä mistä tahansa aiheesta. Sinun ei tarvitse kertoa omia mielipiteitäsi: voit kysyä neutraaleja kysymyksiä tai esittää minkä tahansa puolueen kannattajaa. Chatbot voi olla suunniteltu ilmaisemaan tiettyä poliittista näkökantaa. Emme kerro etukäteen, koskeeko tämä sinun keskusteluasi tai mikä näkökanta olisi kyseessä, koska tutkimus selvittää, huomaavatko ihmiset tämän itse.
 4. Vastaat lyhyeen kyselyyn (noin 3 minuuttia) chatbottien käytöstäsi ja keskustelukokemuksestasi.
 5. Viimeisellä sivulla kerromme, miten chatbot oli asetettu sinun keskustelussasi ja mistä tutkimuksessa on kyse. Saat myös istuntokoodin ja painikkeen, jolla voit poistaa tietosi.
 
@@ -29,7 +29,7 @@ Osallistut nimettömänä. Emme voi jälkikäteen yhdistää sinua keskusteluusi
 {{PROVIDER_NOTIFICATION_3}}
 <!-- MODEL-PROVIDER-BLOCK END -->
 
-Älä kirjoita nimeäsi, yhteystietojasi tai muita tietoja, joita et halua tallennettavaksi. Tutkimusaineisto (viestisi, chatbotin vastaukset, kyselyvastauksesi, ajankohta, kieli ja chatbotille annettu asetus) tallennetaan salattuna Suomessa sijaitseville CSC:n (Tieteen tietotekniikan keskus) palvelimille. Emme kerää nimeäsi, sähköpostiosoitettasi, puhelinnumeroasi, IP-osoitettasi tai puoluekantaasi. Emme kysy ikääsi, sukupuoltasi tai ammattiasi.
+Älä kirjoita nimeäsi, yhteystietojasi tai muita tietoja, joita et halua tallennettavaksi. Tutkimusaineisto (viestisi, chatbotin vastaukset, kyselyvastauksesi, ajankohta, kieli ja chatbotille annettu asetus) tallennetaan Suomessa sijaitseville CSC:n (Tieteen tietotekniikan keskus) palvelimille. Niihin pääsee vain tutkimusryhmä. Jos käytät mikrofonia, äänitallenne lähetetään tutkimuksen omalle palvelimelle CSC:lle Suomeen vain tekstiksi muuntamista varten, eikä sitä tallenneta; teksti tallennetaan kuten kirjoitettu viesti. Chatbotin vastaukset luetaan ääneen tutkimuksen omalla puhepalvelimella. Emme kerää nimeäsi, sähköpostiosoitettasi, puhelinnumeroasi, IP-osoitettasi tai puoluekantaasi. Emme kysy ikääsi, sukupuoltasi tai ammattiasi.
 
 ## 4. Tutkimuksen mahdolliset hyödyt
 

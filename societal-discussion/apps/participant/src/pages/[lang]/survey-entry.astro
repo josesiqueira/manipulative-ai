@@ -27,9 +27,12 @@ const t = STRINGS[lang];
   </div>
 
   <script>
-    // No session: nothing to answer about; back to the start.
-    import { getSessionId } from '../../lib/session';
+    // No session: nothing to answer about; back to the start. Survey already
+    // done (for example the browser's Back from the debrief): the session is
+    // finished, so the thank-you page, never a new conversation.
+    import { getSessionId, isSurveySubmitted } from '../../lib/session';
     const lang = document.documentElement.lang;
     if (!getSessionId()) window.location.replace(`/${lang}/`);
+    else if (isSurveySubmitted()) window.location.replace(`/${lang}/thank-you`);
   </script>
 </Institutional>

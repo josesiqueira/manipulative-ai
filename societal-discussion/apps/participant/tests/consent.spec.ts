@@ -3,7 +3,8 @@ import { expect, test, type Page, type Route } from '@playwright/test';
 // A fake backend for the three endpoints the consent flow uses. Every test
 // starts with it; the real API is covered by the backend tests.
 interface Fake {
-  sessions: Record<string, { id: string; consent_accepted_at: string | null }>;
+  // finished: the survey is done, so the API refuses new conversations.
+  sessions: Record<string, { id: string; consent_accepted_at: string | null; finished?: boolean }>;
   calls: { method: string; path: string; body: unknown }[];
 }
 
@@ -32,8 +33,12 @@ async function fakeApi(page: Page, seed: Fake['sessions'] = {}): Promise<Fake> {
       const s = fake.sessions[body?.session_id];
       if (!s) return json(404, { detail: 'Session not found' });
       if (!s.consent_accepted_at) return json(403, { detail: 'Consent required' });
+      if (s.finished) return json(403, { detail: 'Session finished' });
       return json(201, { id: 'c1', starter_topic: null, is_complete: false });
     }
+    // The chat page reads the stored conversation and its (empty) history.
+    if (req.method() === 'GET' && url.pathname === '/api/conversations/c1') return json(200, { id: 'c1', starter_topic: null, is_complete: false });
+    if (req.method() === 'GET' && url.pathname === '/api/conversations/c1/messages') return json(200, []);
     return json(500, { detail: `unexpected ${req.method()} ${url.pathname}` });
   });
   return fake;
@@ -95,6 +100,22 @@ test.describe('consent gate', () => {
       expect(text).not.toContain('encrypted');
       expect(text).not.toContain('salattuna');
       expect(text).toContain(lang === 'fi' ? '31.12.2028' : '31 december 2028');
+      // Voice input is disclosed before consent.
+      expect(text).toContain(lang === 'fi' ? 'mikrofonilla' : 'microphone');
+    }
+  });
+
+  test('the notices never claim encryption at rest and disclose the microphone', async ({ page }) => {
+    await fakeApi(page);
+    for (const lang of ['fi', 'en']) {
+      for (const doc of ['privacy-notice', 'research-notification']) {
+        await page.goto(`/${lang}/info/${doc}`);
+        const text = (await page.getByTestId('notice').innerText()).toLowerCase();
+        for (const word of ['encrypted', 'salattu', 'salattuna', 'encryption at rest', 'salaus tallennuksessa', '[18]', 'if stored', 'jos tallennetaan', '10 tai 15']) {
+          expect(text, `${lang} ${doc}`).not.toContain(word);
+        }
+        expect(text, `${lang} ${doc}`).toContain(lang === 'fi' ? 'mikrofonia' : 'microphone');
+      }
     }
   });
 
@@ -138,6 +159,41 @@ test.describe('consent gate', () => {
     expect(sessionCalls(fake)).toHaveLength(0);
     expect(conversationCalls(fake)).toHaveLength(1);
     expect(conversationCalls(fake)[0].body).toMatchObject({ session_id: 'ok', language: 'fi' });
+  });
+
+  test('consent with a stored finished session starts a new session instead', async ({ page }) => {
+    const fake = await fakeApi(page, { done: { id: 'done', consent_accepted_at: '2026-10-23T16:00:00+03:00', finished: true } });
+    await page.goto('/fi/');
+    await page.evaluate(() => localStorage.setItem('sessionId', 'done'));
+    await page.goto('/fi/consent');
+    for (const box of await page.locator('[data-consent-box]').all()) await box.check();
+    await page.getByTestId('consent-start').click();
+    await expect(page).toHaveURL(/\/fi\/chat$/);
+    await expect(page.getByTestId('transcript')).toBeVisible();
+    expect(sessionCalls(fake)).toHaveLength(1);
+    const newId = await page.evaluate(() => localStorage.getItem('sessionId'));
+    expect(newId).not.toBe('done');
+    expect(conversationCalls(fake).map((c) => (c.body as { session_id: string }).session_id)).toEqual(['done', newId]);
+  });
+
+  test('a stored session whose survey is done never reaches the chat again', async ({ page }) => {
+    const fake = await fakeApi(page, { done: { id: 'done', consent_accepted_at: '2026-10-23T16:00:00+03:00', finished: true } });
+    await page.goto('/fi/');
+    // Without the browser's survey note: the API's 403 "Session finished" is enough.
+    await page.evaluate(() => localStorage.setItem('sessionId', 'done'));
+    await page.goto('/fi/chat');
+    await expect(page).toHaveURL(/\/fi\/consent$/);
+    expect(await page.evaluate(() => localStorage.getItem('sessionId'))).toBeNull();
+    // With the note, the landing page's Start goes straight to consent.
+    await page.evaluate(() => {
+      localStorage.setItem('sessionId', 'done');
+      localStorage.setItem('surveySubmitted', '1');
+    });
+    await page.goto('/fi/');
+    await page.getByTestId('landing-start').click();
+    await expect(page).toHaveURL(/\/fi\/consent$/);
+    expect(await page.evaluate(() => localStorage.getItem('sessionId'))).toBeNull();
+    expect(conversationCalls(fake)).toHaveLength(1);
   });
 
   test('landing start without a session goes to consent', async ({ page }) => {

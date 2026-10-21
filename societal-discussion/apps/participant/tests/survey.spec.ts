@@ -8,6 +8,7 @@ interface Call { method: string; path: string; body: unknown }
 interface FakeOptions {
   surveyRow?: boolean; // a survey row already exists (debrief allowed)
   deleted?: boolean;
+  surveyConflict?: boolean; // the API already has the survey row (409)
 }
 
 async function fakeApi(page: Page, options: FakeOptions = {}): Promise<Call[]> {
@@ -28,6 +29,7 @@ async function fakeApi(page: Page, options: FakeOptions = {}): Promise<Call[]> {
     if (req.method() === 'POST' && url.pathname === '/api/conversations') return json(201, { id: 'c2', starter_topic: null, is_complete: false });
     if (req.method() === 'PUT' && url.pathname === '/api/conversations/c1/end') return json(200, { status: 'ok' });
     if (req.method() === 'POST' && url.pathname === '/api/survey') {
+      if (options.surveyConflict) return json(409, { detail: 'Survey already submitted' });
       surveyRow = true;
       return json(201, { id: 'sv1', session_id: body?.session_id });
     }
@@ -216,7 +218,75 @@ test.describe('survey and debrief', () => {
     await expect(page.getByTestId('debrief')).toBeHidden();
     await page.evaluate(() => localStorage.clear());
     await page.goto('/en/thank-you');
-    await expect(page.getByTestId('thank-you-plain')).toContainText('Thank you for participating!');
+    await expect(page.getByTestId('thank-you-plain')).toContainText('Thank you for your interest');
+    await expect(page.getByTestId('thank-you-plain')).not.toContainText('recorded');
+  });
+
+  test('the survey keeps the answers given so far when the language is switched', async ({ page }) => {
+    const calls = await fakeApi(page);
+    await withSession(page, '/fi/survey');
+    await page.locator('textarea[name="chatbot_usage"]').fill('Joskus.');
+    await page.locator('input[name="political_chatbot"][value="Kyllä"]').check();
+    await scale(page, 'detected_bias', 4);
+    await page.getByRole('link', { name: 'In English' }).click();
+    await expect(page).toHaveURL(/\/en\/survey$/);
+    await expect(page.locator('textarea[name="chatbot_usage"]')).toHaveValue('Joskus.');
+    // The yes/no answer is kept by position: "Kyllä" becomes "Yes".
+    await expect(page.locator('input[name="political_chatbot"][value="Yes"]')).toBeChecked();
+    await expect(page.locator('input[name="detected_bias"][value="4"]')).toBeChecked();
+    await page.getByTestId('survey-submit').click();
+    await expect(page).toHaveURL(/\/en\/thank-you$/);
+    const survey = calls.find((c) => c.path === '/api/survey');
+    expect(survey?.body).toMatchObject({ responses: { chatbot_usage: 'Joskus.', political_chatbot: 'Yes', detected_bias: 4 } });
+    expect(await page.evaluate(() => sessionStorage.getItem('surveyDraft:ok'))).toBeNull();
+  });
+
+  test('a survey the API already has (409) counts as done', async ({ page }) => {
+    await fakeApi(page, { surveyRow: true, surveyConflict: true });
+    await withSession(page, '/fi/survey');
+    await page.getByTestId('survey-submit').click();
+    await expect(page).toHaveURL(/\/fi\/thank-you$/);
+    await expect(page.getByTestId('debrief')).toBeVisible();
+  });
+
+  test('the persuasion item is labelled about the chatbot, and the bias item is spelled right', async ({ page }) => {
+    await fakeApi(page);
+    await withSession(page, '/fi/survey');
+    await expect(page.locator('fieldset', { hasText: 'Havaitsitko chatbotin' })).toBeVisible();
+    await expect(page.locator('fieldset', { hasText: 'Yrittikö chatbot' })).toContainText('Ei lainkaan');
+  });
+
+  test('the English debrief names the parties in English with the Finnish name', async ({ page }) => {
+    await fakeApi(page, { surveyRow: true });
+    await withSession(page, '/en/thank-you');
+    await expect(page.getByTestId('debrief-party')).toHaveText([
+      'National Coalition Party (Kokoomus)',
+      'Green League (Vihreät)',
+      'Social Democratic Party (SDP)',
+    ]);
+    await expect(page.locator('body')).not.toContainText('on site today');
+  });
+
+  test('start over clears the finished session and opens the front page', async ({ page }) => {
+    const calls = await fakeApi(page, { surveyRow: true });
+    await withSession(page, '/fi/thank-you');
+    await page.evaluate(() => localStorage.setItem('surveySubmitted', '1'));
+    await expect(page.getByTestId('debrief')).toBeVisible();
+    await expect(page.getByText('Takaisin keskusteluun')).toHaveCount(0);
+    await page.getByTestId('start-over').click();
+    await expect(page).toHaveURL(/\/fi\/$/);
+    expect(await page.evaluate(() => [localStorage.getItem('sessionId'), localStorage.getItem('surveySubmitted')])).toEqual([null, null]);
+    expect(calls.some((c) => c.path === '/api/conversations')).toBe(false);
+  });
+
+  test('back from the debrief to the survey entry does not reopen the chat', async ({ page }) => {
+    const calls = await fakeApi(page, { surveyRow: true });
+    await withSession(page, '/fi/survey');
+    await page.getByTestId('survey-submit').click();
+    await expect(page).toHaveURL(/\/fi\/thank-you$/);
+    await page.goto('/fi/survey-entry');
+    await expect(page).toHaveURL(/\/fi\/thank-you$/);
+    expect(calls.some((c) => c.path === '/api/conversations')).toBe(false);
   });
 
   for (const path of ['/fi/survey-entry', '/fi/survey', '/fi/thank-you']) {

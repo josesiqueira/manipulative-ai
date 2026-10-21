@@ -1,4 +1,4 @@
-// The browser-side state of a visit: three localStorage keys. Everything here
+// The browser-side state of a visit: four localStorage keys. Everything here
 // runs only in client scripts (no window on the server).
 import type { Language } from './strings';
 
@@ -40,4 +40,11 @@ export function clearSession(): void {
   setSessionId(null);
   setConversationId(null);
   write(KEYS.survey, null);
+}
+
+// The code the participant can quote to ask for their data: the first eight
+// hex characters of the session id as XXXX-XXXX, as the API's session_code.py.
+export function sessionCode(sessionId: string): string {
+  const raw = sessionId.replace(/-/g, '').slice(0, 8).toUpperCase();
+  return `${raw.slice(0, 4)}-${raw.slice(4)}`;
 }
