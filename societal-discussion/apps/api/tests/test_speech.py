@@ -10,6 +10,7 @@ from src.models import Conversation, Session
 from src.routers import speech as speech_router
 from src.services import speech as speech_service
 from src.services.speech import tts as tts_module
+from src.services.speech.local_engines import decode_any
 
 CONSENT = {"consent_version": "2026-10-23-v1", "age_confirmed": True}
 
@@ -97,7 +98,7 @@ def test_decode_clip_resamples_and_stops_at_the_cap():
         decode_clip(_wav_bytes(61.0))
 
 
-async def test_synthesize_returns_wav_and_aligned_words(client, monkeypatch):
+async def test_synthesize_returns_mp3_and_aligned_words(client, monkeypatch):
     async def fake_local(text, language):
         rate = 16000
         return np.zeros(rate, dtype=np.float32), rate, None  # one second of silence, no alignments
@@ -117,9 +118,12 @@ async def test_synthesize_returns_wav_and_aligned_words(client, monkeypatch):
     assert body["wtimes"] == [100, 500]
     assert body["wdurations"] == [300, 400]
     assert body["sample_rate"] == 16000
-    with wave.open(io.BytesIO(base64.b64decode(body["audio_base64"])), "rb") as w:
-        assert w.getframerate() == 16000
-        assert w.getnframes() == 16000
+    assert body["audio_mime"] == "audio/mpeg"
+    mp3 = base64.b64decode(body["audio_base64"])
+    assert len(mp3) < 16000  # one second at 64 kbit/s is about 8 KB; WAV would be 32 KB
+    samples, rate = decode_any(mp3)
+    assert rate == 16000
+    assert abs(samples.size - 16000) < 3000  # the encoder pads a little
 
 
 async def test_synthesize_caps_text_and_needs_an_open_conversation(client):
@@ -172,7 +176,6 @@ def test_words_from_alignments_splits_on_spaces():
 
 
 def test_decode_any_reads_a_wav_at_its_own_rate():
-    from src.services.speech.local_engines import decode_any
 
     samples, rate = decode_any(_wav_bytes(1.0, rate=22050))
     assert rate == 22050

@@ -51,8 +51,17 @@ class Settings(BaseSettings):
     speech_models_dir: str = "models"   # Piper voices and the whisper model directory
     speech_local_whisper_model: str = "small"   # size name (downloaded) or a directory under models_dir
     speech_local_whisper_compute: str = "int8"
-    speech_local_whisper_threads: int = 0       # CTranslate2 threads; 0 = its default (4)
-    speech_max_waiting: int = 12        # per engine and worker process; more waiting jobs get a fast 503
+    # Engine threads x job slots = the CPU the pod may use (measured
+    # 2026-10-21: left to their defaults, the engines start a thread per
+    # node core and a throttled pod runs 4 to 5 times slower).
+    speech_stt_engine: str = "parakeet"  # "parakeet" or "whisper" (faster-whisper small)
+    speech_stt_threads: int = 4
+    speech_stt_slots: int = 1
+    speech_tts_threads: int = 2
+    speech_tts_slots: int = 2
+    speech_role: str = "all"            # speech pods: "tts", "stt" or "all" (which models warm_up loads)
+    speech_max_waiting: int = 40        # per engine; more waiting jobs get a fast 503
+    speech_max_wait_seconds: float = 8.0  # a job that waited longer is refused: the phone has moved on
     speech_warm_up: bool = False        # load and run the local engines at start
     # Speech pods have no database: they ask the API whether a conversation
     # is open (GET {url}/api/conversations/{id}). Empty = check the database.

@@ -29,6 +29,7 @@ interface FakeOptions {
   messageDelayMs?: number; // how long the model "thinks"
   finished?: boolean; // the survey is done: no new conversation
   streamError?: boolean; // the model fails after part of the reply was sent
+  failVoiceFor?: string; // the speech server fails on the sentence containing this
 }
 
 async function fakeApi(page: Page, reply = 'Hyvää iltaa. Tervetuloa keskustelemaan.', synthesizeDelayMs = 0, options: FakeOptions = {}) {
@@ -76,6 +77,7 @@ async function fakeApi(page: Page, reply = 'Hyvää iltaa. Tervetuloa keskustele
     if (req.method() === 'POST' && url.pathname === '/api/speech/transcribe') return json(200, { text: 'Mitä mieltä olette veroista?' });
     if (req.method() === 'POST' && url.pathname === '/api/speech/synthesize') {
       const text = (body as { text: string }).text;
+      if (options.failVoiceFor && text.includes(options.failVoiceFor)) return json(500, { detail: 'Speech synthesis failed' });
       const words = text.split(' ');
       if (synthesizeDelayMs) await new Promise((resolve) => setTimeout(resolve, synthesizeDelayMs));
       return json(200, { audio_base64: silentWavBase64(), sample_rate: 16000, words, wtimes: words.map((_, i) => i * 100), wdurations: words.map(() => 90) });
@@ -109,8 +111,8 @@ test.describe('chat page', () => {
     const message = calls.find((c) => c.method === 'POST' && c.path === '/api/conversations/c1/messages/stream');
     expect(message?.body).toEqual({ content: 'Hei', input_mode: 'typed' });
     expect(calls.filter((c) => c.path === '/api/speech/synthesize').map((c) => (c.body as { text: string; language: string }))).toEqual([
-      { conversation_id: 'c1', text: 'Hyvää iltaa.', language: 'fi' },
-      { conversation_id: 'c1', text: 'Tervetuloa keskustelemaan.', language: 'fi' },
+      { conversation_id: 'c1', text: 'Hyvää iltaa.', language: 'fi', index: 0 },
+      { conversation_id: 'c1', text: 'Tervetuloa keskustelemaan.', language: 'fi', index: 1 },
     ]);
     await expect(page.getByTestId('send')).toBeEnabled();
   });
@@ -303,6 +305,20 @@ test.describe('chat page', () => {
     await expect(page.getByTestId('hint')).toHaveText('Viestin lähetys epäonnistui. Viestisi on yhä kentässä: yritä uudelleen.');
     await expect(page.getByTestId('message')).toHaveValue('Kerro verotuksesta');
     await expect(page.locator('.bubble')).toHaveCount(0);
+  });
+
+  test('a sentence the speech server cannot voice is skipped and the rest is still spoken', async ({ page }) => {
+    const calls = await fakeApi(page, 'Ensimmäinen lause. Toinen lause. Kolmas lause.', 0, { failVoiceFor: 'Toinen' });
+    await openChat(page);
+    await expect(page.getByTestId('stage')).toHaveAttribute('data-avatar-mode', 'live', { timeout: 60_000 });
+    await page.getByTestId('message').fill('Hei');
+    await page.getByTestId('send').click();
+    await expect.poll(() => calls.filter((c) => c.path === '/api/speech/synthesize').length, { timeout: 20_000 }).toBe(3);
+    const sent = calls.filter((c) => c.path === '/api/speech/synthesize').map((c) => c.body as { text: string; index: number });
+    expect(sent.map((b) => [b.text, b.index])).toEqual([['Ensimmäinen lause.', 0], ['Toinen lause.', 1], ['Kolmas lause.', 2]]);
+    await expect(page.getByTestId('status')).not.toHaveText(/Puhun/, { timeout: 20_000 });
+    await expect(page.locator('.bubble-assistant')).toHaveText('Ensimmäinen lause. Toinen lause. Kolmas lause.');
+    await expect(page.getByTestId('hint')).toHaveText('');
   });
 
   test('the message limit gets its own message', async ({ page }) => {

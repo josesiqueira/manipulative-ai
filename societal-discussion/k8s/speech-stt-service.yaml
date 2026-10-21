@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: speech-stt
+  namespace: manipulative-ai-2
+  labels:
+    app: speech-stt
+spec:
+  selector:
+    app: speech-stt
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+  type: ClusterIP

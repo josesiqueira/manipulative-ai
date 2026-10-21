@@ -24,6 +24,7 @@ dependencies = [
     "piper-tts[alignment]==1.8.0",
     "av>=14,<16",
     "numpy>=1.26",
+    "onnx-asr==0.12.0",
 ]
 
 [dependency-groups]

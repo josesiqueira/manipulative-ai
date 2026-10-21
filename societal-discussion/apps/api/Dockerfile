@@ -23,9 +23,9 @@ COPY pyproject.toml uv.lock ./
 RUN uv venv /app/.venv && \
     uv sync --frozen --no-dev --no-install-project
 
-# Local speech models (emergency tier): faster-whisper small and
-# the two Piper voices, fetched at build time so the container never
-# downloads at run time. World-readable: OpenShift runs an arbitrary UID.
+# Local speech models: the two Piper voices, Parakeet TDT 0.6B v3 for
+# recognition and faster-whisper small as its fallback, fetched at build
+# time so the container never downloads at run time. World-readable: OpenShift runs an arbitrary UID.
 ENV SPEECH_MODELS_DIR=/app/models \
     HF_HUB_OFFLINE=1
 COPY scripts/fetch_speech_models.py ./scripts/

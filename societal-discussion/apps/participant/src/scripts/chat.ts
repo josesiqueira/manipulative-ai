@@ -232,18 +232,21 @@ export async function startChat(): Promise<void> {
       spoken.textContent = tokens.slice(0, cut).join('');
       rest.textContent = tokens.slice(cut).join('');
     };
-    const clip = (i: number): Promise<SpeechClip> | null => {
+    // A sentence the server could not voice is skipped (null), so one lost
+    // clip never silences the rest of the reply.
+    const clip = (i: number): Promise<SpeechClip | null> | null => {
       if (i >= sentences.length) return null;
-      const p = synthesize(conversation, sentences[i], lang);
-      p.catch(() => undefined); // an unused prefetch must not surface as an unhandled rejection
-      return p;
+      return synthesize(conversation, sentences[i], lang, i).catch((err) => {
+        console.warn('sentence not voiced', err);
+        return null;
+      });
     };
     const run = async () => {
       const head = await headReady;
       if (before !== interruptions) return;
       speaking = true;
       status.textContent = t.speaking;
-      let next: Promise<SpeechClip> | null = null;
+      let next: Promise<SpeechClip | null> | null = null;
       try {
         for (let i = 0; speaking; ) {
           if (i >= sentences.length) {
@@ -253,7 +256,14 @@ export async function startChat(): Promise<void> {
           }
           const current = await (next ?? clip(i));
           next = clip(i + 1);
-          if (!current || !speaking) break;
+          if (!speaking) break;
+          if (!current) {
+            // Not voiced: its words count as said, the highlight moves on.
+            spokenWords += sentences[i].split(/\s+/).filter((w) => w && w !== BULLET).length;
+            render();
+            i++;
+            continue;
+          }
           await head.speak(current, lang, () => {
             spokenWords++;
             render();

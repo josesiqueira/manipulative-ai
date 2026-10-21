@@ -1,22 +1,33 @@
 """
-Local speech engines: faster-whisper for recognition and word timings, Piper
-for synthesis. Models load once per process (warm_up() at start, or on first
-use) and run in a thread pool so the event loop keeps serving other phones.
+Local speech engines: Piper for synthesis, Parakeet TDT 0.6B v3 (or
+faster-whisper small as the fallback) for recognition, and faster-whisper for
+word timings of a remote voice. Models load once per process (warm_up() at
+start, or on first use).
 
-Recognition and synthesis each have their own lock, so one never waits for
-the other. Within a process each engine runs one job at a time (espeak-ng,
-which Piper uses for phonemes, is not thread-safe); throughput comes from
-several worker processes and several speech pods. A job whose phone has
-already given up is dropped before it starts, and when too many jobs are
-waiting a new one is refused at once (SpeechBusy) instead of queueing past
-the phone's timeout.
+Throughput (measured 2026-10-21): onnxruntime and CTranslate2 size their
+thread pools from the node's cores, not from the pod's CPU limit, and a pod
+throttled that way voiced an 8 s sentence in 2.3 s instead of 0.5 s. So every
+engine gets an explicit thread count, and jobs run on a pool per engine with
+as many workers as there are job slots (threads x slots = the CPU budget).
+One Piper voice can be used by several jobs at once (piper 1.8 phonemizes
+under its own lock; onnxruntime sessions are thread-safe).
+
+Waiting jobs are served first-sentence-first: the first clip of a reply is
+what the participant waits for, prefetched clips can wait. A job whose phone
+has gone, or that waited longer than the phone would, is dropped before it
+starts; when too many are waiting a new one is refused at once (SpeechBusy).
 """
 from __future__ import annotations
 
 import asyncio
+import heapq
 import io
+import itertools
+import json
 import threading
+import time
 from collections.abc import Awaitable, Callable
+from concurrent.futures import ThreadPoolExecutor
 from contextvars import ContextVar
 from functools import lru_cache
 from pathlib import Path
@@ -26,13 +37,14 @@ import numpy as np
 from ...config import get_settings
 
 PIPER_VOICES = {"fi": "fi_FI-harri-medium", "en": "en_GB-alan-medium"}
+PARAKEET_DIR = "parakeet-tdt-0.6b-v3"
 
-_stt_lock = threading.Lock()
-_tts_lock = threading.Lock()
+# Whisper is used one call at a time per model object.
+_whisper_lock = threading.Lock()
 
 
 class SpeechBusy(RuntimeError):
-    """Too many speech jobs are already waiting in this process."""
+    """Too many speech jobs are already waiting, or this one waited too long."""
 
 
 class SpeechAbandoned(RuntimeError):
@@ -42,10 +54,23 @@ class SpeechAbandoned(RuntimeError):
 # Set by the endpoint to request.is_disconnected: checked when a job's turn
 # comes, so work for a phone that has gone is never done.
 client_gone: ContextVar[Callable[[], Awaitable[bool]] | None] = ContextVar("client_gone", default=None)
+# Set by the endpoint: 0 for the first sentence of a reply, higher for the
+# prefetched ones and for recognition (which has its own pool).
+job_priority: ContextVar[int] = ContextVar("job_priority", default=0)
 
 
 def _models_dir() -> Path:
     return Path(get_settings().speech_models_dir)
+
+
+def _session_options(threads: int):
+    import onnxruntime
+
+    opts = onnxruntime.SessionOptions()
+    opts.intra_op_num_threads = threads
+    opts.inter_op_num_threads = 1
+    opts.execution_mode = onnxruntime.ExecutionMode.ORT_SEQUENTIAL
+    return opts
 
 
 @lru_cache(maxsize=1)
@@ -60,56 +85,131 @@ def whisper_model():
         source,
         device="cpu",
         compute_type=settings.speech_local_whisper_compute,
-        cpu_threads=settings.speech_local_whisper_threads,
+        cpu_threads=settings.speech_stt_threads,
+    )
+
+
+@lru_cache(maxsize=1)
+def parakeet_model():
+    import onnx_asr
+
+    return onnx_asr.load_model(
+        "nemo-parakeet-tdt-0.6b-v3",
+        _models_dir() / PARAKEET_DIR,
+        quantization="int8",
+        sess_options=_session_options(get_settings().speech_stt_threads),
     )
 
 
 @lru_cache(maxsize=4)
 def piper_voice(language: str):
+    """Piper's own loader with explicit onnxruntime threads (PiperVoice.load
+    takes no session options). include_alignments: Piper reports how many
+    samples each phoneme took, which gives exact word timings for lip-sync
+    without a recognition pass."""
+    import onnx
+    import onnxruntime
     from piper import PiperVoice
+    from piper.config import PiperConfig
+    from piper.patch_voice_with_alignment import add_alignment_output
 
     name = PIPER_VOICES.get(language, PIPER_VOICES["fi"])
     path = _models_dir() / f"{name}.onnx"
     if not path.exists():
         raise FileNotFoundError(f"Piper voice not found: {path}")
-    # include_alignments: Piper reports how many samples each phoneme took,
-    # which gives exact word timings for lip-sync without a recognition pass.
-    return PiperVoice.load(path, include_alignments=True)
+    model = onnx.load(str(path))
+    try:
+        add_alignment_output(model)
+    except ValueError:
+        pass  # already patched
+    config = PiperConfig.from_dict(json.loads(Path(f"{path}.json").read_text(encoding="utf-8")))
+    session = onnxruntime.InferenceSession(
+        model.SerializeToString(),
+        sess_options=_session_options(get_settings().speech_tts_threads),
+        providers=["CPUExecutionProvider"],
+    )
+    return PiperVoice(config=config, session=session)
 
 
 MAX_CLIP_SECONDS = 60
 MAX_CLIP_SAMPLES = MAX_CLIP_SECONDS * 16000
 
-_stt_slot = asyncio.Semaphore(1)
-_tts_slot = asyncio.Semaphore(1)
-_waiting = {"stt": 0, "tts": 0}
+
+class _Pool:
+    """Job slots for one engine, handed out lowest priority number first,
+    with a thread pool of the same size to run the jobs on."""
+
+    def __init__(self, slots: int):
+        self.slots = slots
+        self.free = slots
+        self.queue: list[tuple[int, int, asyncio.Future]] = []
+        self.order = itertools.count()
+        self.executor = ThreadPoolExecutor(max_workers=slots)
+
+    def waiting(self) -> int:
+        return sum(1 for _p, _n, f in self.queue if not f.done())
+
+    async def acquire(self, priority: int) -> None:
+        if self.free > 0 and self.waiting() == 0:
+            self.free -= 1
+            return
+        future = asyncio.get_running_loop().create_future()
+        heapq.heappush(self.queue, (priority, next(self.order), future))
+        try:
+            await future
+        except asyncio.CancelledError:
+            if future.done() and not future.cancelled():
+                self.release()  # the slot was handed over just as we gave up
+            raise
+
+    def release(self) -> None:
+        while self.queue:
+            _p, _n, future = heapq.heappop(self.queue)
+            if not future.done():
+                future.set_result(None)
+                return
+        self.free += 1
 
 
-async def _run(kind: str, slot: asyncio.Semaphore, fn, *args, timeout: float | None = None):
-    if _waiting[kind] >= get_settings().speech_max_waiting:
+_pools: dict[str, _Pool] = {}
+
+
+def _pool(kind: str) -> _Pool:
+    pool = _pools.get(kind)
+    if pool is None:
+        settings = get_settings()
+        pool = _Pool(settings.speech_tts_slots if kind == "tts" else settings.speech_stt_slots)
+        _pools[kind] = pool
+    return pool
+
+
+async def _run(kind: str, fn, *args):
+    settings = get_settings()
+    pool = _pool(kind)
+    if pool.waiting() >= settings.speech_max_waiting:
         raise SpeechBusy(kind)
-    _waiting[kind] += 1
-    queued = True
+    queued_at = time.monotonic()
+    await pool.acquire(job_priority.get())
     try:
-        async with slot:
-            _waiting[kind] -= 1
-            queued = False
-            gone = client_gone.get()
-            if gone is not None and await gone():
-                raise SpeechAbandoned(kind)
-            job = asyncio.to_thread(fn, *args)
-            return await (asyncio.wait_for(job, timeout=timeout) if timeout else job)
+        if time.monotonic() - queued_at > settings.speech_max_wait_seconds:
+            raise SpeechBusy(f"{kind}: waited too long")
+        gone = client_gone.get()
+        if gone is not None and await gone():
+            raise SpeechAbandoned(kind)
+        return await asyncio.get_running_loop().run_in_executor(pool.executor, fn, *args)
     finally:
-        if queued:
-            _waiting[kind] -= 1
+        pool.release()
 
 
 def warm_up() -> None:
-    """Load the models and run each engine once, so the first phone of the
-    evening does not wait for model loading."""
-    for language in PIPER_VOICES:
-        _synthesize_sync("Hei." if language == "fi" else "Hello.", language)
-    _transcribe_samples(np.zeros(16000, dtype=np.float32), "fi")
+    """Load the models this pod serves and run each once, so the first phone
+    of the evening does not wait for model loading."""
+    role = get_settings().speech_role
+    if role in ("all", "tts"):
+        for language in PIPER_VOICES:
+            _synthesize_sync("Hei." if language == "fi" else "Hello.", language)
+    if role in ("all", "stt"):
+        _transcribe_samples(np.zeros(16000, dtype=np.float32), "fi")
 
 
 def decode_clip(audio: bytes, max_samples: int = MAX_CLIP_SAMPLES) -> np.ndarray:
@@ -180,15 +280,19 @@ def _transcribe_sync(audio: bytes, language: str) -> str:
 
 
 def _transcribe_samples(samples: np.ndarray, language: str) -> str:
-    with _stt_lock:
-        segments, _ = whisper_model().transcribe(
-            samples,
-            language=language,
-            beam_size=1,
-            vad_filter=True,
-            condition_on_previous_text=False,
-        )
-        text = " ".join(s.text.strip() for s in segments)
+    if get_settings().speech_stt_engine == "parakeet":
+        # Parakeet finds the language itself and returns punctuated text.
+        text = parakeet_model().recognize(samples, sample_rate=16000)
+    else:
+        with _whisper_lock:
+            segments, _ = whisper_model().transcribe(
+                samples,
+                language=language,
+                beam_size=1,
+                vad_filter=True,
+                condition_on_previous_text=False,
+            )
+            text = " ".join(s.text.strip() for s in segments)
     # Operational log: clip length and word count only, never the words.
     print(f"Speech transcribe: clip {samples.size / 16000:.1f} s, {len(text.split())} words recognised")
     return text.strip()
@@ -196,7 +300,7 @@ def _transcribe_samples(samples: np.ndarray, language: str) -> str:
 
 def _word_times_sync(samples_16k: np.ndarray, language: str) -> list[tuple[str, float, float]]:
     """Whisper word starts and ends in seconds for 16 kHz float samples."""
-    with _stt_lock:
+    with _whisper_lock:
         segments, _ = whisper_model().transcribe(
             samples_16k, language=language, beam_size=1, word_timestamps=True, vad_filter=False
         )
@@ -238,28 +342,27 @@ def _synthesize_sync(text: str, language: str) -> tuple[np.ndarray, int, list[tu
     timings: list[tuple[int, int]] = []
     have_alignments = True
     offset = 0
-    with _tts_lock:
-        for chunk in voice.synthesize(text, include_alignments=True):
-            audio = chunk.audio_float_array.astype(np.float32)
-            parts.append(audio)
-            rate = chunk.sample_rate
-            if chunk.phoneme_alignments:
-                timings.extend(_words_from_alignments(chunk.phoneme_alignments, offset, rate))
-            else:
-                have_alignments = False
-            offset += audio.shape[0]
+    for chunk in voice.synthesize(text, include_alignments=True):
+        audio = chunk.audio_float_array.astype(np.float32)
+        parts.append(audio)
+        rate = chunk.sample_rate
+        if chunk.phoneme_alignments:
+            timings.extend(_words_from_alignments(chunk.phoneme_alignments, offset, rate))
+        else:
+            have_alignments = False
+        offset += audio.shape[0]
     if not parts:
         return np.zeros(0, dtype=np.float32), rate, None
     return np.concatenate(parts), rate, timings if have_alignments else None
 
 
 async def transcribe_local(audio: bytes, language: str) -> str:
-    return await _run("stt", _stt_slot, _transcribe_sync, audio, language, timeout=60)
+    return await _run("stt", _transcribe_sync, audio, language)
 
 
 async def synthesize_local(text: str, language: str) -> tuple[np.ndarray, int, list[tuple[int, int]] | None]:
-    return await _run("tts", _tts_slot, _synthesize_sync, text, language)
+    return await _run("tts", _synthesize_sync, text, language)
 
 
 async def word_times_local(samples_16k: np.ndarray, language: str) -> list[tuple[str, float, float]]:
-    return await _run("stt", _stt_slot, _word_times_sync, samples_16k, language)
+    return await _run("stt", _word_times_sync, samples_16k, language)

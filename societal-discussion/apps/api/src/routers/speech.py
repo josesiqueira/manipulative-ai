@@ -3,7 +3,7 @@ Speech endpoints for the chat page.
 
 POST /api/speech/transcribe?conversation_id=..&language=..  body: the recording as
     recorded (Content-Type audio/webm or audio/mp4) -> {text}
-POST /api/speech/synthesize   {conversation_id, text, language} -> WAV (base64) + word timings
+POST /api/speech/synthesize   {conversation_id, text, language, index} -> MP3 (base64) + word timings
 
 Both need a conversation that exists and is not complete. No audio and no
 transcript is stored or logged here; the text becomes data only when the
@@ -26,7 +26,7 @@ from ..config import get_settings
 from ..database import get_db
 from ..models import Conversation
 from ..services import speech
-from ..services.speech.local_engines import SpeechAbandoned, SpeechBusy, client_gone
+from ..services.speech.local_engines import SpeechAbandoned, SpeechBusy, client_gone, job_priority
 
 router = APIRouter()
 
@@ -80,7 +80,11 @@ async def _open_conversation(db: AsyncSession | None, conversation_id: str) -> N
 def _speech_error(exc: Exception, what: str) -> HTTPException:
     if isinstance(exc, (SpeechBusy, SpeechAbandoned)):
         print(f"Speech {what}: {type(exc).__name__}")
-        return HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Speech busy, try again")
+        return HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Speech busy, try again",
+            headers={"Retry-After": "2"},
+        )
     print(f"Speech {what} error: {type(exc).__name__}")
     detail = "Speech recognition failed" if what == "recognition" else "Speech synthesis failed"
     return HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
@@ -132,10 +136,14 @@ class SynthesisRequest(BaseModel):
     conversation_id: str
     text: str = Field(min_length=1)
     language: str = "fi"
+    # The sentence's place in its reply: 0, the one the participant is
+    # waiting for, goes ahead of prefetched sentences.
+    index: int = Field(default=0, ge=0)
 
 
 class SynthesisResponse(BaseModel):
     audio_base64: str
+    audio_mime: str
     sample_rate: int
     words: list[str]
     wtimes: list[int]
@@ -154,12 +162,14 @@ async def synthesize(
         raise HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail="Text too long")
     await _open_conversation(db, data.conversation_id)
     client_gone.set(request.is_disconnected)
+    job_priority.set(min(data.index, 1000))
     try:
         result = await speech.synthesize(text, _language(data.language))
     except Exception as exc:  # noqa: BLE001
         raise _speech_error(exc, "synthesis")
     return SynthesisResponse(
-        audio_base64=base64.b64encode(result.wav).decode("ascii"),
+        audio_base64=base64.b64encode(result.audio).decode("ascii"),
+        audio_mime="audio/mpeg",
         sample_rate=result.sample_rate,
         words=result.words,
         wtimes=result.wtimes,

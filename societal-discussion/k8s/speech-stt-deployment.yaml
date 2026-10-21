@@ -1,0 +1,72 @@
+# Sized for the project quota of 4 CPU of limits in total (participant 200m,
+# admin 200m, API 700m, voice 2000m, recognition 900m). With a larger quota:
+# voice 4 replicas of 4 CPU (slots 2, threads 2), recognition 3 replicas of
+# 4 CPU (threads 4), requests equal to limits (measured 2026-10-21 for a room
+# of 50: first sentence p90 0.7 s, recognition p50 1.1 s).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: speech-stt
+  namespace: manipulative-ai-2
+  labels:
+    app: speech-stt
+spec:
+  replicas: 1
+  # The project quota (4 CPU of limits) has no room for a second pod during
+  # an update: the old pod stops before the new one starts.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: speech-stt
+  template:
+    metadata:
+      labels:
+        app: speech-stt
+    spec:
+      containers:
+        - name: speech-stt
+          image: image-registry.apps.2.rahti.csc.fi/manipulative-ai-2/api:latest
+          imagePullPolicy: Always
+          command: ["python", "-m", "uvicorn", "src.speech_main:app", "--host", "0.0.0.0", "--port", "8080"]
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env:
+            # Recognition: Parakeet TDT 0.6B v3, one job at a time with as
+            # many threads as the pod's CPU limit (1 for 900m; 4 for 4 CPU).
+            - name: SPEECH_ROLE
+              value: "stt"
+            - name: SPEECH_STT_ENGINE
+              value: "parakeet"
+            - name: SPEECH_STT_SLOTS
+              value: "1"
+            - name: SPEECH_STT_THREADS
+              value: "1"
+            - name: SPEECH_WARM_UP
+              value: "true"
+            - name: SPEECH_CONVERSATION_CHECK_URL
+              value: "http://api:8080"
+            - name: OPENBLAS_NUM_THREADS
+              value: "1"
+            - name: CORS_ORIGINS
+              value: "https://vaalikeskustelu.2.rahtiapp.fi,https://admin-vaalikeskustelu.2.rahtiapp.fi,https://api-vaalikeskustelu.2.rahtiapp.fi"
+          resources:
+            requests:
+              memory: "3Gi"
+              cpu: "900m"
+            limits:
+              memory: "3Gi"
+              cpu: "900m"
+          # Ready only when its engine is loaded and has run once.
+          readinessProbe:
+            httpGet:
+              path: /api/speech/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 120
+            periodSeconds: 20

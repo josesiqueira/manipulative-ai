@@ -101,9 +101,19 @@ export async function endConversation(conversationId: string): Promise<void> {
 }
 
 // The recording goes as the raw body with its own mime type; nothing is kept on the server.
+// A busy speech server answers 503 at once: one more try after a short pause.
+// No request waits more than 15 s, so a lost one never holds up the page.
+async function speechFetch(url: string, init: RequestInit): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(url, { ...init, signal: AbortSignal.timeout(15_000) });
+    if (res.status !== 503 || attempt > 0) return res;
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+  }
+}
+
 export async function transcribe(conversationId: string, blob: Blob, language: Language): Promise<string> {
   const url = `${API_URL}/api/speech/transcribe?conversation_id=${encodeURIComponent(conversationId)}&language=${language}`;
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': blob.type || 'application/octet-stream' }, body: blob });
+  const res = await speechFetch(url, { method: 'POST', headers: { 'Content-Type': blob.type || 'application/octet-stream' }, body: blob });
   if (!res.ok) throw new Error('transcribe-failed');
   const data = await res.json();
   return (data.text as string) ?? '';
@@ -117,11 +127,13 @@ export interface SpeechClip {
   wdurations: number[];
 }
 
-export async function synthesize(conversationId: string, text: string, language: Language): Promise<SpeechClip> {
-  const res = await fetch(`${API_URL}/api/speech/synthesize`, {
+// index: the sentence's place in its reply; the server voices the first
+// sentence of a reply before the prefetched ones.
+export async function synthesize(conversationId: string, text: string, language: Language, index = 0): Promise<SpeechClip> {
+  const res = await speechFetch(`${API_URL}/api/speech/synthesize`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ conversation_id: conversationId, text, language }),
+    body: JSON.stringify({ conversation_id: conversationId, text, language, index }),
   });
   if (!res.ok) throw new Error('synthesize-failed');
   return res.json();

@@ -1,22 +1,22 @@
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: speech
+  name: speech-stt
   namespace: manipulative-ai-2
   annotations:
     # Each clip goes to the least busy speech pod, not to the pod a phone's
     # cookie points at.
     haproxy.router.openshift.io/balance: leastconn
     haproxy.router.openshift.io/disable_cookies: "true"
-    haproxy.router.openshift.io/timeout: 60s
+    haproxy.router.openshift.io/timeout: 30s
 spec:
-  # Same host as the API: /api/speech/* goes to the speech pods, the rest
-  # to the API, so the participant app calls the same URLs.
+  # Same host as the API: /api/speech/transcribe goes to these pods, the rest to the
+  # API, so the participant app calls the same URLs.
   host: api-vaalikeskustelu.2.rahtiapp.fi
-  path: /api/speech
+  path: /api/speech/transcribe
   to:
     kind: Service
-    name: speech
+    name: speech-stt
     weight: 100
   port:
     targetPort: 8080
