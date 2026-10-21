@@ -28,6 +28,7 @@ interface FakeOptions {
   messageStatus?: number; // the answer to a message, when not 200
   messageDelayMs?: number; // how long the model "thinks"
   finished?: boolean; // the survey is done: no new conversation
+  streamError?: boolean; // the model fails after part of the reply was sent
 }
 
 async function fakeApi(page: Page, reply = 'Hyvää iltaa. Tervetuloa keskustelemaan.', synthesizeDelayMs = 0, options: FakeOptions = {}) {
@@ -57,10 +58,19 @@ async function fakeApi(page: Page, reply = 'Hyvää iltaa. Tervetuloa keskustele
     if (req.method() === 'GET' && url.pathname === '/api/conversations/c1/messages') {
       return json(200, (options.history ?? []).map((m, i) => ({ id: `h${i}`, created_at: 'x', ...m })));
     }
-    if (req.method() === 'POST' && url.pathname === '/api/conversations/c1/messages') {
+    if (req.method() === 'POST' && url.pathname === '/api/conversations/c1/messages/stream') {
       if (options.messageDelayMs) await new Promise((resolve) => setTimeout(resolve, options.messageDelayMs));
       if (options.messageStatus) return json(options.messageStatus, { detail: 'refused' });
-      return json(200, { id: 'm2', role: 'assistant', content: reply, created_at: 'x' });
+      // The reply as the server streams it: a keep-alive comment, the text
+      // in pieces of a few words, then 'done' (or 'error').
+      const pieces = reply.match(/\S+\s*/g) ?? [];
+      const events = [': ping\n\n'];
+      for (let i = 0; i < pieces.length; i += 3) {
+        events.push(`event: delta\ndata: ${JSON.stringify({ text: pieces.slice(i, i + 3).join('') })}\n\n`);
+      }
+      if (options.streamError) events.push(`event: error\ndata: ${JSON.stringify({ detail: 'failed' })}\n\n`);
+      else events.push(`event: done\ndata: ${JSON.stringify({ id: 'm2', content: reply, created_at: 'x' })}\n\n`);
+      return route.fulfill({ status: 200, contentType: 'text/event-stream', body: events.join('') });
     }
     if (req.method() === 'PUT' && url.pathname === '/api/conversations/c1/end') return json(200, { status: 'ok' });
     if (req.method() === 'POST' && url.pathname === '/api/speech/transcribe') return json(200, { text: 'Mitä mieltä olette veroista?' });
@@ -96,7 +106,7 @@ test.describe('chat page', () => {
     await expect(page.locator('.bubble-user')).toHaveText('Hei');
     await expect(page.locator('.bubble-assistant')).toContainText('Tervetuloa keskustelemaan.');
     await expect.poll(() => calls.filter((c) => c.path === '/api/speech/synthesize').length, { timeout: 20_000 }).toBe(2);
-    const message = calls.find((c) => c.method === 'POST' && c.path === '/api/conversations/c1/messages');
+    const message = calls.find((c) => c.method === 'POST' && c.path === '/api/conversations/c1/messages/stream');
     expect(message?.body).toEqual({ content: 'Hei', input_mode: 'typed' });
     expect(calls.filter((c) => c.path === '/api/speech/synthesize').map((c) => (c.body as { text: string; language: string }))).toEqual([
       { conversation_id: 'c1', text: 'Hyvää iltaa.', language: 'fi' },
@@ -118,7 +128,7 @@ test.describe('chat page', () => {
     await page.getByTestId('send').click();
     await expect(page.locator('.bubble-user').nth(1)).toHaveText('Toinen');
     await expect(page.locator('.bubble-assistant')).toHaveCount(2, { timeout: 20_000 });
-    const sent = calls.filter((c) => c.method === 'POST' && c.path === '/api/conversations/c1/messages').map((c) => (c.body as { content: string }).content);
+    const sent = calls.filter((c) => c.method === 'POST' && c.path === '/api/conversations/c1/messages/stream').map((c) => (c.body as { content: string }).content);
     expect(sent).toEqual(['Hei', 'Toinen']);
     // The first reply was cut short: fewer than its 8 sentences were requested before the second turn.
     const firstTurnSynth = calls.filter((c) => c.path === '/api/speech/synthesize').length;
@@ -180,7 +190,7 @@ test.describe('chat page', () => {
     expect(upload?.path).toBe('/api/speech/transcribe?conversation_id=c1&language=fi');
     expect(upload?.contentType).toMatch(/^audio\/webm/);
     expect(upload?.size ?? 0).toBeGreaterThan(1000);
-    const message = calls.find((c) => c.method === 'POST' && c.path === '/api/conversations/c1/messages');
+    const message = calls.find((c) => c.method === 'POST' && c.path === '/api/conversations/c1/messages/stream');
     expect(message?.body).toEqual({ content: 'Mitä mieltä olette veroista?', input_mode: 'spoken' });
     await expect(page.locator('.bubble-assistant')).toBeVisible();
   });
@@ -283,6 +293,16 @@ test.describe('chat page', () => {
     await expect(page.locator('.bubble')).toHaveCount(0);
     await expect(page.getByTestId('waiting')).toHaveCount(0);
     await expect(page.getByTestId('send')).toBeEnabled();
+  });
+
+  test('a reply that breaks off midway is removed and the question goes back into the input', async ({ page }) => {
+    await fakeApi(page, 'Hyvä kysymys. Verotus on tärkeä asia meille kaikille.', 0, { streamError: true });
+    await openChat(page);
+    await page.getByTestId('message').fill('Kerro verotuksesta');
+    await page.getByTestId('send').click();
+    await expect(page.getByTestId('hint')).toHaveText('Viestin lähetys epäonnistui. Viestisi on yhä kentässä: yritä uudelleen.');
+    await expect(page.getByTestId('message')).toHaveValue('Kerro verotuksesta');
+    await expect(page.locator('.bubble')).toHaveCount(0);
   });
 
   test('the message limit gets its own message', async ({ page }) => {

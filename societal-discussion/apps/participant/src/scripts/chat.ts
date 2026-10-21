@@ -8,7 +8,6 @@ import {
   getConversation,
   getMessages,
   getSession,
-  sendMessage,
   synthesize,
   transcribe,
   type ChatMessage,
@@ -16,7 +15,7 @@ import {
   type SpeechClip,
 } from '../lib/participantApi';
 import { BULLET, toPlainText } from '../lib/plainText';
-import { splitSentences } from '../lib/sentences';
+import { SentenceFeeder, streamMessage } from '../lib/replyStream';
 import { clearSession, getConversationId, getSessionId, isSurveySubmitted, sessionCode, setConversationId } from '../lib/session';
 import { STRINGS, type Language } from '../lib/strings';
 
@@ -162,6 +161,7 @@ export async function startChat(): Promise<void> {
   let interruptions = 0;
   const stopSpeaking = () => {
     interruptions++;
+    cancelVoice?.();
     if (!speaking) return;
     speaking = false;
     speaker?.stop();
@@ -191,61 +191,104 @@ export async function startChat(): Promise<void> {
     return loaded;
   });
 
-  // 4. Speak a reply sentence by sentence, fetching the next clip while the
-  // current one plays. The bubble shows the whole reply at once; the words
-  // light up as they are spoken when the live head is on. The text is the
-  // reply's plain text (toPlainText): the same for the bubble, the highlight
-  // and the voice.
-  const speakReply = async (text: string, bubble: HTMLElement) => {
-    const sentences = splitSentences(text);
-    if (sentences.length === 0) return;
+  // 4. The voice of a reply that is still being written: sentences are
+  // added as the model completes them and spoken in order, the next clip
+  // fetched while the current one plays. The bubble grows with the text;
+  // when the live head is on, the words light up as they are spoken. The
+  // text is the reply's plain text (toPlainText): the same for the bubble,
+  // the highlight and the voice.
+  let cancelVoice: (() => void) | null = null;
+  const startVoice = (bubble: HTMLElement) => {
     const before = interruptions;
-    const head = await headReady;
-    if (before !== interruptions) return;
-    // The highlight counts spoken words over the shown text and keeps its
-    // line breaks; a list bullet is not a spoken word.
-    const tokens = text.split(/(\s+)/);
-    const wordEnds: number[] = [];
-    tokens.forEach((token, i) => {
-      if (token.trim() && token !== BULLET) wordEnds.push(i + 1);
-    });
-    speaking = true;
-    status.textContent = t.speaking;
+    const sentences: string[] = [];
+    let ended = false;
+    let wake: (() => void) | null = null;
+    const nudge = () => {
+      wake?.();
+      wake = null;
+    };
+    cancelVoice = nudge;
+    let text = '';
+    let live = true; // the spoken / rest spans are in the bubble
     let spokenWords = 0;
     const spoken = document.createElement('span');
     spoken.className = 'spoken';
     const rest = document.createElement('span');
-    rest.textContent = text;
     bubble.textContent = '';
     bubble.append(spoken, rest);
-    const prefetch = (i: number): Promise<SpeechClip> | null => {
+    // The highlight counts spoken words over the shown text and keeps its
+    // line breaks; a list bullet is not a spoken word.
+    const render = () => {
+      if (!live) {
+        bubble.textContent = text;
+        return;
+      }
+      const tokens = text.split(/(\s+)/);
+      const wordEnds: number[] = [];
+      tokens.forEach((token, i) => {
+        if (token.trim() && token !== BULLET) wordEnds.push(i + 1);
+      });
+      const cut = spokenWords > 0 ? (wordEnds[Math.min(spokenWords, wordEnds.length) - 1] ?? 0) : 0;
+      spoken.textContent = tokens.slice(0, cut).join('');
+      rest.textContent = tokens.slice(cut).join('');
+    };
+    const clip = (i: number): Promise<SpeechClip> | null => {
       if (i >= sentences.length) return null;
       const p = synthesize(conversation, sentences[i], lang);
       p.catch(() => undefined); // an unused prefetch must not surface as an unhandled rejection
       return p;
     };
-    let next = prefetch(0);
-    try {
-      for (let i = 0; i < sentences.length && speaking; i++) {
-        const clip = await next;
-        next = prefetch(i + 1);
-        if (!clip || !speaking) break;
-        await head.speak(clip, lang, () => {
-          spokenWords = Math.min(spokenWords + 1, wordEnds.length);
-          const cut = wordEnds[spokenWords - 1] ?? 0;
-          spoken.textContent = tokens.slice(0, cut).join('');
-          rest.textContent = tokens.slice(cut).join('');
-          followSpoken(spoken);
-        });
+    const run = async () => {
+      const head = await headReady;
+      if (before !== interruptions) return;
+      speaking = true;
+      status.textContent = t.speaking;
+      let next: Promise<SpeechClip> | null = null;
+      try {
+        for (let i = 0; speaking; ) {
+          if (i >= sentences.length) {
+            if (ended) break;
+            await new Promise<void>((resolve) => (wake = resolve));
+            continue;
+          }
+          const current = await (next ?? clip(i));
+          next = clip(i + 1);
+          if (!current || !speaking) break;
+          await head.speak(current, lang, () => {
+            spokenWords++;
+            render();
+            followSpoken(spoken);
+          });
+          i++;
+        }
+      } catch (err) {
+        console.warn('speech playback stopped', err);
+        hint.textContent = t.speechError;
+      } finally {
+        speaking = false;
+        if (status.textContent === t.speaking) status.textContent = '';
       }
-    } catch (err) {
-      console.warn('speech playback stopped', err);
-      hint.textContent = t.speechError;
-    } finally {
-      bubble.textContent = text;
-      speaking = false;
-      if (status.textContent === t.speaking) status.textContent = '';
-    }
+    };
+    const done = run().finally(() => {
+      live = false;
+      render();
+      if (cancelVoice === nudge) cancelVoice = null;
+    });
+    return {
+      setText(next: string) {
+        text = next;
+        render();
+      },
+      add(sentence: string) {
+        sentences.push(sentence);
+        nudge();
+      },
+      end() {
+        ended = true;
+        nudge();
+      },
+      done,
+    };
   };
 
   // 5. Waiting and failing. While the reply is on its way, an assistant
@@ -314,7 +357,9 @@ export async function startChat(): Promise<void> {
     showProblem(t.sendError);
   };
 
-  // 6. One turn, typed or spoken.
+  // 6. One turn, typed or spoken. The reply streams in: the waiting bubble
+  // gives way to the reply's first words, and the voice starts with the
+  // first complete sentence while the rest is still being written.
   let busy = false;
   const turn = async (content: string, mode: InputMode) => {
     if (busy || !content.trim()) return;
@@ -325,23 +370,45 @@ export async function startChat(): Promise<void> {
     setBusy(true, t.thinking);
     showWaiting();
     let bubble: HTMLElement | null = null;
-    let replyText = '';
+    let voice: ReturnType<typeof startVoice> | null = null;
+    let raw = '';
+    const feeder = new SentenceFeeder((sentence) => voice?.add(sentence));
     try {
-      const reply = await sendMessage(conversation, content.trim(), mode);
-      replyText = toPlainText(reply.content);
-      hideWaiting();
-      bubble = addBubble('assistant', replyText);
+      const reply = await streamMessage(conversation, content.trim(), mode, (piece) => {
+        if (!bubble) {
+          hideWaiting();
+          bubble = addBubble('assistant', '');
+          voice = startVoice(bubble);
+        }
+        raw += piece;
+        voice?.setText(toPlainText(raw));
+        feeder.push(piece);
+      });
+      if (!bubble) {
+        hideWaiting();
+        bubble = addBubble('assistant', '');
+        voice = startVoice(bubble);
+        feeder.push(reply.content);
+      }
+      voice?.setText(toPlainText(reply.content));
+      feeder.flush();
+      voice?.end();
     } catch (err) {
       hideWaiting();
+      // A reply cut off midway was not saved: it goes, like the question.
+      stopSpeaking();
+      (bubble as HTMLElement | null)?.remove();
       sendFailed(content.trim(), userBubble, err);
     } finally {
       setBusy(false);
+      // The voice may already be speaking the first sentences.
+      if (speaking) status.textContent = t.speaking;
       busy = false;
       input.focus();
     }
-    // Playback happens with the controls free: typing or pressing the
-    // microphone interrupts the voice (barge-in).
-    if (bubble) await speakReply(replyText, bubble);
+    // The voice goes on with the controls free: typing or pressing the
+    // microphone interrupts it (barge-in).
+    if (voice) await (voice as ReturnType<typeof startVoice>).done;
   };
 
   form.addEventListener('submit', (event) => {
