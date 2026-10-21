@@ -53,7 +53,8 @@ spec:
           volumeMounts:
             - name: sqlite-data
               mountPath: /data
-          # Speech recognition and synthesis run inside this container.
+          # Speech is served by the speech pods (speech-deployment.yaml, path route
+          # /api/speech); the same endpoints here are only a fallback.
           resources:
             requests:
               memory: "1Gi"

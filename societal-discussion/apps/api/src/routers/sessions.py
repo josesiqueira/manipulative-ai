@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
-from ..models import Message, Session, SurveyResponse
+from ..models import Conversation, Message, Session, SurveyResponse
 from ..services.party_grounding import PARTY_DISPLAY_NAMES, base_party, framing, is_populist
 from ..services.session_code import format_session_code
 
@@ -54,7 +54,7 @@ def _to_response(session: Session) -> SessionResponse:
 @router.post("", response_model=SessionResponse, status_code=status.HTTP_201_CREATED)
 async def create_session(
     data: SessionCreate | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Create a session. With a body, record consent (age confirmation required)."""
     session = Session()
@@ -78,7 +78,7 @@ async def create_session(
 @router.get("/{session_id}", response_model=SessionResponse)
 async def get_session(
     session_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Get session details."""
     result = await db.execute(select(Session).where(Session.id == session_id))
@@ -114,11 +114,14 @@ class DebriefResponse(BaseModel):
 @router.get("/{session_id}/debrief", response_model=DebriefResponse)
 async def get_debrief(
     session_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     result = await db.execute(
         select(Session)
-        .options(selectinload(Session.conversations), selectinload(Session.survey_responses))
+        .options(
+            selectinload(Session.conversations).selectinload(Conversation.messages),
+            selectinload(Session.survey_responses),
+        )
         .where(Session.id == session_id)
     )
     session = result.scalar_one_or_none()
@@ -130,7 +133,14 @@ async def get_debrief(
     if not session.survey_responses and session.data_deleted_at is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Survey not submitted")
 
-    conversations = sorted(session.conversations, key=lambda c: c.started_at)
+    # Only conversations the participant actually had: an opened chat page
+    # with no message sent never showed them that party. After a deletion the
+    # messages are gone, so every conversation is listed.
+    deleted = session.data_deleted_at is not None
+    conversations = sorted(
+        (c for c in session.conversations if deleted or c.messages),
+        key=lambda c: c.started_at,
+    )
     return DebriefResponse(
         session_code=format_session_code(session.id),
         data_deleted=session.data_deleted_at is not None,
@@ -150,7 +160,7 @@ async def get_debrief(
 @router.delete("/{session_id}/data", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_session_data(
     session_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Participant-initiated deletion (thank-you page, or by emailed code).
 

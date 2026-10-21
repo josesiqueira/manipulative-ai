@@ -1,13 +1,17 @@
-from src.models import Conversation, Session, SurveyResponse
+from src.models import Conversation, Message, Session, SurveyResponse
 
 
-async def _consented_session(db_session, parties: list[str]) -> Session:
+async def _consented_session(db_session, parties: list[str], empty: tuple[str, ...] = ()) -> Session:
     s = Session(consent_version="t", age_confirmed=True)
     db_session.add(s)
     await db_session.flush()
     for p in parties:
-        db_session.add(Conversation(session_id=s.id, assigned_party=p, language="fi"))
+        c = Conversation(session_id=s.id, assigned_party=p, language="fi")
+        db_session.add(c)
         await db_session.flush()
+        if p not in empty:
+            db_session.add(Message(conversation_id=c.id, role="user", content="moi"))
+            await db_session.flush()
     return s
 
 
@@ -18,8 +22,14 @@ async def test_debrief_is_forbidden_before_survey(client, db_session):
     assert "sdp" not in res.text
 
 
-async def test_debrief_lists_every_conversation_after_survey(client, db_session):
-    s = await _consented_session(db_session, ["kokoomus", "sdp_populist", "rkp_antipopulist"])
+async def test_debrief_lists_every_conversation_with_messages_after_survey(client, db_session):
+    # The chat page for vihreat_populist was opened but nothing was sent:
+    # that party was never shown, so the debrief does not name it.
+    s = await _consented_session(
+        db_session,
+        ["kokoomus", "sdp_populist", "vihreat_populist", "rkp_antipopulist"],
+        empty=("vihreat_populist",),
+    )
     db_session.add(SurveyResponse(session_id=s.id, responses={}))
     await db_session.flush()
     res = await client.get(f"/api/sessions/{s.id}/debrief")

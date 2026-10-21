@@ -28,7 +28,11 @@ def make_engine(url: str, **kwargs) -> AsyncEngine:
     return eng
 
 
-engine = make_engine(settings.database_url, echo=settings.debug)
+# Requests now hold a connection only for short reads and writes (never
+# during a model call or a speech job), but a lecture room sends bursts: a
+# pool of 20 plus 30 overflow keeps them from queueing behind each other.
+_pool = {} if ":memory:" in settings.database_url else {"pool_size": 20, "max_overflow": 30, "pool_timeout": 30}
+engine = make_engine(settings.database_url, echo=settings.debug, **_pool)
 
 async_session_maker = async_sessionmaker(
     engine,
@@ -43,7 +47,10 @@ class Base(DeclarativeBase):
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Dependency that provides a database session."""
+    """Dependency that provides a database session. Routers declare it with
+    scope="function" so the commit runs before the response is sent: by
+    default FastAPI runs this exit code after the response, and the phone's
+    next request (sent the moment it has the answer) would not find the row."""
     async with async_session_maker() as session:
         try:
             yield session

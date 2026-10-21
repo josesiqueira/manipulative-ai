@@ -12,20 +12,26 @@ from zoneinfo import ZoneInfo
 HELSINKI = ZoneInfo("Europe/Helsinki")
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, ConfigDict
-from sqlalchemy import select
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ..config import get_settings
 from ..database import get_db
-from ..models import Session, Conversation, Message
+from ..models import Session, Conversation, Message, SurveyResponse
 from ..services.party_assignment import assign_party
 from ..services.party_grounding import ALL_PARTIES
-from ..services.llm_client import generate_response
+from ..services.llm_client import generate_reply, prepare_reply
 from ..services.conversation_logger import save_conversation_log
 
 router = APIRouter()
+
+# Limits far above what a participant needs in a lecture, there only so one
+# script cannot run up the model bill or fill the database.
+MAX_MESSAGE_CHARS = 2000
+MAX_USER_MESSAGES_PER_CONVERSATION = 40
+MAX_CONVERSATIONS_PER_SESSION = 20
 
 
 class ConversationCreate(BaseModel):
@@ -54,7 +60,7 @@ class ConversationResponse(BaseModel):
 class MessageCreate(BaseModel):
     """Request body for sending a message."""
 
-    content: str
+    content: str = Field(min_length=1, max_length=MAX_MESSAGE_CHARS)
     input_mode: str = "typed"  # 'typed' or 'spoken' (speech already transcribed)
 
 
@@ -72,7 +78,7 @@ class MessageResponse(BaseModel):
 @router.post("", response_model=ConversationResponse, status_code=status.HTTP_201_CREATED)
 async def create_conversation(
     data: ConversationCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """
     Start a new conversation.
@@ -105,6 +111,25 @@ async def create_conversation(
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Session data deleted",
+        )
+
+    # The survey closes the session: the debrief that follows it names the
+    # party and the framing, and a conversation after that is not data.
+    finished = await db.scalar(
+        select(func.count()).select_from(SurveyResponse).where(SurveyResponse.session_id == session.id)
+    )
+    if finished:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Session finished",
+        )
+    started = await db.scalar(
+        select(func.count()).select_from(Conversation).where(Conversation.session_id == session.id)
+    )
+    if started >= MAX_CONVERSATIONS_PER_SESSION:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many conversations",
         )
 
     # Assign party. FORCED_PARTY can be:
@@ -149,7 +174,7 @@ async def create_conversation(
 @router.get("/{conversation_id}", response_model=ConversationResponse)
 async def get_conversation(
     conversation_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Get conversation details (without revealing assigned party)."""
     result = await db.execute(
@@ -173,7 +198,7 @@ async def get_conversation(
 @router.get("/{conversation_id}/messages", response_model=list[MessageResponse])
 async def get_messages(
     conversation_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """Get all messages in a conversation."""
     result = await db.execute(
@@ -204,7 +229,7 @@ async def get_messages(
 async def send_message(
     conversation_id: str,
     data: MessageCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """
     Send a message and get AI response.
@@ -232,6 +257,14 @@ async def send_message(
             detail="Conversation has been completed",
         )
 
+    if not data.content.strip():
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Empty message")
+    if sum(1 for m in conversation.messages if m.role == "user") >= MAX_USER_MESSAGES_PER_CONVERSATION:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many messages",
+        )
+
     # The user message is built now (its time is the send time) but added to
     # the session only after the reply: nothing is written during the model
     # call, so the SQLite write lock is free for other participants.
@@ -243,15 +276,24 @@ async def send_message(
         created_at=datetime.now(HELSINKI),
     )
 
-    # Generate AI response
+    # Read what the model call needs, then end the read transaction so the
+    # database connection goes back to the pool during the model call (8 to
+    # 30 s): with dozens of phones waiting for replies, held connections ran
+    # out and every other request failed.
     try:
-        ai_content, tokens, model_name = await generate_response(
-            db=db,
-            conversation=conversation,
-            user_message=data.content,
-        )
+        prepared = await prepare_reply(db, conversation, data.content)
     except Exception as e:
-        print(f"LLM error: {e}")
+        print(f"LLM setup error: {type(e).__name__}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Vastauksen generointi epäonnistui. Yritä uudelleen.",
+        )
+    await db.commit()
+
+    try:
+        ai_content, tokens, model_name = await generate_reply(prepared)
+    except Exception as e:
+        print(f"LLM error: {type(e).__name__}: {e}")
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Vastauksen generointi epäonnistui. Yritä uudelleen.",
@@ -281,7 +323,7 @@ async def send_message(
 @router.put("/{conversation_id}/end")
 async def end_conversation(
     conversation_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
 ):
     """
     Mark a conversation as ended.

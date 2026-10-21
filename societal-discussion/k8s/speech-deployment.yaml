@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: speech
+  namespace: manipulative-ai-2
+  labels:
+    app: speech
+spec:
+  # Speech recognition and the avatar's voice for a full lecture room: the
+  # API image, run as the speech-only app (src/speech_main.py), no database.
+  replicas: 4
+  selector:
+    matchLabels:
+      app: speech
+  template:
+    metadata:
+      labels:
+        app: speech
+    spec:
+      containers:
+        - name: speech
+          image: image-registry.apps.2.rahti.csc.fi/manipulative-ai-2/api:latest
+          imagePullPolicy: Always
+          command: ["python", "-m", "uvicorn", "src.speech_main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "$(SPEECH_WORKERS)"]
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env:
+            - name: SPEECH_WORKERS
+              value: "2"
+            - name: SPEECH_LOCAL_WHISPER_THREADS
+              value: "2"
+            - name: SPEECH_WARM_UP
+              value: "true"
+            - name: SPEECH_CONVERSATION_CHECK_URL
+              value: "http://api:8080"
+            - name: CORS_ORIGINS
+              value: "https://vaalikeskustelu.2.rahtiapp.fi,https://admin-vaalikeskustelu.2.rahtiapp.fi,https://api-vaalikeskustelu.2.rahtiapp.fi"
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "2000m"
+            limits:
+              memory: "6Gi"
+              cpu: "4000m"
+          # Ready only when every worker has loaded and run both engines.
+          readinessProbe:
+            httpGet:
+              path: /api/speech/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            initialDelaySeconds: 120
+            periodSeconds: 20

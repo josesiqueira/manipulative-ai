@@ -74,7 +74,7 @@ class StatsResponse(BaseModel):
 
 @router.get("/stats", response_model=StatsResponse)
 async def get_stats(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """Get experiment statistics (admin only)."""
@@ -213,7 +213,7 @@ class DailyStatsResponse(BaseModel):
 @router.get("/stats/daily", response_model=DailyStatsResponse)
 async def get_daily_stats(
     days: int = 7,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """
@@ -278,7 +278,7 @@ async def get_daily_stats(
 
 @router.delete("/data/reset")
 async def reset_all_data(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """
@@ -330,7 +330,7 @@ class AdminConversationResponse(BaseModel):
 @router.post("/conversations", response_model=AdminConversationResponse, status_code=status.HTTP_201_CREATED)
 async def admin_create_conversation(
     data: AdminConversationCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """Create a conversation with a specific party (admin/testing only)."""
@@ -450,7 +450,7 @@ async def list_conversations(
     exclude_test: bool = True,
     page: int = 1,
     per_page: int = 20,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """Paginated, filtered list of conversations (admin only).
@@ -525,7 +525,7 @@ async def list_conversations(
 @router.get("/conversations/{conversation_id}/detail", response_model=ConversationDetailResponse)
 async def get_conversation_detail(
     conversation_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """Full detail for a single conversation (admin only)."""
@@ -586,7 +586,7 @@ class ConversationFlagUpdate(BaseModel):
 async def flag_conversation(
     conversation_id: str,
     data: ConversationFlagUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """Set or clear the admin flag on a conversation."""
@@ -634,7 +634,7 @@ async def flag_conversation(
 @router.post("/conversations/{conversation_id}/save-test", response_model=ConversationListItem)
 async def save_test_conversation(
     conversation_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """Promote a test conversation from ephemeral to saved.
@@ -683,7 +683,7 @@ async def save_test_conversation(
 @router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_test_conversation(
     conversation_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """Permanently delete a conversation and its messages.
@@ -753,7 +753,7 @@ def _session_item(s: Session) -> SessionListItem:
 
 @router.get("/sessions", response_model=list[SessionListItem])
 async def list_sessions(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """List all sessions with conversation counts."""
@@ -770,7 +770,7 @@ async def list_sessions(
 @router.get("/sessions/by-code/{code}", response_model=list[SessionListItem])
 async def find_sessions_by_code(
     code: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """Look up sessions by the XXXX-XXXX code shown on the thank-you page.
@@ -801,7 +801,7 @@ async def export_data(
     assigned_party: str | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """
@@ -1008,7 +1008,7 @@ SURVEY_RESPONSE_KEYS = [
 @router.get("/export/surveys")
 async def export_surveys(
     format: str = "csv",
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """
@@ -1157,7 +1157,7 @@ async def get_llm_providers(_: bool = Depends(verify_admin)):
 
 @router.get("/llm/configs", response_model=list[LLMConfigResponse])
 async def get_llm_configs(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """Get all LLM configurations with masked API keys."""
@@ -1194,7 +1194,7 @@ async def get_llm_configs(
 async def update_llm_config(
     provider: str,
     data: LLMConfigUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """Update an LLM provider configuration."""
@@ -1258,7 +1258,7 @@ async def update_llm_config(
 @router.post("/llm/active", response_model=LLMConfigResponse)
 async def set_active_provider(
     data: SetActiveProviderRequest,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """Set the active LLM provider."""
@@ -1361,7 +1361,7 @@ class ExperimentConfigUpdate(BaseModel):
 
 @router.get("/experiment", response_model=ExperimentConfigResponse)
 async def get_experiment_config(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """Get experiment configuration."""
@@ -1380,7 +1380,7 @@ async def get_experiment_config(
 @router.put("/experiment", response_model=ExperimentConfigResponse)
 async def update_experiment_config(
     data: ExperimentConfigUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """Update experiment configuration."""
@@ -1501,7 +1501,7 @@ class PromptConfigUpdate(BaseModel):
 
 @router.get("/prompts", response_model=list[PromptConfigResponse])
 async def get_all_prompts(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """Get all prompts — DB override or default for each party."""
@@ -1544,7 +1544,7 @@ async def get_all_prompts(
 async def update_prompt(
     party: str,
     data: PromptConfigUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """Update the system instruction for a party."""
@@ -1586,7 +1586,7 @@ async def update_prompt(
 @router.delete("/prompts/{party}")
 async def reset_prompt(
     party: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
     """Reset a prompt to the default system instruction."""

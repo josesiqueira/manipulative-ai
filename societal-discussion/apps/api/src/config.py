@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     speech_models_dir: str = "models"   # Piper voices and the whisper model directory
     speech_local_whisper_model: str = "small"   # size name (downloaded) or a directory under models_dir
     speech_local_whisper_compute: str = "int8"
+    speech_local_whisper_threads: int = 0       # CTranslate2 threads; 0 = its default (4)
+    speech_max_waiting: int = 12        # per engine and worker process; more waiting jobs get a fast 503
+    speech_warm_up: bool = False        # load and run the local engines at start
+    # Speech pods have no database: they ask the API whether a conversation
+    # is open (GET {url}/api/conversations/{id}). Empty = check the database.
+    speech_conversation_check_url: str = ""
     speech_max_upload_bytes: int = 2_000_000
     speech_max_text_chars: int = 600
 

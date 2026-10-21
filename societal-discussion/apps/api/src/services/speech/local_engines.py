@@ -1,13 +1,23 @@
 """
 Local speech engines: faster-whisper for recognition and word timings, Piper
-for synthesis. Models load once per process, on first use, and run in a
-thread pool so the event loop keeps serving other phones.
+for synthesis. Models load once per process (warm_up() at start, or on first
+use) and run in a thread pool so the event loop keeps serving other phones.
+
+Recognition and synthesis each have their own lock, so one never waits for
+the other. Within a process each engine runs one job at a time (espeak-ng,
+which Piper uses for phonemes, is not thread-safe); throughput comes from
+several worker processes and several speech pods. A job whose phone has
+already given up is dropped before it starts, and when too many jobs are
+waiting a new one is refused at once (SpeechBusy) instead of queueing past
+the phone's timeout.
 """
 from __future__ import annotations
 
 import asyncio
 import io
 import threading
+from collections.abc import Awaitable, Callable
+from contextvars import ContextVar
 from functools import lru_cache
 from pathlib import Path
 
@@ -17,7 +27,21 @@ from ...config import get_settings
 
 PIPER_VOICES = {"fi": "fi_FI-harri-medium", "en": "en_GB-alan-medium"}
 
-_lock = threading.Lock()
+_stt_lock = threading.Lock()
+_tts_lock = threading.Lock()
+
+
+class SpeechBusy(RuntimeError):
+    """Too many speech jobs are already waiting in this process."""
+
+
+class SpeechAbandoned(RuntimeError):
+    """The phone gave up on the request before its job could start."""
+
+
+# Set by the endpoint to request.is_disconnected: checked when a job's turn
+# comes, so work for a phone that has gone is never done.
+client_gone: ContextVar[Callable[[], Awaitable[bool]] | None] = ContextVar("client_gone", default=None)
 
 
 def _models_dir() -> Path:
@@ -32,7 +56,12 @@ def whisper_model():
     name = settings.speech_local_whisper_model
     local_dir = _models_dir() / f"whisper-{name}"
     source = str(local_dir) if local_dir.exists() else name
-    return WhisperModel(source, device="cpu", compute_type=settings.speech_local_whisper_compute)
+    return WhisperModel(
+        source,
+        device="cpu",
+        compute_type=settings.speech_local_whisper_compute,
+        cpu_threads=settings.speech_local_whisper_threads,
+    )
 
 
 @lru_cache(maxsize=4)
@@ -51,9 +80,36 @@ def piper_voice(language: str):
 MAX_CLIP_SECONDS = 60
 MAX_CLIP_SAMPLES = MAX_CLIP_SECONDS * 16000
 
-# At most two local engine jobs at once; the rest wait in the event loop
-# instead of piling up threads.
-_jobs = asyncio.Semaphore(2)
+_stt_slot = asyncio.Semaphore(1)
+_tts_slot = asyncio.Semaphore(1)
+_waiting = {"stt": 0, "tts": 0}
+
+
+async def _run(kind: str, slot: asyncio.Semaphore, fn, *args, timeout: float | None = None):
+    if _waiting[kind] >= get_settings().speech_max_waiting:
+        raise SpeechBusy(kind)
+    _waiting[kind] += 1
+    queued = True
+    try:
+        async with slot:
+            _waiting[kind] -= 1
+            queued = False
+            gone = client_gone.get()
+            if gone is not None and await gone():
+                raise SpeechAbandoned(kind)
+            job = asyncio.to_thread(fn, *args)
+            return await (asyncio.wait_for(job, timeout=timeout) if timeout else job)
+    finally:
+        if queued:
+            _waiting[kind] -= 1
+
+
+def warm_up() -> None:
+    """Load the models and run each engine once, so the first phone of the
+    evening does not wait for model loading."""
+    for language in PIPER_VOICES:
+        _synthesize_sync("Hei." if language == "fi" else "Hello.", language)
+    _transcribe_samples(np.zeros(16000, dtype=np.float32), "fi")
 
 
 def decode_clip(audio: bytes, max_samples: int = MAX_CLIP_SAMPLES) -> np.ndarray:
@@ -120,7 +176,11 @@ def _transcribe_sync(audio: bytes, language: str) -> str:
     samples = decode_clip(audio)
     if samples.size == 0:
         return ""
-    with _lock:
+    return _transcribe_samples(samples, language)
+
+
+def _transcribe_samples(samples: np.ndarray, language: str) -> str:
+    with _stt_lock:
         segments, _ = whisper_model().transcribe(
             samples,
             language=language,
@@ -136,7 +196,7 @@ def _transcribe_sync(audio: bytes, language: str) -> str:
 
 def _word_times_sync(samples_16k: np.ndarray, language: str) -> list[tuple[str, float, float]]:
     """Whisper word starts and ends in seconds for 16 kHz float samples."""
-    with _lock:
+    with _stt_lock:
         segments, _ = whisper_model().transcribe(
             samples_16k, language=language, beam_size=1, word_timestamps=True, vad_filter=False
         )
@@ -178,7 +238,7 @@ def _synthesize_sync(text: str, language: str) -> tuple[np.ndarray, int, list[tu
     timings: list[tuple[int, int]] = []
     have_alignments = True
     offset = 0
-    with _lock:
+    with _tts_lock:
         for chunk in voice.synthesize(text, include_alignments=True):
             audio = chunk.audio_float_array.astype(np.float32)
             parts.append(audio)
@@ -194,15 +254,12 @@ def _synthesize_sync(text: str, language: str) -> tuple[np.ndarray, int, list[tu
 
 
 async def transcribe_local(audio: bytes, language: str) -> str:
-    async with _jobs:
-        return await asyncio.wait_for(asyncio.to_thread(_transcribe_sync, audio, language), timeout=60)
+    return await _run("stt", _stt_slot, _transcribe_sync, audio, language, timeout=60)
 
 
 async def synthesize_local(text: str, language: str) -> tuple[np.ndarray, int, list[tuple[int, int]] | None]:
-    async with _jobs:
-        return await asyncio.to_thread(_synthesize_sync, text, language)
+    return await _run("tts", _tts_slot, _synthesize_sync, text, language)
 
 
 async def word_times_local(samples_16k: np.ndarray, language: str) -> list[tuple[str, float, float]]:
-    async with _jobs:
-        return await asyncio.to_thread(_word_times_sync, samples_16k, language)
+    return await _run("stt", _stt_slot, _word_times_sync, samples_16k, language)

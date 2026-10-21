@@ -3,6 +3,9 @@ kind: Route
 metadata:
   name: api
   namespace: manipulative-ai-2
+  annotations:
+    # The default 30 s cut long model replies off (largest party: 25 to 35 s).
+    haproxy.router.openshift.io/timeout: 180s
 spec:
   host: api-vaalikeskustelu.2.rahtiapp.fi
   to:

@@ -1,12 +1,12 @@
 """
-manipulative-ai2 API — FastAPI backend.
+Vaalikeskustelu API: FastAPI backend.
 
 Endpoints:
-- /api/sessions — create/get participant sessions
-- /api/conversations — create conversations, send messages, end conversations
-- /api/survey — submit survey responses
-- /api/admin — admin panel (stats, export, LLM config)
-- /api/health — health check
+- /api/sessions: create/get participant sessions
+- /api/conversations: create conversations, send messages, end conversations
+- /api/survey: submit survey responses
+- /api/admin: admin panel (stats, export, LLM config)
+- /api/health: health check
 """
 
 from contextlib import asynccontextmanager
@@ -28,11 +28,15 @@ async def lifespan(app: FastAPI):
     yield
 
 
+# No public API documentation: it would describe the experiment's hidden
+# condition fields to anyone in the audience who looks.
 app = FastAPI(
     title="Vaalikeskustelu API",
-    description="Backend API for manipulative-ai2 political chatbot experiment",
     version="0.2.0",
     lifespan=lifespan,
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
 )
 
 # CORS middleware

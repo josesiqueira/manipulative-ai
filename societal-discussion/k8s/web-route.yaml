@@ -3,6 +3,8 @@ kind: Route
 metadata:
   name: web
   namespace: manipulative-ai-2
+  annotations:
+    haproxy.router.openshift.io/timeout: 120s
 spec:
   host: admin-vaalikeskustelu.2.rahtiapp.fi
   to:
