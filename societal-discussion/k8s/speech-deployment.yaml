@@ -8,7 +8,7 @@ metadata:
 spec:
   # Speech recognition and the avatar's voice for a full lecture room: the
   # API image, run as the speech-only app (src/speech_main.py), no database.
-  replicas: 4
+  replicas: 1
   selector:
     matchLabels:
       app: speech
@@ -36,13 +36,15 @@ spec:
               value: "http://api:8080"
             - name: CORS_ORIGINS
               value: "https://vaalikeskustelu.2.rahtiapp.fi,https://admin-vaalikeskustelu.2.rahtiapp.fi,https://api-vaalikeskustelu.2.rahtiapp.fi"
+          # The project quota is 4 CPU of limits in total (CSC default):
+          # participant 200m + admin 200m + API 1000m + speech 2600m.
           resources:
             requests:
               memory: "2Gi"
-              cpu: "2000m"
+              cpu: "1000m"
             limits:
               memory: "6Gi"
-              cpu: "4000m"
+              cpu: "2600m"
           # Ready only when every worker has loaded and run both engines.
           readinessProbe:
             httpGet:
