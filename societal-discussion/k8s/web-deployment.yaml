@@ -7,6 +7,10 @@ metadata:
     app: web
 spec:
   replicas: 1
+  # The project quota (4 CPU of limits) has no room for a second pod during
+  # an update: the old pod stops before the new one starts.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: web
