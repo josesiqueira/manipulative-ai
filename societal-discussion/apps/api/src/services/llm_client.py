@@ -8,6 +8,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
+import openai
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -85,23 +86,41 @@ class EmptyReplyError(RuntimeError):
     """The model returned no text twice in a row."""
 
 
+def _retryable(exc: Exception) -> bool:
+    if isinstance(exc, openai.RateLimitError):
+        # credit_balance_exhausted / insufficient_quota is also a 429 but
+        # never clears by waiting (seen 2026-10-21 at 18:25).
+        body = getattr(exc, "body", None) or {}
+        return body.get("type") != "insufficient_quota"
+    return isinstance(exc, (openai.APITimeoutError, openai.APIConnectionError,
+                            openai.InternalServerError))
+
+
 async def generate_reply(prepared: PreparedReply) -> tuple[str, int, str]:
     """Call the model. Returns (response_text, token_count, model_name). An
-    empty reply is never stored: the call is repeated once, and a second empty
-    reply raises EmptyReplyError."""
+    unusable reply (empty, or a stream cut without a finish reason) is never
+    stored: the call is repeated once, then EmptyReplyError."""
     total_tokens = 0
-    for _attempt in range(2):
-        response_text, token_count = await prepared.provider.generate(
-            messages=prepared.messages,
-            model=prepared.model,
-            max_tokens=MAX_COMPLETION_TOKENS,
-            temperature=0.1,
-        )
+    for attempt in range(2):
+        try:
+            response_text, token_count = await prepared.provider.generate(
+                messages=prepared.messages,
+                model=prepared.model,
+                max_tokens=MAX_COMPLETION_TOKENS,
+                temperature=0.1,
+            )
+        except Exception as e:  # noqa: BLE001
+            if attempt == 1 or not _retryable(e):
+                raise
+            print(f"LLM call failed ({type(e).__name__}), retrying")
+            continue
         total_tokens += token_count or 0
-        if response_text and response_text.strip():
+        finish = getattr(prepared.provider, "last_finish_reason", "stop")
+        if response_text and response_text.strip() and finish is not None:
             return response_text.strip(), total_tokens, prepared.model
-        print(f"LLM empty reply from {prepared.model} ({token_count} tokens), retrying")
-    raise EmptyReplyError(f"{prepared.model} returned an empty reply twice")
+        print(f"LLM unusable reply from {prepared.model} (finish={finish}, "
+              f"{token_count} tokens), retrying")
+    raise EmptyReplyError(f"{prepared.model} returned no usable reply twice")
 
 
 async def stream_reply(prepared: PreparedReply) -> AsyncIterator[str]:

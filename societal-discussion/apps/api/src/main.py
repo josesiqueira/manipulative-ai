@@ -9,6 +9,8 @@ Endpoints:
 - /api/health: health check
 """
 
+import asyncio
+import concurrent.futures
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -24,6 +26,10 @@ settings = get_settings()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize database on startup."""
+    # Each streamed reply holds a worker thread for its whole duration (the
+    # OpenAI stream is blocking): the default pool of CPUs + 4 threads would
+    # make a room full of phones wait for each other's replies.
+    asyncio.get_running_loop().set_default_executor(concurrent.futures.ThreadPoolExecutor(max_workers=128))
     await init_db()
     yield
 
