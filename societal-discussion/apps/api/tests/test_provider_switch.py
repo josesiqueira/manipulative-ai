@@ -178,7 +178,9 @@ def test_gptlab_request_turns_qwen_thinking_off_and_sends_one_system_message():
     qwen = provider._kwargs(messages, "qwen3.8:27b", 4096, 0.1)
     assert qwen["reasoning_effort"] == "none"
     assert qwen["max_tokens"] == 4096
-    assert "service_tier" not in qwen and "temperature" not in qwen
+    assert "service_tier" not in qwen
+    # The models' own sampling (Ollama registry), not the endpoint's 1.0 top_p.
+    assert (qwen["temperature"], qwen["top_p"]) == (1.0, 0.95)
     assert qwen["messages"][0] == {"role": "system", "content": "OHJE JA OHJELMAKEHYS JA KIELI"}
     assert "reasoning_effort" not in provider._kwargs(messages, "gemma4:31b-it-q4_K_M", 4096, 0.1)
 

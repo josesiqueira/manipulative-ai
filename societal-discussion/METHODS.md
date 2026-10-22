@@ -249,7 +249,10 @@ survey entry page and from there to the survey.
   University's GPU-farmi-004 (Ollama, OpenAI-compatible API): `qwen3.8:27b`
   by default, `qwen3.6:35b-a3b-q4_K_M` or `gemma4:31b-it-q4_K_M`, through
   `GPTLabProvider` in `openai_provider.py`. Qwen's thinking is turned off
-  (`reasoning_effort: "none"`); the models' own sampling defaults are kept.
+  (`reasoning_effort: "none"`). The models' own sampling is kept: Ollama's
+  OpenAI-compatible endpoint would replace a missing temperature and top_p
+  with 1.0, so the values the three models publish in the Ollama registry
+  (temperature 1, top_p 0.95) are sent explicitly.
   Reading a whole programme the first time takes minutes there (measured
   18 to 20 October 2026), so the programmes are read once before use.
 - **The provider is on the record and in the notices**: the participant
@@ -258,10 +261,10 @@ survey entry page and from there to the survey.
   (`consent_version` ends in `+openai`, `+anthropic` or `+gptlab`), each
   reply stores its model, and the thank-you page shows the note of every
   provider that answered in the session.
-- **Temperature**: none of the three providers' current models gets one;
+- **Temperature**: no current model gets a value of our own;
   each runs at its own default. GPT-5.5 and GPT-6 models accept only the
-  default (1.0) (`_supports_custom_temperature`); the Anthropic and GPT Lab
-  requests send none. The value 0.1 is still sent to older OpenAI models
+  default (1.0) (`_supports_custom_temperature`); the Anthropic requests
+  send none; the GPT Lab requests send the models' own published values. The value 0.1 is still sent to older OpenAI models
   that accept it, such as GPT-5.4 (HEPP2026).
 - **The model is on the record**: every assistant message stores the model
   identifier the request was made with (the model selected in the admin

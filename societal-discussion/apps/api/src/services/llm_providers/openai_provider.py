@@ -144,6 +144,10 @@ class OpenAIProvider(LLMProvider):
 _GPTLAB_TIMEOUT = httpx.Timeout(900.0, connect=10.0)
 
 
+GPTLAB_TEMPERATURE = 1.0
+GPTLAB_TOP_P = 0.95
+
+
 class GPTLabProvider(OpenAIProvider):
     """Open models on GPT Lab's GPU-farmi-004 (Tampere University)."""
 
@@ -162,9 +166,15 @@ class GPTLabProvider(OpenAIProvider):
             "stream": True,
             "stream_options": {"include_usage": True},
         }
+        # Ollama's OpenAI-compatible endpoint replaces a missing temperature
+        # and top_p with 1.0, not the model's own values. The three farm
+        # models publish temperature 1 and top_p 0.95 in the Ollama registry
+        # (read 22 October 2026), so both are sent to keep the models' own
+        # sampling; top_k and the penalties are not touched by the endpoint.
+        kwargs["temperature"] = GPTLAB_TEMPERATURE
+        kwargs["top_p"] = GPTLAB_TOP_P
         # Qwen 3.5 and newer think before answering by default on this
-        # endpoint; "none" turns it off (measured 20 October 2026). The
-        # model's own sampling defaults are kept.
+        # endpoint; "none" turns it off (measured 20 October 2026).
         if model.startswith("qwen3"):
             kwargs["reasoning_effort"] = "none"
         return kwargs
