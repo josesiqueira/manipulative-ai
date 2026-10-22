@@ -73,15 +73,17 @@ To reproduce a specific release: `git checkout <tag>`.
 - **Participant app**: Astro 7 with the Node adapter, TypeScript, Tailwind
   CSS 4, TalkingHead for the avatar; Playwright browser tests.
 - **Admin app**: Next.js 14 (App Router), TypeScript, Tailwind CSS.
-- **Language model**: OpenAI GPT-6 Astra for the Metso run (GPT-5.4 for
-  HEPP2026).
+- **Language model**: one of three providers, switched at runtime and
+  recorded per session: OpenAI GPT-6 Astra, Anthropic Claude Sonnet 5.5, or
+  open models (Qwen3.8 27B by default) on Tampere University's GPT Lab GPU
+  farm (GPT-5.4 for HEPP2026).
 - **Deployment**: CSC Rahti (OpenShift); container images for the API, the
   participant app and the admin app; manifests in
   [`societal-discussion/k8s/`](societal-discussion/k8s/).
 
-The bot is grounded by placing the entire party programme text (62 KB to
-688 KB of Finnish text, an estimated 20 K to 220 K tokens depending on the
-party) into the system prompt at every request. No retrieval, no
+The bot is grounded by placing the entire party programme text (59 KB to
+651 KB of cleaned Finnish text, 32 K to 333 K tokens by Anthropic's count,
+depending on the party) into the system prompt at every request. No retrieval, no
 embeddings, no vector store.
 
 ---

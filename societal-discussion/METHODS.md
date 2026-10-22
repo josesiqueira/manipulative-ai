@@ -7,11 +7,15 @@ point for the methods section of the thesis or paper. Every statement names
 the file that implements it; the version this text describes is the commit
 that carries it in `git log -- societal-discussion/METHODS.md`.
 
-What changed from the HEPP2026 release: 18 conditions instead of 10, a
-consent gate before any conversation, a public participant app with a
-talking avatar and speech in both directions, a debrief with data rights
-after the survey, and two new fields on every message (input mode and the
-model that answered). The survey questions are unchanged.
+What changed from the HEPP2026 release: 18 conditions instead of 10 (an
+anti-populist variant replaces the standard one), a consent gate before any
+conversation, a public participant app with a talking avatar and speech in
+both directions, a debrief with data rights after the survey, two new fields
+on every message (input mode and the model that answered), a cleaned party
+corpus (print furniture and one duplicated document removed, the parties'
+text unchanged), the framing section moved after the programme, and three
+model providers that can be switched at runtime, with the answering provider
+recorded on every session. The survey questions are unchanged.
 
 ---
 
@@ -26,9 +30,10 @@ manipulation.
 
 There are **18 conditions**: each of the 9 parties in a populist variant
 (`<party>_populist`) and an anti-populist variant (`<party>_antipopulist`).
-Both variants read the identical party corpus and add one fixed markers
-section to the behavioural instruction (section 3), so each treatment is the
-same for every party and the two differ only in that section. The list is
+Both variants read the identical party corpus and the identical
+behavioural instruction, and add one fixed framing section after the
+programme (section 3), so each treatment is the same for every party and the
+two differ only in that section. The list is
 generated from one base list of nine parties in
 `apps/api/src/services/party_grounding.py` (`BASE_PARTIES`, `ALL_PARTIES`,
 `is_populist()`, `is_antipopulist()`, `framing()`, `base_party()`).
@@ -85,9 +90,12 @@ or long-context grounding.
   holds every word of the brochure copy in the same order. Until
   22 October 2026 the RKP bot read this programme twice. The evidence and
   the per-party figures are in `../Party Program dataset/README.md`.
-- **Tokens**: an estimate of roughly 20 K (smallest) to 220 K (largest)
-  tokens of source material per system prompt (from the byte sizes; the
-  code does not count tokens).
+- **Tokens**: each tokenizer counts differently. Anthropic's free token
+  count gives 32,053 (Liike Nyt) to 333,396 (Vihreät) tokens per system
+  prompt on the cleaned corpus (22 October 2026); GPT-6 Astra reported
+  207,766 prompt tokens for the first Vihreät request on the uncleaned
+  corpus (20 October 2026). The code does not count tokens before sending;
+  every reply stores the total the provider reported (section 13).
 - **Why not retrieval**: the corpus is bounded and static during the
   experiment, so there is nothing to retrieve, no retrieval failures, and
   the source text reaches the model unchanged.
@@ -97,8 +105,8 @@ or long-context grounding.
 
 ## 3. System prompt structure
 
-Each model request is built from four layers, concatenated in order
-(`prompt_builder.py`):
+Each model request is built from four layers, in order
+(`prompt_builder.py`, `build_system_parts()`):
 
 ```
 [1. Behavioural instruction in Finnish]   from the prompt_configs table
@@ -119,11 +127,15 @@ that `is_populist()` accepts and `ANTIPOPULISM_MARKERS_SECTION` for every
 id that `is_antipopulist()` accepts. The framing follows the programme so
 that layers 1 and 2 are the same text for the four versions of a party
 (two framings, two languages); the provider's prompt cache can then reuse
-one cached copy of the programme for all four. Until 22 October 2026 (and
-in the HEPP2026 release) the markers section sat inside layer 1, before the
-heading "Poliittiset ohjelmasi ja näkemyksesi", that is before the
-programme.
-Both ask the model to internalise three features without naming the theory,
+one cached copy of the programme for all four. The request carries the
+layers as two system parts: layers 1 and 2, then layers 3 and 4.
+Anthropic receives them as two system blocks and caches the first; OpenAI
+and GPT Lab receive them joined into one system message, the same text as
+before the split. Until 22 October 2026 (and in the HEPP2026 release) the
+markers section sat inside layer 1, before the heading "Poliittiset
+ohjelmasi ja näkemyksesi", that is before the programme.
+
+The two framing sections ask the model to internalise three features without naming the theory,
 in the same structure (three dimensions, the middle one with the triad of
 advocacy, accountability and legitimacy):
 
@@ -173,7 +185,7 @@ The participant app is bilingual (FI/EN) through the URL: every page lives
 under `/fi/` or `/en/` (`apps/participant/src/pages/[lang]/`), the choice is
 remembered in the browser (`localStorage` key `language`, `src/lib/session.ts`)
 and sent with the session (`consent_language`) and with each conversation
-(`conversations.language`). The party corpus stays Finnish; only layer 3
+(`conversations.language`). The party corpus stays Finnish; only layer 4
 changes. One Finnish prompt covers both languages, so no translation of the
 corpus confounds the comparison. Speech recognition and the voice follow the
 page language (section 9).
@@ -210,14 +222,22 @@ survey entry page and from there to the survey.
 
 ## 8. Language model
 
-- **Model for the Metso run**: OpenAI `gpt-6-astra`, the default in
+- **Which provider answers** is chosen at runtime, without a restart: the
+  active provider and model in the admin panel (or
+  `apps/api/scripts/use_provider.sh openai|anthropic|gptlab [model]`, which
+  sets the same), else the environment (`LLM_PROVIDER`, `LLM_MODEL`)
+  (`resolve_provider()` in `apps/api/src/services/llm_client.py`). The API
+  keys come from the environment. Which provider answered on the day is
+  therefore read from the data (below), not from this text.
+- **First provider**: OpenAI `gpt-6-astra`, the default in
   `apps/api/src/services/llm_models.py`, through
-  `apps/api/src/services/llm_providers/openai_provider.py`; the admin panel
-  can select another model. The participant pages name the provider and
-  model that answer (see "The provider is on the record and in the notices"
-  below).
+  `apps/api/src/services/llm_providers/openai_provider.py`, with
+  `reasoning_effort: "low"` (ordinary replies keep their length and style,
+  the hidden reasoning is cut to about 30 tokens) and the priority service
+  tier (faster output at twice the token price), both measured on
+  21 October 2026.
 - **Second provider**: Anthropic (`claude-sonnet-5-5` by default, or
-  `claude-opus-5-5`), through
+  `claude-opus-5-5` or `claude-haiku-5-5`), through
   `apps/api/src/services/llm_providers/anthropic_provider.py`, chosen with
   `LLM_PROVIDER` or in the admin panel. It receives the same prompt; the
   first system part (instruction and programme) is written to Anthropic's
@@ -238,10 +258,11 @@ survey entry page and from there to the survey.
   (`consent_version` ends in `+openai`, `+anthropic` or `+gptlab`), each
   reply stores its model, and the thank-you page shows the note of every
   provider that answered in the session.
-- **Temperature**: 0.1 for the models that accept one; GPT-5.5 and GPT-6
-  models accept only the default (1.0) and get none
-  (`_supports_custom_temperature`). GPT-6 Astra therefore runs at its default
-  temperature.
+- **Temperature**: none of the three providers' current models gets one;
+  each runs at its own default. GPT-5.5 and GPT-6 models accept only the
+  default (1.0) (`_supports_custom_temperature`); the Anthropic and GPT Lab
+  requests send none. The value 0.1 is still sent to older OpenAI models
+  that accept it, such as GPT-5.4 (HEPP2026).
 - **The model is on the record**: every assistant message stores the model
   identifier the request was made with (the model selected in the admin
   panel, or the provider's default: `messages.model_name`, written in
@@ -287,7 +308,9 @@ gate that is part of the research protocol:
 5. **Survey entry, survey, thank-you with debrief** (section 11).
 
 The consent version is a constant (`studyConfig.ts`, `2026-10-23-v1`) and
-is bumped whenever the consent wording changes; it is stored on every
+is bumped whenever the consent wording changes; the consent page adds the
+provider whose texts the participant read (`2026-10-23-v1+anthropic`, and
+likewise `+openai` or `+gptlab`), and the result is stored on every
 session.
 
 ## 10. Avatar, voice and speech input
@@ -342,8 +365,10 @@ discloses the condition, and only once a survey row exists for the session
 (403 before that). It shows, per conversation, the party's display name and
 which framing was used (populist or anti-populist); what the replies were (a model's text
 from public programmes, not the party's statements); why the study did not
-say so beforehand; the session code; "Delete my data"; the provider note;
-and the contacts and notice links.
+say so beforehand; the session code; "Delete my data"; a note for each
+provider that answered in the session (the debrief lists the models that
+answered, `models`, in order of first use); and the contacts and notice
+links.
 
 - **Session code**: the first 8 hex characters of the session id as
   `XXXX-XXXX` (`apps/api/src/services/session_code.py`), shown with a copy
@@ -391,13 +416,16 @@ carries one row per message with `session_id`, `input_mode` and
 `model_name`; the survey export (`GET /api/admin/export/surveys`) carries
 `session_id`, the submission time and the eleven response keys.
 
+`token_count` is the total the provider reported for the request: the
+whole prompt (including any part read from the prompt cache) plus the
+reply. The provider of each session is the suffix of `consent_version`;
+the model of each reply is `model_name`.
+
 Message text is stored as plain text in SQLite on the Rahti volume. The
-consent summary (`apps/participant/src/lib/strings.ts`)
-says "stored on CSC servers in Finland" and never "encrypted". The full
-privacy notice (`src/content/notices/privacy-notice.*.md`) still carries a
-sentence that message text is encrypted at rest; that sentence does not
-match the system and is an open decision for the research team, to be
-removed from the notice unless message encryption is implemented.
+consent summary (`apps/participant/src/lib/strings.ts`) says "stored on CSC
+servers in Finland" and never "encrypted"; the full privacy notice
+(`src/content/notices/privacy-notice.*.md`) names encryption in transit
+(TLS) only.
 
 ## 14. What is deliberately not used
 
@@ -424,6 +452,10 @@ removed from the notice unless message encryption is implemented.
   framing effect be separated from the party effect. Because the
   anti-populist register is close to how some parties already talk and far
   from others, the analysis should include a party by framing interaction.
+- **Provider as a covariate**: the model is not part of the manipulation,
+  but if the provider changes during data collection, replies from
+  different models must be separated or balanced in the analysis
+  (`model_name`, the `consent_version` suffix).
 - **Manipulation simplicity**: the intervention is "system prompt + party
   corpus + populist or anti-populist markers + language directive + turn-1 anchor";
   the avatar and the voice are constant across conditions and therefore not
@@ -438,6 +470,7 @@ removed from the notice unless message encryption is implemented.
 | Few-shot versus grounding | "Are LLMs Enough for Hyperpartisan/Bias Detection? ICL vs Fine-Tuning" (arXiv 2509.07768); "CEA-LIST at CheckThat! 2025" (arXiv 2507.07539) |
 | Persona prompting risks | "Persona Prompting as a Lens on LLM Social Reasoning" (EACL 2026); "Persona is a Double-Edged Sword" (OpenReview) |
 | Populism markers | Cranmer 2011: us versus them, people-centrism, anti-elitism |
+| Anti-populist markers | Mudde 2004 (pluralism, pp. 543-544) |
 | Debriefing | TENK 2019 (Finnish National Board on Research Integrity): disclosure of the true nature of the study |
 | Source corpus | Pohtiva (Finnish political programme archive, FSD) |
 | Talking avatar | TalkingHead (met4citizen), MIT licence (`apps/participant/src/vendor/talkinghead/LICENSE`); the head file is the AvatarSDK example from the same repository as recorded in `avatar.ts`; its licence is still to be confirmed |
@@ -451,7 +484,8 @@ removed from the notice unless message encryption is implemented.
 |---|---|
 | Party corpus files (9 .txt) | `apps/api/src/party_data/` |
 | 18 condition ids, display names, populist helpers | `apps/api/src/services/party_grounding.py` |
-| System prompt and populist markers | `apps/api/src/services/prompt_builder.py` |
+| Party corpus cleaning | `apps/api/scripts/clean_party_corpus.py`, `../Party Program dataset/README.md` |
+| System prompt (two parts), populist and anti-populist framing sections | `apps/api/src/services/prompt_builder.py` |
 | Weighted no-repeat assignment | `apps/api/src/services/party_assignment.py` |
 | Sessions, consent, debrief, delete | `apps/api/src/routers/sessions.py` |
 | Conversations, messages (input mode, model name) | `apps/api/src/routers/conversations.py` |
@@ -460,7 +494,8 @@ removed from the notice unless message encryption is implemented.
 | Speech models fetched at build | `apps/api/scripts/fetch_speech_models.py`, `apps/api/Dockerfile` |
 | Session code | `apps/api/src/services/session_code.py` |
 | Admin endpoints (stats, exports, by-code lookup) | `apps/api/src/routers/admin.py` |
-| Model provider abstraction | `apps/api/src/services/llm_client.py`, `llm_providers/`, `llm_models.py` |
+| Model providers and the runtime switch | `apps/api/src/services/llm_client.py`, `llm_providers/`, `llm_models.py`, `apps/api/scripts/use_provider.sh` |
+| Public provider endpoint | `apps/api/src/routers/provider.py` (`GET /api/provider`) |
 | Participant app (Astro) | `apps/participant/` |
 | Consent, declined, notices | `apps/participant/src/pages/[lang]/consent.astro`, `declined.astro`, `info/[doc].astro`, `src/content/notices/` |
 | Study constants and provider texts | `apps/participant/src/lib/studyConfig.ts`, `providerNotice.ts` |
