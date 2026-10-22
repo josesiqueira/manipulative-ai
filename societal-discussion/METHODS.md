@@ -67,6 +67,10 @@ or long-context grounding.
   header and URLs, "Tulostettu Pohtiva ...", the archive's party name and
   title, and the Puolue, Otsikko, Vuosi and Ohjelmatyyppi fields) and the
   lines at every page break (header, URL, print timestamp, page number).
+  One page number that the text extraction attached to the end of a line of
+  party text ("1 / 16" in Liike Nyt's 2023 election programme) is removed as
+  well, by a rule that accepts only the page missing from its document's
+  page sequence.
   Every remaining line is the original line, byte for byte and in order; the
   script checks this. The party's own text, including its titles, slogans
   and every mention of the party, is unchanged. Removed: 4.8 to 6.3 percent

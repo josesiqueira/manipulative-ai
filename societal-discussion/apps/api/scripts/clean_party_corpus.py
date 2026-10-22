@@ -22,6 +22,11 @@ added:
 - the lines printed at every page break: "Pohtiva - <title>", the page URL,
   the print timestamp ("1.4.2026 klo 11.43") and the page number ("3 / 16").
 
+One more case: a page number that the text extraction attached to the end of
+a line of party text ("...ja keskusta1 / 16"). It is removed only when it is
+the one page of its document that has no page number line of its own, and
+only the page number characters go; the rest of the line stays as it is.
+
 Every other line, the party's own text, is copied byte for byte and in the
 same order; the script checks this before it writes anything.
 
@@ -90,22 +95,64 @@ def furniture(lines: list[str]) -> dict[int, str]:
     return drop
 
 
+def glued_page_numbers(lines: list[str], drop: dict[int, str]) -> dict[int, str]:
+    """Map line index to the page number glued to the end of that line.
+
+    For each document, the pages 1..M without a page number line of their
+    own are the candidates; a candidate page k is accepted only when exactly
+    one kept line of that document ends with "k / M".
+    """
+    starts = [k - 2 for k, line in enumerate(lines) if line == COVER_PRINTED]
+    glued: dict[int, str] = {}
+    for n, start in enumerate(starts):
+        end = starts[n + 1] if n + 1 < len(starts) else len(lines)
+        numbers = [
+            lines[k] for k in range(start, end)
+            if drop.get(k) == "page number"
+        ]
+        totals = {int(x.split(" / ")[1]) for x in numbers}
+        if len(totals) != 1:
+            raise SystemExit(f"document at line {start + 1}: page totals {totals}")
+        total = totals.pop()
+        missing = set(range(1, total + 1)) - {int(x.split(" / ")[0]) for x in numbers}
+        for page in sorted(missing):
+            suffix = f"{page} / {total}"
+            hits = [
+                k for k in range(start, end)
+                if k not in drop and lines[k].endswith(suffix) and lines[k] != suffix
+                and not lines[k][: -len(suffix)].endswith((" ", "/"))
+                and not lines[k][-len(suffix) - 1:-len(suffix)].isdigit()
+            ]
+            if len(hits) != 1:
+                raise SystemExit(f"document at line {start + 1}: page {page} not found once")
+            glued[hits[0]] = suffix
+    return glued
+
+
 def clean(text: str) -> tuple[str, dict[str, int]]:
     lines = text.split("\n")
     drop = furniture(lines)
-    kept = [line for k, line in enumerate(lines) if k not in drop]
-    # Check: the kept lines are exactly the original lines minus the dropped
-    # ones, in the same order, byte for byte.
-    it = iter(lines)
-    for line in kept:
-        for original in it:
-            if original == line:
-                break
+    glued = glued_page_numbers(lines, drop)
+    kept = []
+    for k, line in enumerate(lines):
+        if k in drop:
+            continue
+        kept.append(line[: -len(glued[k])] if k in glued else line)
+    # Check: the kept lines are the original lines minus the dropped ones, in
+    # the same order and byte for byte, except that a line with a glued page
+    # number lost exactly those last characters.
+    originals = [(k, line) for k, line in enumerate(lines) if k not in drop]
+    assert len(originals) == len(kept)
+    for (k, original), line in zip(originals, kept):
+        if k in glued:
+            assert original == line + glued[k], k
         else:
-            raise SystemExit("kept lines are not an ordered subset of the original")
+            assert original == line, k
     counts: dict[str, int] = {}
     for category in drop.values():
         counts[category] = counts.get(category, 0) + 1
+    if glued:
+        counts["glued page number"] = len(glued)
     return "\n".join(kept), counts
 
 
@@ -119,7 +166,8 @@ def main() -> None:
             if marker in cleaned and marker != " klo ":
                 raise SystemExit(f"{source.name}: '{marker}' left after cleaning")
         removed = len(text) - len(cleaned)
-        print(f"{source.name}: {sum(counts.values())} lines, {removed} characters "
+        lines = sum(v for c, v in counts.items() if c != "glued page number")
+        print(f"{source.name}: {lines} lines, {removed} characters "
               f"({100 * removed / len(text):.2f}%) removed  {counts}")
         for folder in (CLEANED, RUNTIME):
             target = folder / source.name
