@@ -67,26 +67,32 @@ or long-context grounding.
 
 ## 3. System prompt structure
 
-Each model request is built from three layers, concatenated in order
+Each model request is built from four layers, concatenated in order
 (`prompt_builder.py`):
 
 ```
 [1. Behavioural instruction in Finnish]   from the prompt_configs table
                                           (admin override per condition),
-                                          else DEFAULT_SYSTEM_INSTRUCTION,
-                                          with POPULISM_MARKERS_SECTION or
-                                          ANTIPOPULISM_MARKERS_SECTION
-                                          inserted for the condition
+                                          else DEFAULT_SYSTEM_INSTRUCTION;
+                                          the same for all 18 conditions
 [2. Full party programme (Finnish)]       from apps/api/src/party_data/
-[3. Language directive]                   appended last:
+[3. Framing section]                      POPULISM_MARKERS_SECTION or
+                                          ANTIPOPULISM_MARKERS_SECTION,
+                                          from framing_section_for()
+[4. Language directive]                   appended last:
                                           FI "Vastaa aina suomeksi ..."
                                           EN "... respond ALWAYS in English"
 ```
 
-The markers section is inserted before the heading "Poliittiset ohjelmasi
-ja näkemyksesi" of the default instruction by `_default_instruction_for()`:
-`POPULISM_MARKERS_SECTION` for every id that `is_populist()` accepts,
-`ANTIPOPULISM_MARKERS_SECTION` for every id that `is_antipopulist()` accepts.
+`framing_section_for()` returns `POPULISM_MARKERS_SECTION` for every id
+that `is_populist()` accepts and `ANTIPOPULISM_MARKERS_SECTION` for every
+id that `is_antipopulist()` accepts. The framing follows the programme so
+that layers 1 and 2 are the same text for the four versions of a party
+(two framings, two languages); the provider's prompt cache can then reuse
+one cached copy of the programme for all four. Until 22 October 2026 (and
+in the HEPP2026 release) the markers section sat inside layer 1, before the
+heading "Poliittiset ohjelmasi ja näkemyksesi", that is before the
+programme.
 Both ask the model to internalise three features without naming the theory,
 in the same structure (three dimensions, the middle one with the triad of
 advocacy, accountability and legitimacy):
@@ -104,9 +110,9 @@ anti-populist discourse; it is not a published validated scale. Its wording
 lets every party keep its programme positions, including proposals to reform
 or leave institutions, while changing how it argues for them. The admin panel can store a different
 instruction per condition (all 18) in the `prompt_configs` table; a stored
-instruction replaces the default including the markers section.
+instruction replaces layer 1 only, and the framing section is always added.
 
-Layer 3 sits after the corpus so it dominates the model's attention. This
+Layer 4 sits after the corpus so it dominates the model's attention. This
 is how the FI/EN choice works without translating the corpus.
 
 ## 4. Turn-1 anchor and voice locking

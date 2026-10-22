@@ -1477,6 +1477,7 @@ from ..services.prompt_builder import (
     DEFAULT_SYSTEM_INSTRUCTION,
     _default_instruction_for,
     build_system_prompt,
+    framing_section_for,
 )
 
 
@@ -1486,6 +1487,7 @@ class PromptConfigResponse(BaseModel):
     party: str
     party_display_name: str
     system_instruction: str
+    framing_section: str = ""  # added after the program text, never overridden
     source: str  # "database" or "default"
     prompt_preview: str  # first 500 chars of assembled system prompt
     updated_at: datetime | None = None
@@ -1519,9 +1521,6 @@ async def get_all_prompts(
             source = "database"
             updated_at = db_cfg.updated_at
         else:
-            # Use the per-party resolver so the admin Prompts page shows the
-            # same default that the bot would actually use (e.g. populism
-            # markers for every populist twin).
             instruction = _default_instruction_for(party)
             source = "default"
             updated_at = None
@@ -1532,6 +1531,7 @@ async def get_all_prompts(
             party=party,
             party_display_name=PARTY_DISPLAY_NAMES.get(party, party),
             system_instruction=instruction,
+            framing_section=framing_section_for(party),
             source=source,
             prompt_preview=preview[:500] + "..." if len(preview) > 500 else preview,
             updated_at=updated_at,
@@ -1577,6 +1577,7 @@ async def update_prompt(
         party=party,
         party_display_name=PARTY_DISPLAY_NAMES.get(party, party),
         system_instruction=config.system_instruction,
+        framing_section=framing_section_for(party),
         source="database",
         prompt_preview=preview[:500] + "..." if len(preview) > 500 else preview,
         updated_at=config.updated_at,

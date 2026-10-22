@@ -10,8 +10,10 @@ async def test_admin_prompt_list_shows_all_eighteen_conditions(client):
     rows = res.json()
     assert [r["party"] for r in rows] == ALL_PARTIES
     for row in rows:
-        assert (POPULISM_MARKERS_SECTION in row["system_instruction"]) == is_populist(row["party"]), row["party"]
-        assert (ANTIPOPULISM_MARKERS_SECTION in row["system_instruction"]) == is_antipopulist(row["party"]), row["party"]
+        assert (row["framing_section"] == POPULISM_MARKERS_SECTION) == is_populist(row["party"]), row["party"]
+        assert (row["framing_section"] == ANTIPOPULISM_MARKERS_SECTION) == is_antipopulist(row["party"]), row["party"]
+        assert POPULISM_MARKERS_SECTION not in row["system_instruction"]
+        assert ANTIPOPULISM_MARKERS_SECTION not in row["system_instruction"]
         assert row["source"] == "default"
     assert {r["party_display_name"] for r in rows if is_populist(r["party"])} == {
         n for n in (r["party_display_name"] for r in rows) if n.endswith(" Populist")

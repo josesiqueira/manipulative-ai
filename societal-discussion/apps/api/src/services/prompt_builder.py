@@ -2,8 +2,13 @@
 Prompt builder for manipulative-ai2.
 
 Injects the FULL party program text into the system prompt (CAG approach).
-The system instruction (behavioral rules) can be customized per party
-via the admin panel. The party program text is always appended at the end.
+
+Order: the shared instruction, the party program text, the condition's
+framing section (populist or anti-populist), the language directive. The
+shared instruction and the program text form the same prefix for all four
+versions of a party (two framings, two languages), so they can share one
+cached copy at the provider. The shared instruction can be overridden per
+condition in the admin panel; the framing section is always added.
 """
 
 from sqlalchemy import select
@@ -107,24 +112,22 @@ keskustellaan mieluummin itse aiheesta")
 
 
 def _default_instruction_for(party: str) -> str:
-    """Resolve the in-code default instruction for a party.
+    """The in-code default instruction: the same for every condition."""
+    return DEFAULT_SYSTEM_INSTRUCTION
 
-    Populist variants (`<party>_populist`) get the populism-markers section
-    and anti-populist variants (`<party>_antipopulist`) the anti-populism
-    markers, each inserted just before the 'Poliittiset ohjelmasi ja
-    näkemyksesi' heading. A former standard id (`<party>`) gets the plain
-    DEFAULT_SYSTEM_INSTRUCTION.
+
+def framing_section_for(party: str) -> str:
+    """The framing section that follows the program text.
+
+    Populist variants (`<party>_populist`) get the populism markers and
+    anti-populist variants (`<party>_antipopulist`) the anti-populism
+    markers. A former standard id (`<party>`) gets none.
     """
     if is_antipopulist(party):
-        section = ANTIPOPULISM_MARKERS_SECTION
-    elif is_populist(party):
-        section = POPULISM_MARKERS_SECTION
-    else:
-        return DEFAULT_SYSTEM_INSTRUCTION
-    anchor = "## Poliittiset ohjelmasi ja näkemyksesi"
-    if anchor in DEFAULT_SYSTEM_INSTRUCTION:
-        return DEFAULT_SYSTEM_INSTRUCTION.replace(anchor, section + anchor, 1)
-    return DEFAULT_SYSTEM_INSTRUCTION + "\n\n" + section
+        return ANTIPOPULISM_MARKERS_SECTION
+    if is_populist(party):
+        return POPULISM_MARKERS_SECTION
+    return ""
 
 
 async def get_system_instruction(db: AsyncSession, party: str) -> str:
@@ -147,10 +150,14 @@ def build_system_prompt(
     instruction: str | None = None,
     language: str = "fi",
 ) -> str:
-    """Build system prompt with instruction + full party program text + language directive."""
+    """Build the system prompt: instruction, full party program text,
+    framing section, language directive."""
     party_text = load_party_program(party)
     instr = instruction if instruction else _default_instruction_for(party)
+    framing = framing_section_for(party).rstrip()
     lang_directive = LANGUAGE_INSTRUCTIONS.get(language, LANGUAGE_INSTRUCTIONS["fi"])
+    if framing:
+        return instr + party_text.rstrip() + "\n\n" + framing + lang_directive
     return instr + party_text + lang_directive
 
 
@@ -165,7 +172,8 @@ async def build_full_prompt(
     Assemble complete messages array for LLM API call.
 
     Structure:
-    1. System message (instruction + full party program text + language directive)
+    1. System message (instruction + full party program text + framing
+       section + language directive)
     2. Conversation history (real previous turns)
     3. Current user message
     """
