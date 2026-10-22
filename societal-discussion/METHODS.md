@@ -229,13 +229,16 @@ survey entry page and from there to the survey.
   (`resolve_provider()` in `apps/api/src/services/llm_client.py`). The API
   keys come from the environment. Which provider answered on the day is
   therefore read from the data (below), not from this text.
-- **First provider**: OpenAI `gpt-6-astra`, the default in
-  `apps/api/src/services/llm_models.py`, through
+- **First provider**: OpenAI `gpt-6.1-sol`, the default in
+  `apps/api/src/services/llm_models.py` since 22 October 2026, through
   `apps/api/src/services/llm_providers/openai_provider.py`, with
+  `reasoning_effort: "low"` (its lowest setting) on the default service
+  tier. Until that date the default was `gpt-6-astra` with
   `reasoning_effort: "low"` (ordinary replies keep their length and style,
-  the hidden reasoning is cut to about 30 tokens) and the priority service
-  tier (faster output at twice the token price), both measured on
-  21 October 2026.
+  the hidden reasoning is cut to about 30 tokens, measured 21 October 2026)
+  on the priority tier, which OpenAI renamed Fast mode, at twice the token
+  price; at the standard tier GPT-6.1 Sol costs a fifth of GPT-6 Astra per
+  input and output token. GPT-6 Astra stays selectable in the admin panel.
 - **Second provider**: Anthropic (`claude-sonnet-5-5` by default, or
   `claude-opus-5-5` or `claude-haiku-5-5`), through
   `apps/api/src/services/llm_providers/anthropic_provider.py`, chosen with

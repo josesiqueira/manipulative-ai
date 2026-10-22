@@ -1,7 +1,7 @@
 """
 LLM client for generating AI responses.
 
-Uses the OpenAI API with GPT-6 Astra by default (llm_models.py). Party program grounding is handled
+Uses the OpenAI API with GPT-6.1 Sol by default (llm_models.py). Party program grounding is handled
 by prompt_builder.py which injects the full party text into the system prompt.
 """
 import asyncio

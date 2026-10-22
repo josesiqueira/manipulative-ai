@@ -39,7 +39,7 @@ them for the Metso demo.
   MIT) for the avatar; Playwright tests. Details in
   [`apps/participant/README.md`](apps/participant/README.md).
 - **Admin app**: Next.js 14 (App Router), TypeScript, Tailwind CSS, vitest.
-- **Language model**: OpenAI GPT-6 Astra by default (GPT-5.4 for
+- **Language model**: OpenAI GPT-6.1 Sol by default (GPT-5.4 for
   HEPP2026); the admin panel can select another model. The model that
   answered is stored on every assistant message.
 - **Deployment**: CSC Rahti (OpenShift); one image per app; manifests in
@@ -154,7 +154,7 @@ API (`apps/api/src/config.py`; local values in `.env` at this folder's root):
 | `ANTHROPIC_API_KEY` | Anthropic API key | Yes for Anthropic |
 | `GPTLAB_API_KEY`, `GPTLAB_BASE_URL` | GPT Lab access token and the GPU-farmi-004 OpenAI-compatible URL (default set) | Yes for GPT Lab |
 | `LLM_PROVIDER` | Provider that answers: `openai` (default), `anthropic` or `gptlab`; the admin panel (Settings, LLM provider) or `apps/api/scripts/use_provider.sh` switches without a restart and takes precedence | No |
-| `LLM_MODEL` | Model id; empty = the provider's recommended model (`gpt-6-astra`, `claude-sonnet-5-5`, `qwen3.8:27b`) | No |
+| `LLM_MODEL` | Model id; empty = the provider's recommended model (`gpt-6.1-sol`, `claude-sonnet-5-5`, `qwen3.8:27b`) | No |
 | `ADMIN_PASSWORD` | Admin password (header `X-Admin-Password`) | Yes |
 | `ENCRYPTION_SECRET` | Fernet key for the API keys stored by the admin panel | Yes |
 | `CORS_ORIGINS` | Comma-separated allowed origins (the defaults include the local ports 3000, 4321, 8080) | Yes in production |

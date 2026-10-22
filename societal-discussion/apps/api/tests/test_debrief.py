@@ -65,7 +65,7 @@ async def test_debrief_lists_the_models_that_answered_in_order_of_first_use(clie
     body = (await client.get(f"/api/sessions/{s.id}/debrief")).json()
     assert body["models"] == [
         {"provider": "anthropic", "model": "claude-sonnet-5-5", "model_name": "Claude Sonnet 5.5"},
-        {"provider": "openai", "model": "gpt-6-astra", "model_name": "GPT-6 Astra (Metso 2026)"},
+        {"provider": "openai", "model": "gpt-6-astra", "model_name": "GPT-6 Astra"},
     ]
 
 

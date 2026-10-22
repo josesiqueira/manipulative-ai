@@ -32,7 +32,7 @@ def _provider():
 
 
 def test_gpt_6_astra_is_the_default_openai_model():
-    assert get_default_model("openai") == "gpt-6-astra"
+    assert get_default_model("openai") == "gpt-6.1-sol"
 
 
 async def test_gpt_6_gets_no_temperature_and_gpt_5_4_keeps_it():

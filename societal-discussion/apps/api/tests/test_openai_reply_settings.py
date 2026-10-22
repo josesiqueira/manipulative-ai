@@ -47,7 +47,7 @@ async def test_gpt6_request_settings_and_join():
     text, n, model = await generate_reply(PreparedReply(p, "gpt-6-astra", [{"role": "user", "content": "x"}]))
     assert text == "Hei maailma." and n == 10
     kw = fake.calls[0]
-    assert kw["reasoning_effort"] == "low" and kw["service_tier"] == "priority"
+    assert kw["reasoning_effort"] == "low" and "service_tier" not in kw
     assert kw["stream"] is True and "temperature" not in kw and kw["max_completion_tokens"] == 4096
 
 
@@ -78,3 +78,18 @@ async def test_gpt54_keeps_temperature_and_no_gpt6_settings():
     await generate_reply(PreparedReply(p, "gpt-5.4", []))
     kw = fake.calls[0]
     assert kw["temperature"] == 0.1 and "reasoning_effort" not in kw and "service_tier" not in kw
+
+
+@pytest.mark.asyncio
+async def test_gpt61_sol_runs_at_low_effort_on_the_default_tier():
+    p, fake = provider([OK])
+    await generate_reply(PreparedReply(p, "gpt-6.1-sol", []))
+    kw = fake.calls[0]
+    assert kw["reasoning_effort"] == "low"
+    assert "service_tier" not in kw and "temperature" not in kw
+
+
+def test_gpt56_models_get_no_temperature():
+    p, _ = provider([])
+    assert "temperature" not in p._kwargs([], "gpt-5.6-terra", 100, 0.1)
+    assert p._kwargs([], "gpt-5.4", 100, 0.1)["temperature"] == 0.1

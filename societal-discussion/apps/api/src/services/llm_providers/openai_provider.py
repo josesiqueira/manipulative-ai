@@ -13,9 +13,10 @@ from .base import LLMProvider, split_system
 # family accept arbitrary temperatures. We block-list the known-restrictive
 # prefixes so everything else (including GPT-5.4, GPT-4.x, o-series) keeps
 # receiving the configured temperature.
-_TEMPERATURE_INCOMPATIBLE_PREFIXES = ("gpt-5.5", "gpt-6")
+_TEMPERATURE_INCOMPATIBLE_PREFIXES = ("gpt-5.5", "gpt-5.6", "gpt-6")
 
-# GPT-6 request settings (measured on gpt-6-astra, 2026-10-21).
+# GPT-6 request settings (measured on gpt-6-astra, 2026-10-21; the same for
+# gpt-6.1-sol, whose lowest effort is also low).
 # reasoning_effort: the model accepts low, medium, high, xhigh (not none or
 # minimal). The default behaves like medium; "low" keeps ordinary replies
 # the same length and style, cuts the hidden reasoning to about 30 tokens and
@@ -25,9 +26,12 @@ _TEMPERATURE_INCOMPATIBLE_PREFIXES = ("gpt-5.5", "gpt-6")
 # tokens per second and a shorter wait for the first token, at twice the
 # token price. Its prompt cache is separate from the default tier's, so the
 # cache warm-up must use the same tier. Empty string = default tier.
+# Since 30 July 2026 OpenAI calls it Fast mode, still at twice the price;
+# from 22 October 2026 the default tier is used (gpt-6.1-sol at the standard
+# price instead of gpt-6-astra in Fast mode).
 _GPT6_PREFIXES = ("gpt-6",)
 GPT6_REASONING_EFFORT = "low"
-GPT6_SERVICE_TIER = "priority"
+GPT6_SERVICE_TIER = ""
 
 # One client (one HTTP connection pool) per API key for the whole process,
 # instead of a new client and TLS connection per message. The read timeout

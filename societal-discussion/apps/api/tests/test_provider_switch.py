@@ -104,7 +104,7 @@ def _settings(monkeypatch, **values):
 async def test_environment_picks_the_provider_and_model(db_session, monkeypatch):
     _settings(monkeypatch, openai_api_key="sk-openai", anthropic_api_key="sk-ant", llm_provider="openai", llm_model="")
     provider, model = await get_llm_provider(db_session)
-    assert isinstance(provider, OpenAIProvider) and model == "gpt-6-astra"
+    assert isinstance(provider, OpenAIProvider) and model == "gpt-6.1-sol"
 
     _settings(monkeypatch, llm_provider="anthropic")
     provider, model = await get_llm_provider(db_session)

@@ -8,7 +8,8 @@ AVAILABLE_MODELS = {
     "openai": {
         "display_name": "OpenAI",
         "models": [
-            {"id": "gpt-6-astra", "name": "GPT-6 Astra (Metso 2026)", "recommended": True},
+            {"id": "gpt-6.1-sol", "name": "GPT-6.1 Sol", "recommended": True},
+            {"id": "gpt-6-astra", "name": "GPT-6 Astra", "recommended": False},
             {"id": "gpt-5.4", "name": "GPT-5.4 (frontier, 1M context; HEPP 2026)", "recommended": False},
             {"id": "gpt-5.4-mini", "name": "GPT-5.4 Mini (cheap, 1M context)", "recommended": False},
             {"id": "gpt-4.1", "name": "GPT-4.1 (1M context, no surcharge)", "recommended": False},

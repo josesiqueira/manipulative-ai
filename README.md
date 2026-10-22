@@ -74,7 +74,7 @@ To reproduce a specific release: `git checkout <tag>`.
   CSS 4, TalkingHead for the avatar; Playwright browser tests.
 - **Admin app**: Next.js 14 (App Router), TypeScript, Tailwind CSS.
 - **Language model**: one of three providers, switched at runtime and
-  recorded per session: OpenAI GPT-6 Astra, Anthropic Claude Sonnet 5.5, or
+  recorded per session: OpenAI GPT-6.1 Sol, Anthropic Claude Sonnet 5.5, or
   open models (Qwen3.8 27B by default) on Tampere University's GPT Lab GPU
   farm (GPT-5.4 for HEPP2026).
 - **Deployment**: CSC Rahti (OpenShift); container images for the API, the
