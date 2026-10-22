@@ -91,7 +91,8 @@ embeddings, no vector store.
 ```
 .
 ├── README.md                       you are here
-├── Party Program dataset/          source corpora from Pohtiva (PDF and text)
+├── Party Program dataset/          source corpora from Pohtiva: PDF, extracted
+│                                   text, and the cleaned text the bot reads
 ├── tampere/                        Tampere University logo files and rules
 └── societal-discussion/            the application
     ├── apps/

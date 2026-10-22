@@ -1,8 +1,18 @@
 """Remove the Pohtiva print furniture from the party programme files.
 
-Reads the original merged prints in "Party Program dataset/Party program 9
-txts/" and writes the runtime copies to apps/api/src/party_data/. Only whole
-lines are removed, and only lines that the Pohtiva print service added:
+The party programme data has three stages, in "Party Program dataset/" at
+the repository root:
+
+- "Party program 9 pdfs/": the merged Pohtiva prints as PDF;
+- "Party program 9 txts/": their text, as extracted;
+- "Party program 9 txts cleaned/": the text without the print furniture,
+  written by this script.
+
+The app reads an identical copy of the cleaned files in apps/api/src/
+party_data/ (the API image is built from apps/api only), also written here.
+
+Only whole lines are removed, and only lines that the Pohtiva print service
+added:
 
 - the cover block of each document: "Pohtiva - <title>", the page URL,
   "Tulostettu Pohtiva ...", "URL: ...", the archive's party name and title
@@ -16,8 +26,7 @@ Every other line, the party's own text, is copied byte for byte and in the
 same order; the script checks this before it writes anything.
 
 Usage (from apps/api):  python scripts/clean_party_corpus.py [--check]
---check compares the result with the files in src/party_data/ and writes
-nothing.
+--check compares the result with both cleaned folders and writes nothing.
 """
 
 import re
@@ -25,8 +34,10 @@ import sys
 from pathlib import Path
 
 API = Path(__file__).resolve().parents[1]
-SOURCE = API.parents[2] / "Party Program dataset" / "Party program 9 txts"
-TARGET = API / "src" / "party_data"
+DATASET = API.parents[2] / "Party Program dataset"
+SOURCE = DATASET / "Party program 9 txts"
+CLEANED = DATASET / "Party program 9 txts cleaned"
+RUNTIME = API / "src" / "party_data"
 
 PAGE_HEADER = re.compile(r"^Pohtiva - .+$")
 PAGE_URL = re.compile(r"^ ?https://www\.fsd\.tuni\.fi/pohtiva/\S*$")
@@ -107,16 +118,18 @@ def main() -> None:
         for marker in ("fsd.tuni", "Tulostettu Pohtiva", " klo "):
             if marker in cleaned and marker != " klo ":
                 raise SystemExit(f"{source.name}: '{marker}' left after cleaning")
-        target = TARGET / source.name
         removed = len(text) - len(cleaned)
         print(f"{source.name}: {sum(counts.values())} lines, {removed} characters "
               f"({100 * removed / len(text):.2f}%) removed  {counts}")
-        if check:
-            if target.read_text(encoding="utf-8") != cleaned:
-                print(f"  differs from {target}")
-                failed = True
-        else:
-            target.write_text(cleaned, encoding="utf-8")
+        for folder in (CLEANED, RUNTIME):
+            target = folder / source.name
+            if check:
+                if not target.exists() or target.read_text(encoding="utf-8") != cleaned:
+                    print(f"  differs from {target}")
+                    failed = True
+            else:
+                folder.mkdir(exist_ok=True)
+                target.write_text(cleaned, encoding="utf-8")
     if failed:
         raise SystemExit(1)
 

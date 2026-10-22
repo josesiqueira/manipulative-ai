@@ -55,9 +55,13 @@ or long-context grounding.
   merging each party's election programmes, policy programmes and
   manifestos from 2022 to 2025 (the sources are listed in
   `../Party Program dataset/`). The files are in `apps/api/src/party_data/`.
-- **Print furniture removed**: the originals are the merged Pohtiva prints in
-  `../Party Program dataset/Party program 9 txts/`. Since 22 October 2026
-  the runtime copies in `apps/api/src/party_data/` are made from them by
+- **Three stages of the data** in `../Party Program dataset/`: `Party
+  program 9 pdfs/` (the merged Pohtiva prints), `Party program 9 txts/`
+  (their extracted text) and `Party program 9 txts cleaned/` (the text the
+  bot reads; `apps/api/src/party_data/` holds identical copies for the API
+  image).
+- **Print furniture removed**: since 22 October 2026 the cleaned files are
+  made from the extracted text by
   `apps/api/scripts/clean_party_corpus.py`, which removes only whole lines
   added by the Pohtiva print service: each document's cover block (archive
   header and URLs, "Tulostettu Pohtiva ...", the archive's party name and
