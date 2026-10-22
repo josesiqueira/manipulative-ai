@@ -29,10 +29,14 @@ them for the Metso demo.
 - **API**: FastAPI, SQLAlchemy 2.0 (async), Alembic, Python 3.11 in the
   container (3.12 locally works), uv for dependencies; SQLite on a
   persistent volume in production, the same file locally.
-- **Speech**: `POST /api/speech/transcribe` and `/synthesize` with two
-  engine tiers: remote OpenAI-compatible servers (`SPEECH_STT_URL`,
-  `SPEECH_TTS_URL`) or local engines inside the API image (faster-whisper
-  small, Piper voices `fi_FI-harri-medium` and `en_GB-alan-medium`), see
+- **Speech**: `POST /api/speech/transcribe` and `/synthesize`. Local
+  engines from the API image: Parakeet TDT 0.6B v3 for recognition
+  (`SPEECH_STT_ENGINE=parakeet`, the default; `whisper` selects
+  faster-whisper small) and the Piper voices `fi_FI-harri-medium` and
+  `en_GB-alan-medium`. On Rahti they run in two speech pods of their own
+  (`speech-stt`, `speech-tts`, started with `src.speech_main:app`), reached
+  through path-based routes on the API host. Remote OpenAI-compatible
+  servers (`SPEECH_STT_URL`, `SPEECH_TTS_URL`) are also supported. See
   `apps/api/src/services/speech/`.
 - **Participant app**: Astro 7 with the Node adapter (standalone server),
   TypeScript strict, Tailwind CSS 4, three.js and TalkingHead (vendored,
@@ -162,7 +166,10 @@ API (`apps/api/src/config.py`; local values in `.env` at this folder's root):
 | `SPEECH_STT_URL`, `SPEECH_STT_MODEL` | Remote recognition server (OpenAI-compatible `/v1/audio/transcriptions`) and model name | No (local engine otherwise) |
 | `SPEECH_TTS_URL`, `SPEECH_TTS_MODEL`, `SPEECH_TTS_VOICE`, `SPEECH_TTS_SEND_LANGUAGE` | Remote voice server (`/v1/audio/speech`), model, voice, whether to send a language field | No (local engine otherwise) |
 | `SPEECH_API_KEY` | Bearer token for the remote speech servers | No |
-| `SPEECH_MODELS_DIR` | Folder with the Piper voices and the whisper model (`/app/models` in the image) | For the local engines |
+| `SPEECH_MODELS_DIR` | Folder with the Piper voices, the Parakeet model and the whisper model (`/app/models` in the image) | For the local engines |
+| `SPEECH_STT_ENGINE` | `parakeet` (default) or `whisper` (faster-whisper small) | No |
+| `SPEECH_ROLE`, `SPEECH_STT_THREADS`, `SPEECH_STT_SLOTS`, `SPEECH_TTS_THREADS`, `SPEECH_TTS_SLOTS`, `SPEECH_WARM_UP` | Speech pods: which engine to load (`stt`, `tts` or `all`), engine threads and parallel jobs (threads x jobs = the pod's CPU), load the models at start | No |
+| `SPEECH_CONVERSATION_CHECK_URL` | Speech pods have no database: the API URL they ask whether a conversation is open | In the speech pods |
 | `SPEECH_LOCAL_WHISPER_MODEL`, `SPEECH_LOCAL_WHISPER_COMPUTE` | Local whisper size and compute type (defaults `small`, `int8`) | No |
 | `SPEECH_MAX_UPLOAD_BYTES`, `SPEECH_MAX_TEXT_CHARS` | Caps on a recording (2 MB) and on one sentence to speak (600) | No |
 | `PARTICIPANT_PASSWORD` | Unused since the consent gate replaced the access-code gate | No |
@@ -181,7 +188,8 @@ Manifests in `k8s/`:
 
 | File | Resource |
 |---|---|
-| `api-deployment.yaml` | API Deployment (`FORCED_PARTY` empty; `Recreate` strategy because the volume is RWO; speech runs in this container, so it has 1 to 3 GiB of memory) |
+| `api-deployment.yaml` | API Deployment (`FORCED_PARTY` empty; `Recreate` strategy because the volume is RWO) |
+| `speech-stt-*.yaml`, `speech-tts-*.yaml` | The two speech pods (recognition 0.9 CPU, voice 2 CPU), each with a Service and a path-based Route on the API host for `/api/speech/transcribe` and `/api/speech/synthesize` |
 | `api-service.yaml`, `api-route.yaml` | Service and Route for the API |
 | `participant-deployment.yaml`, `participant-service.yaml`, `participant-route.yaml` | The participant app on https://vaalikeskustelu.2.rahtiapp.fi |
 | `web-deployment.yaml`, `web-service.yaml`, `web-route.yaml` | The admin app on https://admin-vaalikeskustelu.2.rahtiapp.fi/admin |

@@ -343,25 +343,44 @@ open choice (a woman's head with a woman's voice is the alternative).
   words with start times and durations.
 - **Speech input**: a hold-to-talk microphone button; the browser asks for
   permission on first use; the recording (webm/opus or mp4) is sent as the
-  raw request body to `POST /api/speech/transcribe` with the page language;
+  raw request body to `POST /api/speech/transcribe` with the page language
+  (Parakeet, the engine in use, finds the language itself);
   the text comes back and is sent as an ordinary message with
   `input_mode: spoken`. The phone's own speech recognition and voices are
   never used, so no audio or text goes to a phone vendor's cloud.
-- **Two engine tiers** (`apps/api/src/services/speech/`): remote servers
-  with an OpenAI-compatible API (`SPEECH_STT_URL`, `SPEECH_TTS_URL`; the
-  defaults name faster-whisper large-v3-turbo and VoxCPM2, the models the
-  research chose for the university cluster), or local engines inside
-  the API container: faster-whisper `small` (int8) for recognition and
-  Piper voices `fi_FI-harri-medium` and `en_GB-alan-medium` for speech,
-  fetched at image build from pinned Hugging Face revisions, the Piper
-  files with SHA-256 checks (`apps/api/scripts/fetch_speech_models.py`). Word timings come from
-  Piper's phoneme alignments; a remote voice gets whisper word timestamps
-  aligned to the script (`services/speech/alignment.py`).
-- **Limits and privacy**: recordings are capped at 2 MB (both tiers) and,
-  in the local tier, at 60 s of decoded audio; they are decoded in memory,
-  never written to disk. The API log carries the byte size, the content
-  type, the language, the clip length and the recognised word count, never
-  the audio or the words. Two local jobs run at a time.
+- **Engines in the Metso deployment** (`apps/api/src/services/speech/`):
+  recognition with NVIDIA Parakeet TDT 0.6B v3 (CC BY 4.0, int8 ONNX export
+  run with onnx-asr; it returned fewer Finnish errors than faster-whisper
+  `small` and needed 0.9 s for an 8 s Finnish clip on 4 CPU, measured
+  21 October 2026) and speech with the Piper voices `fi_FI-harri-medium`
+  and `en_GB-alan-medium`. Both run on CPU in our own CSC Rahti project,
+  in two pods of their own built from the API image
+  (`apps/api/src/speech_main.py`, `k8s/speech-stt-*.yaml`,
+  `k8s/speech-tts-*.yaml`): `speech-stt` (0.9 CPU, one job at a time) and
+  `speech-tts` (2 CPU, two jobs at a time). A path-based route on the API
+  host sends `/api/speech/transcribe` and `/api/speech/synthesize` to these
+  pods, so the participant app calls the same URLs; the pods have no
+  database and ask the API whether the conversation is open. The models are
+  fetched at image build from pinned Hugging Face revisions with SHA-256
+  checks (`apps/api/scripts/fetch_speech_models.py`). Word timings come
+  from Piper's phoneme alignments. Waiting sentences are served
+  first-sentence-first, and a job that waited longer than 8 s, or whose
+  phone has gone, is dropped.
+- **Other engines the code supports, not used at Metso**: faster-whisper
+  `small` (int8) for recognition (`SPEECH_STT_ENGINE=whisper`), and remote
+  servers with an OpenAI-compatible API (`SPEECH_STT_URL`,
+  `SPEECH_TTS_URL`; the defaults name faster-whisper large-v3-turbo and
+  VoxCPM2, the models chosen for the university cluster), where a remote
+  voice gets whisper word timestamps aligned to the script
+  (`services/speech/alignment.py`).
+- **Cost**: speech adds no per-use cost; no paid speech service is called.
+  It uses the CPU of our Rahti project. Only the language model is paid
+  per token.
+- **Limits and privacy**: recordings are capped at 2 MB and at 60 s of
+  decoded audio; they are decoded in memory, never written to disk. The
+  speech logs carry the byte size, the content type, the language, the
+  clip length and the recognised word count, never the audio or the
+  words.
 
 ## 11. Debrief and data rights
 
@@ -480,7 +499,7 @@ servers in Finland" and never "encrypted"; the full privacy notice
 | Debriefing | TENK 2019 (Finnish National Board on Research Integrity): disclosure of the true nature of the study |
 | Source corpus | Pohtiva (Finnish political programme archive, FSD) |
 | Talking avatar | TalkingHead (met4citizen), MIT licence (`apps/participant/src/vendor/talkinghead/LICENSE`); the head file is the AvatarSDK example from the same repository as recorded in `avatar.ts`; its licence is still to be confirmed |
-| Speech | faster-whisper (Systran), Piper (Rhasspy); VoxCPM2 and whisper large-v3-turbo for the cluster tier |
+| Speech | Parakeet TDT 0.6B v3 (NVIDIA, CC BY 4.0) with onnx-asr, Piper (Rhasspy); faster-whisper (Systran) as the fallback; VoxCPM2 and whisper large-v3-turbo for the cluster tier |
 
 ---
 
@@ -496,7 +515,7 @@ servers in Finland" and never "encrypted"; the full privacy notice
 | Sessions, consent, debrief, delete | `apps/api/src/routers/sessions.py` |
 | Conversations, messages (input mode, model name) | `apps/api/src/routers/conversations.py` |
 | Survey | `apps/api/src/routers/survey.py` |
-| Speech endpoints and engines | `apps/api/src/routers/speech.py`, `apps/api/src/services/speech/` |
+| Speech endpoints and engines | `apps/api/src/routers/speech.py`, `apps/api/src/services/speech/`, `apps/api/src/speech_main.py` (the speech pods), `k8s/speech-stt-*.yaml`, `k8s/speech-tts-*.yaml` |
 | Speech models fetched at build | `apps/api/scripts/fetch_speech_models.py`, `apps/api/Dockerfile` |
 | Session code | `apps/api/src/services/session_code.py` |
 | Admin endpoints (stats, exports, by-code lookup) | `apps/api/src/routers/admin.py` |

@@ -68,8 +68,9 @@ To reproduce a specific release: `git checkout <tag>`.
 ## Tech stack
 
 - **Backend**: FastAPI, SQLAlchemy 2.0 (async), Alembic, Python 3.11 in the
-  container; SQLite on a persistent volume. Speech endpoints with local
-  engines (faster-whisper, Piper) or remote OpenAI-compatible servers.
+  container; SQLite on a persistent volume. Speech recognition (Parakeet TDT
+  0.6B v3) and voice (Piper) run on CPU in two speech pods of our own;
+  remote OpenAI-compatible servers are also supported.
 - **Participant app**: Astro 7 with the Node adapter, TypeScript, Tailwind
   CSS 4, TalkingHead for the avatar; Playwright browser tests.
 - **Admin app**: Next.js 14 (App Router), TypeScript, Tailwind CSS.
