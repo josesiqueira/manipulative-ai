@@ -50,11 +50,25 @@ for the assigned party is placed in the system prompt at every request.
 This is the approach the literature calls cache-augmented generation (CAG)
 or long-context grounding.
 
-- **Corpus per party**: 62 KB (Liike Nyt) to 688 KB (Vihreät) of Finnish
+- **Corpus per party**: 59 KB (Liike Nyt) to 651 KB (Vihreät) of Finnish
   UTF-8 text from **Pohtiva** (the Finnish political-programme archive, FSD),
   merging each party's election programmes, policy programmes and
   manifestos from 2022 to 2025 (the sources are listed in
   `../Party Program dataset/`). The files are in `apps/api/src/party_data/`.
+- **Print furniture removed**: the originals are the merged Pohtiva prints in
+  `../Party Program dataset/Party program 9 txts/`. Since 22 October 2026
+  the runtime copies in `apps/api/src/party_data/` are made from them by
+  `apps/api/scripts/clean_party_corpus.py`, which removes only whole lines
+  added by the Pohtiva print service: each document's cover block (archive
+  header and URLs, "Tulostettu Pohtiva ...", the archive's party name and
+  title, and the Puolue, Otsikko, Vuosi and Ohjelmatyyppi fields) and the
+  lines at every page break (header, URL, print timestamp, page number).
+  Every remaining line is the original line, byte for byte and in order; the
+  script checks this. The party's own text, including its titles, slogans
+  and every mention of the party, is unchanged. Removed: 4.8 to 6.3 percent
+  of the characters per party (3,920 lines in all). The archive lines named
+  the party in every document and at every page break. Until that date (and
+  in the HEPP2026 release) the prints were used as they are.
 - **Tokens**: an estimate of roughly 20 K (smallest) to 220 K (largest)
   tokens of source material per system prompt (from the byte sizes; the
   code does not count tokens).
