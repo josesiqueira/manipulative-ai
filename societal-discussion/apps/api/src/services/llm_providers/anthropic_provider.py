@@ -23,6 +23,27 @@ _CLIENTS: dict[str, anthropic.Anthropic] = {}
 # finished reply, "length" for one cut at max_tokens.
 _FINISH = {"end_turn": "stop", "stop_sequence": "stop", "max_tokens": "length"}
 
+# USD per million tokens (input, 1 h cache write, cache read, output), from
+# Anthropic's pricing page on 22 October 2026, for the usage log line only.
+# Haiku 5.5 prompts over 100K tokens cost more; the line shows its lower price.
+_PRICES = {
+    "claude-sonnet-5-5": (2.0, 4.0, 0.10, 10.0),
+    "claude-opus-5-5": (4.0, 8.0, 0.20, 20.0),
+    "claude-haiku-5-5": (0.10, 0.20, 0.01, 0.50),
+}
+
+
+def usage_line(model: str, input_tokens: int, cache_write: int, cache_read: int, output: int) -> str:
+    """One log line per reply: token counts and their price, never any text."""
+    line = (f"LLM usage model={model} input={input_tokens} cache_write={cache_write} "
+            f"cache_read={cache_read} output={output}")
+    prices = _PRICES.get(model)
+    if prices:
+        usd = (input_tokens * prices[0] + cache_write * prices[1]
+               + cache_read * prices[2] + output * prices[3]) / 1e6
+        line += f" usd={usd:.4f}"
+    return line
+
 
 def _client(api_key: str) -> anthropic.Anthropic:
     client = _CLIENTS.get(api_key)
@@ -86,6 +107,8 @@ class AnthropicProvider(LLMProvider):
             + (usage.output_tokens or 0)
         )
         self.last_finish_reason = _FINISH.get(final.stop_reason, final.stop_reason)
+        print(usage_line(model, usage.input_tokens or 0, self.last_cache_write,
+                         self.last_cache_read, usage.output_tokens or 0), flush=True)
         if self.last_finish_reason != "stop":
             print(f"LLM reply ended with stop_reason={final.stop_reason} "
                   f"tokens={self.last_token_count}")

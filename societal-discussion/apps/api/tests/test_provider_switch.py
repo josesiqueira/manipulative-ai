@@ -198,3 +198,11 @@ async def test_public_provider_endpoint_names_the_answering_model(client, monkey
 async def test_public_provider_endpoint_without_any_key_is_503(client, monkeypatch):
     _settings(monkeypatch, openai_api_key="", anthropic_api_key="", gptlab_api_key="", llm_provider="openai")
     assert (await client.get("/api/provider")).status_code == 503
+
+
+def test_anthropic_usage_line_prices_the_reply_without_text():
+    from src.services.llm_providers.anthropic_provider import usage_line
+
+    line = usage_line("claude-sonnet-5-5", 500, 31_546, 0, 1_000)
+    assert line == ("LLM usage model=claude-sonnet-5-5 input=500 cache_write=31546 "
+                    "cache_read=0 output=1000 usd=0.1372")
