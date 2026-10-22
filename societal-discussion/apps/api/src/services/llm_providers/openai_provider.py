@@ -34,14 +34,14 @@ GPT6_SERVICE_TIER = "priority"
 # stays under the API route's 180 s; the SDK's own retries (2, for
 # connection errors, 429 and 5xx before any text arrives) stay on.
 _TIMEOUT = httpx.Timeout(150.0, connect=10.0)
-_CLIENTS: dict[str, OpenAI] = {}
+_CLIENTS: dict[tuple[str, str | None], OpenAI] = {}
 
 
-def _client(api_key: str) -> OpenAI:
-    client = _CLIENTS.get(api_key)
+def _client(api_key: str, base_url: str | None = None, timeout: httpx.Timeout = _TIMEOUT) -> OpenAI:
+    client = _CLIENTS.get((api_key, base_url))
     if client is None:
-        client = OpenAI(api_key=api_key, timeout=_TIMEOUT, max_retries=2)
-        _CLIENTS[api_key] = client
+        client = OpenAI(api_key=api_key, base_url=base_url, timeout=timeout, max_retries=2)
+        _CLIENTS[(api_key, base_url)] = client
     return client
 
 
@@ -59,10 +59,13 @@ def _supports_custom_temperature(model: str) -> bool:
 class OpenAIProvider(LLMProvider):
     def __init__(self, api_key: str):
         super().__init__(api_key)
-        self.client = _client(api_key)
+        self.client = self._make_client(api_key)
         self.last_token_count = 0
         self.last_finish_reason: str | None = None
         self.last_service_tier: str | None = None
+
+    def _make_client(self, api_key: str) -> OpenAI:
+        return _client(api_key)
 
     def _kwargs(self, messages: list[dict], model: str, max_tokens: int, temperature: float) -> dict:
         kwargs: dict = {
@@ -131,3 +134,37 @@ class OpenAIProvider(LLMProvider):
             # Fast mode can be downgraded to the default tier when traffic
             # ramps up too quickly; the reply is then slower.
             print(f"LLM reply served on tier {self.last_service_tier}")
+
+
+# GPT Lab GPU-farmi-004 serves open models with Ollama behind an
+# OpenAI-compatible API. Reading a whole party programme the first time can
+# take minutes there (measured 18 to 20 October 2026), and the stream sends
+# nothing until it is read, so the read timeout is long; the participant's
+# connection is kept open by the API's own pings meanwhile.
+_GPTLAB_TIMEOUT = httpx.Timeout(900.0, connect=10.0)
+
+
+class GPTLabProvider(OpenAIProvider):
+    """Open models on GPT Lab's GPU-farmi-004 (Tampere University)."""
+
+    def __init__(self, api_key: str, base_url: str):
+        self.base_url = base_url
+        super().__init__(api_key)
+
+    def _make_client(self, api_key: str) -> OpenAI:
+        return _client(api_key, self.base_url, _GPTLAB_TIMEOUT)
+
+    def _kwargs(self, messages: list[dict], model: str, max_tokens: int, temperature: float) -> dict:
+        kwargs: dict = {
+            "model": model,
+            "max_tokens": max_tokens,
+            "messages": _one_system_message(messages),
+            "stream": True,
+            "stream_options": {"include_usage": True},
+        }
+        # Qwen 3.5 and newer think before answering by default on this
+        # endpoint; "none" turns it off (measured 20 October 2026). The
+        # model's own sampling defaults are kept.
+        if model.startswith("qwen3"):
+            kwargs["reasoning_effort"] = "none"
+        return kwargs

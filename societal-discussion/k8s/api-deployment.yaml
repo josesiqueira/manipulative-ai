@@ -41,11 +41,18 @@ spec:
                   name: app-secrets
                   key: ANTHROPIC_API_KEY
                   optional: true
-            # Which provider answers: "openai" or "anthropic" (LLM_MODEL
-            # empty = the provider's recommended model). The admin panel
-            # (Settings, LLM provider) switches without a restart and takes
-            # precedence. The participant notices must name the provider
-            # that answers.
+            # GPT Lab access token for GPU-farmi-004 (provider "gptlab").
+            - name: GPTLAB_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: GPTLAB_API_KEY
+                  optional: true
+            # Which provider answers: "openai", "anthropic" or "gptlab"
+            # (LLM_MODEL empty = the provider's recommended model). The admin
+            # panel (Settings, LLM provider) or apps/api/scripts/use_provider.sh
+            # switches without a restart and takes precedence. The participant
+            # pages read GET /api/provider and show that provider's texts.
             - name: LLM_PROVIDER
               value: "openai"
             - name: LLM_MODEL

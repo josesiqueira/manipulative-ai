@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     llm_provider: str = "openai"
     llm_model: str = ""
+    # GPT Lab GPU-farmi-004 (Tampere University, Ollama, OpenAI-compatible
+    # API): the "gptlab" provider. The key is the GPT Lab access token.
+    gptlab_api_key: str = ""
+    gptlab_base_url: str = "https://gptlab.rd.tuni.fi/GPT-Lab/resources/GPU-farmi-004/v1"
 
     # Encryption
     encryption_secret: str = ""

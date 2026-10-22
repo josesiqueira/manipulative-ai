@@ -120,17 +120,18 @@ async def test_environment_picks_the_provider_and_model(db_session, monkeypatch)
 
 async def test_admin_panel_switch_overrides_the_environment_with_environment_keys(client, monkeypatch):
     _settings(monkeypatch, openai_api_key="sk-openai-1234567890", anthropic_api_key="sk-ant-1234567890",
-              llm_provider="openai", llm_model="")
+              gptlab_api_key="", llm_provider="openai", llm_model="")
     rows = (await client.get("/api/admin/llm/configs", headers=HEADERS)).json()
     assert {r["provider"]: (r["has_key"], r["is_active"]) for r in rows} == {
         "anthropic": (True, False),
+        "gptlab": (False, False),
         "openai": (True, True),
     }
 
     res = await client.post("/api/admin/llm/active", json={"provider": "anthropic"}, headers=HEADERS)
     assert res.status_code == 200 and res.json()["is_active"] is True
     rows = (await client.get("/api/admin/llm/configs", headers=HEADERS)).json()
-    assert {r["provider"]: r["is_active"] for r in rows} == {"anthropic": True, "openai": False}
+    assert {r["provider"]: r["is_active"] for r in rows} == {"anthropic": True, "gptlab": False, "openai": False}
 
     res = await client.post("/api/admin/llm/active", json={"provider": "openai"}, headers=HEADERS)
     assert res.status_code == 200
@@ -153,3 +154,45 @@ def test_anthropic_errors_that_clear_by_waiting_are_retried():
     assert _retryable(overloaded)
     assert _retryable(anthropic.APITimeoutError(request=request))
     assert not _retryable(low_credit)
+
+
+async def test_gptlab_is_the_third_provider(db_session, monkeypatch):
+    from src.services.llm_providers import GPTLabProvider
+
+    _settings(monkeypatch, gptlab_api_key="gptlab-token", llm_provider="gptlab", llm_model="")
+    provider, model = await get_llm_provider(db_session)
+    assert isinstance(provider, GPTLabProvider) and model == "qwen3.8:27b"
+    assert str(provider.client.base_url).startswith("https://gptlab.rd.tuni.fi/GPT-Lab/resources/GPU-farmi-004/v1")
+    assert provider.client.timeout.read == 900.0
+
+
+def test_gptlab_request_turns_qwen_thinking_off_and_sends_one_system_message():
+    from src.services.llm_providers import GPTLabProvider
+
+    provider = GPTLabProvider("gptlab-token", "https://farm.example/v1")
+    messages = [
+        {"role": "system", "content": "OHJE JA OHJELMA"},
+        {"role": "system", "content": "KEHYS JA KIELI"},
+        {"role": "user", "content": "Hei"},
+    ]
+    qwen = provider._kwargs(messages, "qwen3.8:27b", 4096, 0.1)
+    assert qwen["reasoning_effort"] == "none"
+    assert qwen["max_tokens"] == 4096
+    assert "service_tier" not in qwen and "temperature" not in qwen
+    assert qwen["messages"][0] == {"role": "system", "content": "OHJE JA OHJELMAKEHYS JA KIELI"}
+    assert "reasoning_effort" not in provider._kwargs(messages, "gemma4:31b-it-q4_K_M", 4096, 0.1)
+
+
+async def test_public_provider_endpoint_names_the_answering_model(client, monkeypatch):
+    _settings(monkeypatch, openai_api_key="sk-openai", anthropic_api_key="sk-ant", llm_provider="anthropic", llm_model="")
+    res = await client.get("/api/provider")
+    assert res.status_code == 200
+    assert res.json() == {"provider": "anthropic", "model": "claude-sonnet-5-5", "model_name": "Claude Sonnet 5.5"}
+
+    await client.post("/api/admin/llm/active", json={"provider": "openai"}, headers=HEADERS)
+    assert (await client.get("/api/provider")).json()["provider"] == "openai"
+
+
+async def test_public_provider_endpoint_without_any_key_is_503(client, monkeypatch):
+    _settings(monkeypatch, openai_api_key="", anthropic_api_key="", gptlab_api_key="", llm_provider="openai")
+    assert (await client.get("/api/provider")).status_code == 503

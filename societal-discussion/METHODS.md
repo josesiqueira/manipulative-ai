@@ -225,6 +225,19 @@ survey entry page and from there to the survey.
   copy. No temperature is sent (the model's default). Anthropic's tokenizer
   counts the prompts at 32,053 (Liike Nyt) to 333,396 (Vihreät) tokens
   (free token count, 22 October 2026); all Claude 5 models accept 1M.
+- **Third provider**: GPT Lab (`gptlab`), open models on Tampere
+  University's GPU-farmi-004 (Ollama, OpenAI-compatible API): `qwen3.8:27b`
+  by default, `qwen3.6:35b-a3b-q4_K_M` or `gemma4:31b-it-q4_K_M`, through
+  `GPTLabProvider` in `openai_provider.py`. Qwen's thinking is turned off
+  (`reasoning_effort: "none"`); the models' own sampling defaults are kept.
+  Reading a whole programme the first time takes minutes there (measured
+  18 to 20 October 2026), so the programmes are read once before use.
+- **The provider is on the record and in the notices**: the participant
+  pages read `GET /api/provider` and show the data protection texts of the
+  provider that answers; the session stores it with the consent
+  (`consent_version` ends in `+openai`, `+anthropic` or `+gptlab`), each
+  reply stores its model, and the thank-you page shows the note of every
+  provider that answered in the session.
 - **Temperature**: 0.1 for the models that accept one; GPT-5.5 and GPT-6
   models accept only the default (1.0) and get none
   (`_supports_custom_temperature`). GPT-6 Astra therefore runs at its default

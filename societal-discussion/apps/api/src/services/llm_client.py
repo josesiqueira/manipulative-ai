@@ -17,7 +17,7 @@ from ..config import get_settings
 from ..models import Conversation, LLMConfig
 from .encryption import decrypt_api_key
 from .llm_models import AVAILABLE_MODELS, get_default_model, is_valid_model
-from .llm_providers import LLMProvider, OpenAIProvider, AnthropicProvider
+from .llm_providers import AnthropicProvider, GPTLabProvider, LLMProvider, OpenAIProvider
 from .prompt_builder import build_full_prompt
 
 settings = get_settings()
@@ -32,22 +32,27 @@ async def get_active_llm_config(db: AsyncSession) -> LLMConfig | None:
 
 def env_api_key(provider: str) -> str:
     """The provider's API key from the environment, or ""."""
-    if provider == "anthropic":
-        return settings.anthropic_api_key
-    if provider == "openai":
-        return settings.openai_api_key
-    return ""
+    return {
+        "openai": settings.openai_api_key,
+        "anthropic": settings.anthropic_api_key,
+        "gptlab": settings.gptlab_api_key,
+    }.get(provider, "")
 
 
 def _provider(provider: str, api_key: str) -> LLMProvider:
     if provider == "anthropic":
         return AnthropicProvider(api_key)
+    if provider == "gptlab":
+        return GPTLabProvider(api_key, settings.gptlab_base_url)
     return OpenAIProvider(api_key)
 
 
-async def get_llm_provider(db: AsyncSession) -> tuple[LLMProvider, str]:
-    # 1. A provider made active in the admin panel, with its stored key or
-    #    the key from the environment.
+async def resolve_provider(db: AsyncSession) -> tuple[str, str, str] | None:
+    """The provider that answers now: (provider, model, api key), or None.
+
+    1. A provider made active in the admin panel, with its stored key or the
+       key from the environment.
+    2. LLM_PROVIDER and LLM_MODEL from the environment."""
     config = await get_active_llm_config(db)
     if config:
         api_key = (
@@ -56,10 +61,8 @@ async def get_llm_provider(db: AsyncSession) -> tuple[LLMProvider, str]:
             else env_api_key(config.provider)
         )
         if api_key:
-            model = config.selected_model or get_default_model(config.provider)
-            return _provider(config.provider, api_key), model
+            return config.provider, config.selected_model or get_default_model(config.provider), api_key
 
-    # 2. LLM_PROVIDER and LLM_MODEL from the environment.
     provider = settings.llm_provider if settings.llm_provider in AVAILABLE_MODELS else "openai"
     api_key = env_api_key(provider)
     if api_key:
@@ -68,9 +71,16 @@ async def get_llm_provider(db: AsyncSession) -> tuple[LLMProvider, str]:
             if is_valid_model(provider, settings.llm_model)
             else get_default_model(provider)
         )
-        return _provider(provider, api_key), model
+        return provider, model, api_key
+    return None
 
-    raise ValueError("No LLM API key configured.")
+
+async def get_llm_provider(db: AsyncSession) -> tuple[LLMProvider, str]:
+    chosen = await resolve_provider(db)
+    if chosen is None:
+        raise ValueError("No LLM API key configured.")
+    provider, model, api_key = chosen
+    return _provider(provider, api_key), model
 
 
 # Room for the hidden reasoning of reasoning models as well as the reply:

@@ -18,6 +18,7 @@ from sqlalchemy.orm import selectinload
 from ..database import get_db
 from ..models import Conversation, Message, Session, SurveyResponse
 from ..services.party_grounding import PARTY_DISPLAY_NAMES, base_party, framing, is_populist
+from ..services.llm_models import AVAILABLE_MODELS, get_model_name, provider_of_model
 from ..services.session_code import format_session_code
 
 HELSINKI = ZoneInfo("Europe/Helsinki")
@@ -102,6 +103,12 @@ class DebriefConversation(BaseModel):
     started_at: datetime
 
 
+class DebriefModel(BaseModel):
+    provider: str
+    model: str
+    model_name: str
+
+
 class DebriefResponse(BaseModel):
     """Revealed only after the survey exists. This is the one participant
     endpoint that discloses the experimental condition."""
@@ -109,6 +116,29 @@ class DebriefResponse(BaseModel):
     session_code: str
     data_deleted: bool
     conversations: list[DebriefConversation]
+    # The models that answered in this session, in order of first use, so
+    # the page can show each provider's data protection note. After a
+    # deletion the messages are gone; the provider recorded with the consent
+    # is used then, without a model name.
+    models: list[DebriefModel] = []
+
+
+def _models_used(session: Session) -> list[DebriefModel]:
+    replies = sorted(
+        (m for c in session.conversations for m in c.messages if m.role == "assistant" and m.model_name),
+        key=lambda m: m.created_at,
+    )
+    models: list[DebriefModel] = []
+    for m in replies:
+        provider = provider_of_model(m.model_name)
+        if provider and all(x.model != m.model_name for x in models):
+            models.append(DebriefModel(provider=provider, model=m.model_name,
+                                       model_name=get_model_name(provider, m.model_name)))
+    if not models and session.consent_version and "+" in session.consent_version:
+        provider = session.consent_version.rsplit("+", 1)[1]
+        if provider in AVAILABLE_MODELS:
+            models.append(DebriefModel(provider=provider, model="", model_name=""))
+    return models
 
 
 @router.get("/{session_id}/debrief", response_model=DebriefResponse)
@@ -142,6 +172,7 @@ async def get_debrief(
         key=lambda c: c.started_at,
     )
     return DebriefResponse(
+        models=_models_used(session),
         session_code=format_session_code(session.id),
         data_deleted=session.data_deleted_at is not None,
         conversations=[

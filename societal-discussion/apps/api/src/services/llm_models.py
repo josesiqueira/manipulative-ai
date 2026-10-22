@@ -27,6 +27,21 @@ AVAILABLE_MODELS = {
             {"id": "claude-haiku-5-5", "name": "Claude Haiku 5.5 (higher price over 100K tokens)", "recommended": False},
         ],
     },
+    # GPT Lab GPU-farmi-004: open models on Tampere University's own servers
+    # (Ollama). Measured 18 to 20 October 2026 under a benchmark load:
+    # qwen3.8:27b read a 62K-token programme in 299 s and wrote about 15
+    # tokens/s, with fluent Finnish; qwen3.6:35b-a3b read it in 62 s and wrote
+    # about 55 tokens/s, with weaker Finnish. A new conversation on a party
+    # already read starts in seconds. Windows: 262,144 tokens (Qwen), enough
+    # for Vihreat (224,617 Qwen tokens).
+    "gptlab": {
+        "display_name": "GPT Lab (Tampere University)",
+        "models": [
+            {"id": "qwen3.8:27b", "name": "Qwen3.8 27B", "recommended": True},
+            {"id": "qwen3.6:35b-a3b-q4_K_M", "name": "Qwen3.6 35B-A3B", "recommended": False},
+            {"id": "gemma4:31b-it-q4_K_M", "name": "Gemma 4 31B", "recommended": False},
+        ],
+    },
 }
 
 
@@ -95,3 +110,19 @@ def get_provider_display_name(provider: str) -> str:
     """
     provider_data = AVAILABLE_MODELS.get(provider, {})
     return provider_data.get("display_name", provider.title())
+
+
+def get_model_name(provider: str, model_id: str) -> str:
+    """The model's display name, or its id when it is not listed."""
+    for model in get_models_for_provider(provider):
+        if model["id"] == model_id:
+            return model["name"]
+    return model_id
+
+
+def provider_of_model(model_id: str) -> str | None:
+    """The provider that lists this model id, or None."""
+    for provider in AVAILABLE_MODELS:
+        if is_valid_model(provider, model_id):
+            return provider
+    return None

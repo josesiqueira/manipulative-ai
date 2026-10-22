@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .database import init_db
-from .routers import sessions, conversations, survey, admin, speech
+from .routers import sessions, conversations, survey, admin, speech, provider
 
 settings = get_settings()
 
@@ -56,6 +56,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(sessions.router, prefix="/api/sessions", tags=["sessions"])
+app.include_router(provider.router, prefix="/api/provider", tags=["provider"])
 app.include_router(conversations.router, prefix="/api/conversations", tags=["conversations"])
 app.include_router(survey.router, prefix="/api/survey", tags=["survey"])
 app.include_router(admin.router, prefix="/api/admin", tags=["admin"])
