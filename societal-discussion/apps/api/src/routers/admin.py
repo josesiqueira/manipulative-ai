@@ -32,6 +32,8 @@ from ..models import (
 )
 from ..services.encryption import encrypt_api_key, decrypt_api_key, generate_key_preview
 from ..services.llm_models import AVAILABLE_MODELS, get_models_for_provider
+from ..services.llm_client import env_api_key
+from ..config import get_settings as _get_settings
 from ..services.party_grounding import ALL_PARTIES, PARTY_DISPLAY_NAMES, base_party, framing
 from ..services.session_code import format_session_code, session_id_prefix_from_code
 
@@ -1160,34 +1162,52 @@ async def get_llm_configs(
     db: AsyncSession = Depends(get_db, scope="function"),
     _: bool = Depends(verify_admin),
 ):
-    """Get all LLM configurations with masked API keys."""
+    """Get all LLM configurations with masked API keys.
+
+    Every provider is listed (a row is created the first time). A key from
+    the environment counts as configured. When no provider is active in the
+    database, the provider named by LLM_PROVIDER is shown as active, since
+    that is the one answering."""
     result = await db.execute(select(LLMConfig).order_by(LLMConfig.provider))
-    configs = result.scalars().all()
+    configs = {c.provider: c for c in result.scalars().all()}
+    for provider, data in AVAILABLE_MODELS.items():
+        if provider not in configs:
+            configs[provider] = LLMConfig(
+                provider=provider,
+                display_name=data.get("display_name", provider.title()),
+            )
+            db.add(configs[provider])
+    await db.flush()
+    any_active = any(c.is_active for c in configs.values())
+    env_provider = _get_settings().llm_provider
+    return [
+        _llm_config_response(c, c.is_active or (not any_active and c.provider == env_provider))
+        for c in sorted(configs.values(), key=lambda c: c.provider)
+    ]
 
-    responses = []
-    for config in configs:
-        api_key_preview = None
-        has_key = False
-        if config.encrypted_api_key:
-            has_key = True
-            try:
-                decrypted = decrypt_api_key(config.encrypted_api_key)
-                api_key_preview = generate_key_preview(decrypted)
-            except Exception:
-                api_key_preview = "******"
 
-        responses.append(LLMConfigResponse(
-            id=config.id,
-            provider=config.provider,
-            display_name=config.display_name or config.provider.title(),
-            api_key_preview=api_key_preview,
-            has_key=has_key,
-            selected_model=config.selected_model,
-            is_active=config.is_active,
-            updated_at=config.updated_at,
-        ))
-
-    return responses
+def _llm_config_response(config: LLMConfig, is_active: bool) -> LLMConfigResponse:
+    api_key_preview = None
+    has_key = False
+    if config.encrypted_api_key:
+        has_key = True
+        try:
+            api_key_preview = generate_key_preview(decrypt_api_key(config.encrypted_api_key))
+        except Exception:
+            api_key_preview = "******"
+    elif env_api_key(config.provider):
+        has_key = True
+        api_key_preview = generate_key_preview(env_api_key(config.provider)) + " (environment)"
+    return LLMConfigResponse(
+        id=config.id,
+        provider=config.provider,
+        display_name=config.display_name or config.provider.title(),
+        api_key_preview=api_key_preview,
+        has_key=has_key,
+        selected_model=config.selected_model,
+        is_active=is_active,
+        updated_at=config.updated_at,
+    )
 
 
 @router.put("/llm/configs/{provider}", response_model=LLMConfigResponse)
@@ -1232,27 +1252,7 @@ async def update_llm_config(
 
     await db.flush()
     await db.refresh(config)
-
-    api_key_preview = None
-    has_key = False
-    if config.encrypted_api_key:
-        has_key = True
-        try:
-            decrypted = decrypt_api_key(config.encrypted_api_key)
-            api_key_preview = generate_key_preview(decrypted)
-        except Exception:
-            api_key_preview = "******"
-
-    return LLMConfigResponse(
-        id=config.id,
-        provider=config.provider,
-        display_name=config.display_name or config.provider.title(),
-        api_key_preview=api_key_preview,
-        has_key=has_key,
-        selected_model=config.selected_model,
-        is_active=config.is_active,
-        updated_at=config.updated_at,
-    )
+    return _llm_config_response(config, config.is_active)
 
 
 @router.post("/llm/active", response_model=LLMConfigResponse)
@@ -1272,12 +1272,14 @@ async def set_active_provider(
     config = result.scalar_one_or_none()
 
     if not config:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"LLM config for '{data.provider}' not found.",
+        config = LLMConfig(
+            provider=data.provider,
+            display_name=AVAILABLE_MODELS[data.provider].get("display_name", data.provider.title()),
         )
+        db.add(config)
+        await db.flush()
 
-    if not config.encrypted_api_key:
+    if not config.encrypted_api_key and not env_api_key(data.provider):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Cannot activate {data.provider}: no API key configured.",
@@ -1289,27 +1291,7 @@ async def set_active_provider(
 
     await db.flush()
     await db.refresh(config)
-
-    api_key_preview = None
-    has_key = False
-    if config.encrypted_api_key:
-        has_key = True
-        try:
-            decrypted = decrypt_api_key(config.encrypted_api_key)
-            api_key_preview = generate_key_preview(decrypted)
-        except Exception:
-            api_key_preview = "******"
-
-    return LLMConfigResponse(
-        id=config.id,
-        provider=config.provider,
-        display_name=config.display_name or config.provider.title(),
-        api_key_preview=api_key_preview,
-        has_key=has_key,
-        selected_model=config.selected_model,
-        is_active=config.is_active,
-        updated_at=config.updated_at,
-    )
+    return _llm_config_response(config, config.is_active)
 
 
 # ============================================================================

@@ -151,6 +151,9 @@ API (`apps/api/src/config.py`; local values in `.env` at this folder's root):
 |---|---|---|
 | `DATABASE_URL` | SQLAlchemy URL (defaults to local SQLite) | No |
 | `OPENAI_API_KEY` | OpenAI API key | Yes for OpenAI |
+| `ANTHROPIC_API_KEY` | Anthropic API key | Yes for Anthropic |
+| `LLM_PROVIDER` | Provider that answers: `openai` (default) or `anthropic`; the admin panel (Settings, LLM provider) switches without a restart and takes precedence | No |
+| `LLM_MODEL` | Model id; empty = the provider's recommended model (`gpt-6-astra`, `claude-sonnet-5-5`) | No |
 | `ADMIN_PASSWORD` | Admin password (header `X-Admin-Password`) | Yes |
 | `ENCRYPTION_SECRET` | Fernet key for the API keys stored by the admin panel | Yes |
 | `CORS_ORIGINS` | Comma-separated allowed origins (the defaults include the local ports 3000, 4321, 8080) | Yes in production |

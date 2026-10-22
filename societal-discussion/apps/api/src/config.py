@@ -14,8 +14,15 @@ class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite+aiosqlite:///./societal_discussion.db"
 
-    # OpenAI API
+    # Model providers. Both keys can be set; LLM_PROVIDER ("openai" or
+    # "anthropic") picks the one that answers and LLM_MODEL the model (empty
+    # = the provider's recommended model in services/llm_models.py). A
+    # provider made active in the admin panel takes precedence, without a
+    # restart, and uses these keys unless a key was stored there.
     openai_api_key: str = ""
+    anthropic_api_key: str = ""
+    llm_provider: str = "openai"
+    llm_model: str = ""
 
     # Encryption
     encryption_secret: str = ""

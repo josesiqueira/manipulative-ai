@@ -8,6 +8,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 
+import anthropic
 import openai
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..config import get_settings
 from ..models import Conversation, LLMConfig
 from .encryption import decrypt_api_key
-from .llm_models import get_default_model
+from .llm_models import AVAILABLE_MODELS, get_default_model, is_valid_model
 from .llm_providers import LLMProvider, OpenAIProvider, AnthropicProvider
 from .prompt_builder import build_full_prompt
 
@@ -29,19 +30,45 @@ async def get_active_llm_config(db: AsyncSession) -> LLMConfig | None:
     return result.scalar_one_or_none()
 
 
+def env_api_key(provider: str) -> str:
+    """The provider's API key from the environment, or ""."""
+    if provider == "anthropic":
+        return settings.anthropic_api_key
+    if provider == "openai":
+        return settings.openai_api_key
+    return ""
+
+
+def _provider(provider: str, api_key: str) -> LLMProvider:
+    if provider == "anthropic":
+        return AnthropicProvider(api_key)
+    return OpenAIProvider(api_key)
+
+
 async def get_llm_provider(db: AsyncSession) -> tuple[LLMProvider, str]:
+    # 1. A provider made active in the admin panel, with its stored key or
+    #    the key from the environment.
     config = await get_active_llm_config(db)
+    if config:
+        api_key = (
+            decrypt_api_key(config.encrypted_api_key)
+            if config.encrypted_api_key
+            else env_api_key(config.provider)
+        )
+        if api_key:
+            model = config.selected_model or get_default_model(config.provider)
+            return _provider(config.provider, api_key), model
 
-    if config and config.encrypted_api_key:
-        api_key = decrypt_api_key(config.encrypted_api_key)
-        model = config.selected_model or get_default_model(config.provider)
-        if config.provider == "anthropic":
-            return AnthropicProvider(api_key), model
-        else:
-            return OpenAIProvider(api_key), model
-
-    if settings.openai_api_key:
-        return OpenAIProvider(settings.openai_api_key), get_default_model("openai")
+    # 2. LLM_PROVIDER and LLM_MODEL from the environment.
+    provider = settings.llm_provider if settings.llm_provider in AVAILABLE_MODELS else "openai"
+    api_key = env_api_key(provider)
+    if api_key:
+        model = (
+            settings.llm_model
+            if is_valid_model(provider, settings.llm_model)
+            else get_default_model(provider)
+        )
+        return _provider(provider, api_key), model
 
     raise ValueError("No LLM API key configured.")
 
@@ -87,6 +114,11 @@ class EmptyReplyError(RuntimeError):
 
 
 def _retryable(exc: Exception) -> bool:
+    if isinstance(exc, (anthropic.RateLimitError, anthropic.APITimeoutError,
+                        anthropic.APIConnectionError, anthropic.InternalServerError)):
+        # 429, timeouts, dropped connections, 5xx and 529 (overloaded). A
+        # spent credit balance is a 400 on Anthropic and is not retried.
+        return True
     if isinstance(exc, openai.RateLimitError):
         # credit_balance_exhausted / insufficient_quota is also a 429 but
         # never clears by waiting (seen 2026-10-21 at 18:25).

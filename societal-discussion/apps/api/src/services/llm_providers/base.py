@@ -6,6 +6,13 @@ from abc import ABC, abstractmethod
 from typing import Iterator
 
 
+def split_system(messages: list[dict]) -> tuple[list[str], list[dict]]:
+    """The system parts in order, and the other messages."""
+    system = [m["content"] for m in messages if m["role"] == "system"]
+    rest = [{"role": m["role"], "content": m["content"]} for m in messages if m["role"] != "system"]
+    return system, rest
+
+
 class LLMProvider(ABC):
     """
     Abstract base class for LLM providers.

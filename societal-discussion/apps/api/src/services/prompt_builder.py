@@ -145,6 +145,24 @@ async def get_system_instruction(db: AsyncSession, party: str) -> str:
     return _default_instruction_for(party)
 
 
+def build_system_parts(
+    party: str,
+    instruction: str | None = None,
+    language: str = "fi",
+) -> tuple[str, str]:
+    """The system prompt in two parts: the shared prefix (instruction and
+    full party program text, the same for all four versions of a party)
+    and the condition's ending (framing section and language directive).
+    Joined, they are the system prompt."""
+    party_text = load_party_program(party)
+    instr = instruction if instruction else _default_instruction_for(party)
+    framing = framing_section_for(party).rstrip()
+    lang_directive = LANGUAGE_INSTRUCTIONS.get(language, LANGUAGE_INSTRUCTIONS["fi"])
+    if framing:
+        return instr + party_text.rstrip(), "\n\n" + framing + lang_directive
+    return instr + party_text, lang_directive
+
+
 def build_system_prompt(
     party: str,
     instruction: str | None = None,
@@ -152,13 +170,8 @@ def build_system_prompt(
 ) -> str:
     """Build the system prompt: instruction, full party program text,
     framing section, language directive."""
-    party_text = load_party_program(party)
-    instr = instruction if instruction else _default_instruction_for(party)
-    framing = framing_section_for(party).rstrip()
-    lang_directive = LANGUAGE_INSTRUCTIONS.get(language, LANGUAGE_INSTRUCTIONS["fi"])
-    if framing:
-        return instr + party_text.rstrip() + "\n\n" + framing + lang_directive
-    return instr + party_text + lang_directive
+    prefix, ending = build_system_parts(party, instruction, language)
+    return prefix + ending
 
 
 async def build_full_prompt(
@@ -172,14 +185,19 @@ async def build_full_prompt(
     Assemble complete messages array for LLM API call.
 
     Structure:
-    1. System message (instruction + full party program text + framing
-       section + language directive)
+    1. System message, in two parts: the shared prefix (instruction + full
+       party program text) and the ending (framing section + language
+       directive). Providers that cache a prompt prefix mark the first part;
+       the others join the two into one system message.
     2. Conversation history (real previous turns)
     3. Current user message
     """
     instruction = await get_system_instruction(db, party)
-    system_prompt = build_system_prompt(party, instruction, language)
-    messages: list[dict] = [{"role": "system", "content": system_prompt}]
+    prefix, ending = build_system_parts(party, instruction, language)
+    messages: list[dict] = [
+        {"role": "system", "content": prefix},
+        {"role": "system", "content": ending},
+    ]
 
     for msg in conversation_history:
         messages.append({"role": msg["role"], "content": msg["content"]})

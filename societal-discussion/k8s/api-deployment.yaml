@@ -35,6 +35,21 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: OPENAI_API_KEY
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: ANTHROPIC_API_KEY
+                  optional: true
+            # Which provider answers: "openai" or "anthropic" (LLM_MODEL
+            # empty = the provider's recommended model). The admin panel
+            # (Settings, LLM provider) switches without a restart and takes
+            # precedence. The participant notices must name the provider
+            # that answers.
+            - name: LLM_PROVIDER
+              value: "openai"
+            - name: LLM_MODEL
+              value: ""
             - name: ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:

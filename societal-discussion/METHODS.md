@@ -216,6 +216,15 @@ survey entry page and from there to the survey.
   can select another model. The participant app is built with the OpenAI
   provider texts (`PUBLIC_PROVIDER_BLOCK=openai`) and names the model in the
   notices (`apps/participant/src/lib/studyConfig.ts`).
+- **Second provider**: Anthropic (`claude-sonnet-5-5` by default, or
+  `claude-opus-5-5`), through
+  `apps/api/src/services/llm_providers/anthropic_provider.py`, chosen with
+  `LLM_PROVIDER` or in the admin panel. It receives the same prompt; the
+  first system part (instruction and programme) is written to Anthropic's
+  one-hour prompt cache, so the four versions of a party share one cached
+  copy. No temperature is sent (the model's default). Anthropic's tokenizer
+  counts the prompts at 32,053 (Liike Nyt) to 333,396 (Vihreät) tokens
+  (free token count, 22 October 2026); all Claude 5 models accept 1M.
 - **Temperature**: 0.1 for the models that accept one; GPT-5.5 and GPT-6
   models accept only the default (1.0) and get none
   (`_supports_custom_temperature`). GPT-6 Astra therefore runs at its default

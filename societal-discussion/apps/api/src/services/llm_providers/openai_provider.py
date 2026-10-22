@@ -5,7 +5,7 @@ from typing import Iterator
 import httpx
 from openai import OpenAI
 
-from .base import LLMProvider
+from .base import LLMProvider, split_system
 
 
 # GPT-5.5 reasoning-family and GPT-6 models reject any temperature other
@@ -45,6 +45,13 @@ def _client(api_key: str) -> OpenAI:
     return client
 
 
+def _one_system_message(messages: list[dict]) -> list[dict]:
+    """The system parts joined into one system message, as the prompt has
+    always been sent to OpenAI (its prompt cache needs no marker)."""
+    system, rest = split_system(messages)
+    return ([{"role": "system", "content": "".join(system)}] if system else []) + rest
+
+
 def _supports_custom_temperature(model: str) -> bool:
     return not model.startswith(_TEMPERATURE_INCOMPATIBLE_PREFIXES)
 
@@ -61,7 +68,7 @@ class OpenAIProvider(LLMProvider):
         kwargs: dict = {
             "model": model,
             "max_completion_tokens": max_tokens,
-            "messages": [{"role": m["role"], "content": m["content"]} for m in messages],
+            "messages": _one_system_message(messages),
             "stream": True,
             "stream_options": {"include_usage": True},
         }
