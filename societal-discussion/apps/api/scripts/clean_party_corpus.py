@@ -27,6 +27,14 @@ a line of party text ("...ja keskusta1 / 16"). It is removed only when it is
 the one page of its document that has no page number line of its own, and
 only the page number characters go; the rest of the line stays as it is.
 
+And one duplicate: RKP_merged-4.pdf, as it was merged, holds the RKP party
+programme 2025 twice, as the plain document (PDF pages 48 to 57, A4) and as
+the designed brochure of the same text (pages 58 to 73, A5, with its own
+cover, contents page and page numbers). The brochure copy is removed as one
+block, listed in DUPLICATES with its first line, last line, line count and
+SHA-256, and only when all four match. The plain copy holds every word of
+the brochure copy, in the same order, plus the adoption line.
+
 Every other line, the party's own text, is copied byte for byte and in the
 same order; the script checks this before it writes anything.
 
@@ -34,6 +42,7 @@ Usage (from apps/api):  python scripts/clean_party_corpus.py [--check]
 --check compares the result with both cleaned folders and writes nothing.
 """
 
+import hashlib
 import re
 import sys
 from pathlib import Path
@@ -51,6 +60,19 @@ PAGE_NUMBER = re.compile(r"^\d{1,3} / \d{1,3}$")
 COVER_PRINTED = "Tulostettu Pohtiva - Poliittisten ohjelmien tietovarannosta"
 COVER_URL = re.compile(r"^URL: www\.fsd\.tuni\.\S+/pohtiva/\S*$")
 COVER_FIELDS = ("Puolue: ", "Otsikko: ", "Vuosi: ", "Ohjelmatyyppi: ")
+
+# Second copies of a document inside a merged file, removed as one block
+# that runs to the end of the file. The hash is of the block's lines joined
+# with "\n", after the steps above, without the file's final newline.
+DUPLICATES = {
+    "RKP_merged-4.txt": {
+        "what": "RKP:n puolueohjelma 2025, brochure copy (PDF pages 58 to 73)",
+        "first": "RKP:NPUOLUEOHJELMA",
+        "last": "16",
+        "lines": 653,
+        "sha256": "427d3c6e4b8f634e845ee42d26d871514f1360f0d34a33d3e90feba48c2fa598",
+    },
+}
 
 
 def furniture(lines: list[str]) -> dict[int, str]:
@@ -129,7 +151,23 @@ def glued_page_numbers(lines: list[str], drop: dict[int, str]) -> dict[int, str]
     return glued
 
 
-def clean(text: str) -> tuple[str, dict[str, int]]:
+def remove_duplicate(name: str, kept: list[str]) -> tuple[list[str], int]:
+    """Drop the listed second copy of a document; return lines and count."""
+    spec = DUPLICATES.get(name)
+    if spec is None:
+        return kept, 0
+    assert kept[-1] == "", "file must end with a newline"
+    starts = [k for k, line in enumerate(kept) if line == spec["first"]]
+    if len(starts) != 1:
+        raise SystemExit(f"{name}: first line of the duplicate found {len(starts)} times")
+    block = kept[starts[0]:-1]
+    digest = hashlib.sha256("\n".join(block).encode("utf-8")).hexdigest()
+    if (len(block), block[-1], digest) != (spec["lines"], spec["last"], spec["sha256"]):
+        raise SystemExit(f"{name}: the duplicate block does not match its listing")
+    return kept[:starts[0]] + [""], len(block)
+
+
+def clean(text: str, name: str = "") -> tuple[str, dict[str, int]]:
     lines = text.split("\n")
     drop = furniture(lines)
     glued = glued_page_numbers(lines, drop)
@@ -148,7 +186,10 @@ def clean(text: str) -> tuple[str, dict[str, int]]:
             assert original == line + glued[k], k
         else:
             assert original == line, k
+    kept, duplicate = remove_duplicate(name, kept)
     counts: dict[str, int] = {}
+    if duplicate:
+        counts["duplicate copy"] = duplicate
     for category in drop.values():
         counts[category] = counts.get(category, 0) + 1
     if glued:
@@ -161,7 +202,7 @@ def main() -> None:
     failed = False
     for source in sorted(SOURCE.glob("*.txt")):
         text = source.read_text(encoding="utf-8")
-        cleaned, counts = clean(text)
+        cleaned, counts = clean(text, source.name)
         for marker in ("fsd.tuni", "Tulostettu Pohtiva", " klo "):
             if marker in cleaned and marker != " klo ":
                 raise SystemExit(f"{source.name}: '{marker}' left after cleaning")

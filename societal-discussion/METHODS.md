@@ -77,6 +77,14 @@ or long-context grounding.
   of the characters per party (3,920 lines in all). The archive lines named
   the party in every document and at every page break. Until that date (and
   in the HEPP2026 release) the prints were used as they are.
+- **One duplicated document removed**: the merged RKP file held "RKP:n
+  puolueohjelma 2025" twice, as a plain document (PDF pages 48 to 57) and
+  as RKP's designed brochure of the same text (pages 58 to 73). The
+  brochure copy (653 lines) is removed as one block, identified in the
+  script by its first and last line, line count and SHA-256; the plain copy
+  holds every word of the brochure copy in the same order. Until
+  22 October 2026 the RKP bot read this programme twice. The evidence and
+  the per-party figures are in `../Party Program dataset/README.md`.
 - **Tokens**: an estimate of roughly 20 K (smallest) to 220 K (largest)
   tokens of source material per system prompt (from the byte sizes; the
   code does not count tokens).
