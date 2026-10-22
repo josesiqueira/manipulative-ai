@@ -28,6 +28,8 @@ export interface Strings {
   };
   declined: { title: string; body: string; back: string };
   info: { back: string; privacyTitle: string; researchTitle: string };
+  // While the pages ask which model provider answers, and when they cannot.
+  provider: { loading: string; unavailable: string };
   chat: {
     placeholderTitle: string;
     backToStart: string;
@@ -169,6 +171,7 @@ export const STRINGS: Record<Language, Strings> = {
     },
     declined: { title: 'Kiitos kiinnostuksestasi.', body: 'Mitään tietoja ei tallennettu. Mukavaa luentoa.', back: 'Takaisin alkuun' },
     info: { back: 'Takaisin', privacyTitle: 'Tietosuojailmoitus', researchTitle: 'Tutkimustiedote' },
+    provider: { loading: 'Haetaan...', unavailable: 'Palvelu ei ole juuri nyt käytettävissä. Yritä hetken päästä uudelleen.' },
     chat: {
       placeholderTitle: 'Keskustelu',
       backToStart: 'Takaisin alkuun',
@@ -326,6 +329,7 @@ export const STRINGS: Record<Language, Strings> = {
     },
     declined: { title: 'Thank you for your interest.', body: 'No data was stored. Enjoy the lecture.', back: 'Back to start' },
     info: { back: 'Back', privacyTitle: 'Privacy notice', researchTitle: 'Research notification' },
+    provider: { loading: 'Loading...', unavailable: 'The service is not available right now. Please try again in a moment.' },
     chat: {
       placeholderTitle: 'Conversation',
       backToStart: 'Back to start',

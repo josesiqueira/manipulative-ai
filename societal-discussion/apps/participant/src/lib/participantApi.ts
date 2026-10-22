@@ -4,6 +4,27 @@ import type { Language } from './strings';
 // Empty means the app's own origin (the dev server proxies /api to the API).
 export const API_URL: string = (import.meta.env.PUBLIC_API_URL as string | undefined) ?? 'http://localhost:8000';
 
+// The model provider that answers now; the research team switches it during
+// the event, so the pages ask at load time which texts to show.
+export const PROVIDER_IDS = ['openai', 'anthropic', 'gptlab'] as const;
+export type ProviderId = (typeof PROVIDER_IDS)[number];
+
+export interface ProviderInfo {
+  provider: ProviderId;
+  model: string;
+  model_name: string;
+}
+
+// Throws on 503 (no provider configured), on any other failure and on a
+// provider id these pages have no texts for.
+export async function getProvider(): Promise<ProviderInfo> {
+  const res = await fetch(`${API_URL}/api/provider`);
+  if (!res.ok) throw new Error('provider-failed');
+  const data = await res.json();
+  if (!PROVIDER_IDS.includes(data?.provider)) throw new Error('provider-unknown');
+  return { provider: data.provider, model: String(data.model ?? ''), model_name: String(data.model_name ?? '') };
+}
+
 export interface SessionInfo {
   id: string;
   created_at: string;
@@ -178,10 +199,20 @@ export interface DebriefConversation {
   started_at: string;
 }
 
+// A model that answered in the session, in order of first use. After
+// "Delete my data" model and model_name can be '' (only the provider recorded
+// at consent is left).
+export interface DebriefModel {
+  provider: ProviderId;
+  model: string;
+  model_name: string;
+}
+
 export interface Debrief {
   session_code: string;
   data_deleted: boolean;
   conversations: DebriefConversation[];
+  models?: DebriefModel[];
 }
 
 // null before the survey (403) or for an unknown session (404).

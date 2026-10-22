@@ -21,13 +21,14 @@ Browser tests need Playwright's Chromium once: `npx playwright install chromium`
 ## Build-time values
 
 - `PUBLIC_API_URL`: the FastAPI origin the browser calls. Inlined by `astro build`, so a change means a rebuild (the Dockerfile takes it as a build argument).
-- `PUBLIC_PROVIDER_BLOCK`: `openai` (the Metso build and the Dockerfile default: three checkboxes and the OpenAI texts in the notices) or `finnish` (the model runs on Tampere University servers, two consent checkboxes; also what `npm run dev` uses when the variable is unset). Inlined at build time; this is the provider switch and it is applied per image build.
+
+The model provider is chosen at run time, not at build time: the consent page, both notices and the thank-you page carry the texts of all three providers (`openai`, `anthropic`, `gptlab`), and the page asks `GET /api/provider` which one answers now. The consent page keeps Start disabled until it knows, shows the transfer checkbox only for a provider outside the EU (OpenAI, Anthropic), and stores the provider with the consent as `consent_version` `<version>+<provider>`. The thank-you page shows one technical note per provider listed in the debrief's `models`.
 
 ## Content
 
 - `src/lib/studyConfig.ts`: facts that the DPO or ethics committee may still change.
-- `src/lib/providerNotice.ts`: every provider-specific sentence, both blocks.
-- `src/content/notices/*.md`: the full privacy notice and research notification from the consent package, with `{{RETENTION_END}}` and the provider fences filled at build time. Square-bracket items are open decisions of the research team.
+- `src/lib/providerNotice.ts`: every provider-specific sentence, three blocks; `src/lib/provider.ts` shows the block of the provider that answers and fills the model name.
+- `src/content/notices/*.md`: the full privacy notice and research notification from the consent package, with `{{RETENTION_END}}` filled at build time and the provider fences filled with all three blocks, one shown at run time. Square-bracket items are open decisions of the research team.
 - `public/tampere/`: Tampere University logo files, unchanged; rules in `../../../tampere/README.md`.
 
 ## Chat page

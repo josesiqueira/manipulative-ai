@@ -4,8 +4,6 @@ import { defineConfig, devices } from '@playwright/test';
 // so the tests answer /api/* with page.route handlers (no backend needed) and
 // no cross-origin preflight gets in the way.
 const ORIGIN = 'http://127.0.0.1:4321';
-// A second build with PUBLIC_PROVIDER_BLOCK=openai proves the OpenAI fallback screen.
-const OPENAI_ORIGIN = 'http://127.0.0.1:4322';
 // REAL_API=1 runs tests/real-flow.spec.ts against servers already running
 // (see that file); no build and no fake.
 const REAL = process.env.REAL_API === '1';
@@ -28,20 +26,13 @@ export default defineConfig({
     },
   },
   projects: [
-    { name: 'desktop', testIgnore: /openai/, use: { ...devices['Desktop Chrome'] } },
-    { name: 'phone', testIgnore: /openai/, use: { ...devices['Pixel 7'] } },
-    { name: 'openai-block', testMatch: /openai/, use: { ...devices['Pixel 7'], baseURL: OPENAI_ORIGIN } },
+    { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
+    { name: 'phone', use: { ...devices['Pixel 7'] } },
   ],
   webServer: REAL ? undefined : [
     {
       command: `PUBLIC_API_URL=${ORIGIN} npm run build && HOST=127.0.0.1 PORT=4321 node dist/server/entry.mjs`,
       url: `${ORIGIN}/fi/`,
-      reuseExistingServer: false,
-      timeout: 120_000,
-    },
-    {
-      command: `PUBLIC_API_URL=${OPENAI_ORIGIN} PUBLIC_PROVIDER_BLOCK=openai npx astro build --outDir dist-openai && HOST=127.0.0.1 PORT=4322 node dist-openai/server/entry.mjs`,
-      url: `${OPENAI_ORIGIN}/fi/`,
       reuseExistingServer: false,
       timeout: 120_000,
     },

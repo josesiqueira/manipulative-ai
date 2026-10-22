@@ -1,22 +1,30 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
-// A fake backend for the three endpoints the consent flow uses. Every test
-// starts with it; the real API is covered by the backend tests.
+// A fake backend for the endpoints the consent flow uses. Every test starts
+// with it; the real API is covered by the backend tests. GET /api/provider
+// answers gptlab (the model on Tampere University's servers: two checkboxes)
+// and is counted apart from the calls, since it sends nothing about the
+// participant.
 interface Fake {
   // finished: the survey is done, so the API refuses new conversations.
   sessions: Record<string, { id: string; consent_accepted_at: string | null; finished?: boolean }>;
   calls: { method: string; path: string; body: unknown }[];
+  providerCalls: number;
 }
 
 async function fakeApi(page: Page, seed: Fake['sessions'] = {}): Promise<Fake> {
-  const fake: Fake = { sessions: { ...seed }, calls: [] };
+  const fake: Fake = { sessions: { ...seed }, calls: [], providerCalls: 0 };
   await page.route('**/api/**', async (route: Route) => {
     const req = route.request();
     const url = new URL(req.url());
     const body = req.postDataJSON?.() ?? null;
-    fake.calls.push({ method: req.method(), path: url.pathname, body });
     const json = (status: number, data: unknown) =>
       route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) });
+    if (req.method() === 'GET' && url.pathname === '/api/provider') {
+      fake.providerCalls++;
+      return json(200, { provider: 'gptlab', model: 'qwen3.8-27b', model_name: 'Qwen3.8 27B' });
+    }
+    fake.calls.push({ method: req.method(), path: url.pathname, body });
 
     if (req.method() === 'POST' && url.pathname === '/api/sessions') {
       const id = `s${Object.keys(fake.sessions).length + 1}-0000-0000-0000-000000000000`;
@@ -43,6 +51,9 @@ async function fakeApi(page: Page, seed: Fake['sessions'] = {}): Promise<Fake> {
   });
   return fake;
 }
+
+// The page knows which provider answers (its texts are shown, its boxes counted).
+const providerReady = (page: Page, id = 'gptlab') => expect(page.locator('html')).toHaveAttribute('data-provider', id);
 
 const sessionCalls = (fake: Fake) => fake.calls.filter((c) => c.path === '/api/sessions' && c.method === 'POST');
 const conversationCalls = (fake: Fake) => fake.calls.filter((c) => c.path === '/api/conversations');
@@ -78,24 +89,28 @@ test.describe('consent gate', () => {
   test('start stays disabled until every box is ticked; a reload resets the boxes', async ({ page }) => {
     const fake = await fakeApi(page);
     await page.goto('/fi/consent');
+    await providerReady(page);
     const start = page.getByTestId('consent-start');
     const boxes = page.locator('[data-consent-box]');
-    await expect(boxes).toHaveCount(2); // PUBLIC_PROVIDER_BLOCK=finnish: no transfer checkbox
+    await expect(boxes).toHaveCount(2); // gptlab: no transfer checkbox
     await expect(start).toBeDisabled();
     await boxes.nth(0).check();
     await expect(start).toBeDisabled();
     await boxes.nth(1).check();
     await expect(start).toBeEnabled();
     await page.reload();
+    await providerReady(page);
     await expect(page.locator('[data-consent-box]:checked')).toHaveCount(0);
     await expect(page.getByTestId('consent-start')).toBeDisabled();
     expect(fake.calls).toHaveLength(0);
+    expect(fake.providerCalls).toBe(2); // once per page load
   });
 
   test('consent text never claims encryption', async ({ page }) => {
     await fakeApi(page);
     for (const lang of ['fi', 'en']) {
       await page.goto(`/${lang}/consent`);
+      await providerReady(page);
       const text = (await page.getByTestId('consent-bullets').innerText()).toLowerCase();
       expect(text).not.toContain('encrypted');
       expect(text).not.toContain('salattuna');
@@ -110,6 +125,7 @@ test.describe('consent gate', () => {
     for (const lang of ['fi', 'en']) {
       for (const doc of ['privacy-notice', 'research-notification']) {
         await page.goto(`/${lang}/info/${doc}`);
+        await providerReady(page);
         const text = (await page.getByTestId('notice').innerText()).toLowerCase();
         for (const word of ['encrypted', 'salattu', 'salattuna', 'encryption at rest', 'salaus tallennuksessa', '[18]', 'if stored', 'jos tallennetaan', '10 tai 15']) {
           expect(text, `${lang} ${doc}`).not.toContain(word);
@@ -133,13 +149,14 @@ test.describe('consent gate', () => {
   test('accepting creates the session with consent, then the conversation, then opens the chat', async ({ page }) => {
     const fake = await fakeApi(page);
     await page.goto('/en/consent');
+    await providerReady(page);
     for (const box of await page.locator('[data-consent-box]').all()) await box.check();
     await page.getByTestId('consent-start').click();
     await expect(page).toHaveURL(/\/en\/chat$/);
     await expect(page.getByTestId('transcript')).toBeVisible();
 
     const [sessionCall] = sessionCalls(fake);
-    expect(sessionCall.body).toEqual({ consent_version: '2026-10-23-v1', age_confirmed: true, language: 'en' });
+    expect(sessionCall.body).toEqual({ consent_version: '2026-10-23-v1+gptlab', age_confirmed: true, language: 'en' });
     const [conversationCall] = conversationCalls(fake);
     expect(conversationCall.body).toMatchObject({ session_id: Object.keys(fake.sessions)[0], language: 'en' });
     expect(fake.calls.map((c) => `${c.method} ${c.path}`).slice(0, 3)).toEqual([
@@ -166,6 +183,7 @@ test.describe('consent gate', () => {
     await page.goto('/fi/');
     await page.evaluate(() => localStorage.setItem('sessionId', 'done'));
     await page.goto('/fi/consent');
+    await providerReady(page);
     for (const box of await page.locator('[data-consent-box]').all()) await box.check();
     await page.getByTestId('consent-start').click();
     await expect(page).toHaveURL(/\/fi\/chat$/);
@@ -224,11 +242,14 @@ test.describe('language', () => {
   test('notices render in both languages with the provider text filled', async ({ page }) => {
     await fakeApi(page);
     await page.goto('/fi/info/privacy-notice');
+    await providerReady(page);
     const fi = await page.getByTestId('notice').innerText();
     expect(fi).toContain('Tampereen yliopiston GPT-Lab');
+    expect(fi).toContain('kielimalli Qwen3.8 27B yliopiston');
     expect(fi).not.toContain('{{');
     expect(fi).toContain('31.12.2028');
     await page.goto('/en/info/research-notification');
+    await providerReady(page);
     const en = await page.getByTestId('notice').innerText();
     expect(en).toContain("Tampere University's own servers");
     expect(en).not.toContain('{{');

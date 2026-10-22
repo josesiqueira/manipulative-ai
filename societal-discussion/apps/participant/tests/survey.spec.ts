@@ -39,6 +39,8 @@ async function fakeApi(page: Page, options: FakeOptions = {}): Promise<Call[]> {
       return json(200, {
         session_code: '3F2A-9C11',
         data_deleted: deleted,
+        // After a deletion only the provider recorded at consent is left.
+        models: [{ provider: 'openai', model: deleted ? '' : 'gpt-6-astra', model_name: deleted ? '' : 'GPT-6 Astra' }],
         conversations: [
           { id: 'c1', party_display_name: 'Kokoomus', is_populist: false, framing: 'antipopulist', started_at: '2026-10-23T16:05:00' },
           { id: 'c2', party_display_name: 'Vihreät', is_populist: true, framing: 'populist', started_at: '2026-10-23T16:12:00' },

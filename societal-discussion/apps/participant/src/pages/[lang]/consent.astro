@@ -2,22 +2,25 @@
 import Institutional from '../../layouts/Institutional.astro';
 import { LANGUAGES, STRINGS, type Language } from '../../lib/strings';
 import { STUDY } from '../../lib/studyConfig';
-import { PROVIDER_NOTICE } from '../../lib/providerNotice';
+import { PROVIDER_IDS, PROVIDER_NOTICES, noticeHtml } from '../../lib/providerNotice';
 
 export function getStaticPaths() {
   return LANGUAGES.map((lang) => ({ params: { lang } }));
 }
 const lang = Astro.params.lang as Language;
 const t = STRINGS[lang];
-const provider = PROVIDER_NOTICE[lang];
-const bullets = t.consent.bullets.map((b) =>
-  b.replace('{{PROVIDER_BULLET}}', provider.bullet).replace('{{RETENTION_END}}', STUDY.retentionEnd[lang]),
-);
+// The provider bullet and the transfer checkbox exist once per provider,
+// hidden; the page script shows the ones of the provider that answers.
+const bullets = t.consent.bullets.map((b) => b.replace('{{RETENTION_END}}', STUDY.retentionEnd[lang]));
 const boxes = [
   { id: 'cb-age', label: t.consent.checkboxAge },
   { id: 'cb-read', label: t.consent.checkboxRead },
-  ...(provider.checkbox ? [{ id: 'cb-transfer', label: provider.checkbox }] : []),
 ];
+const transferBoxes = PROVIDER_IDS.flatMap((id) => {
+  const label = PROVIDER_NOTICES[id][lang].checkbox;
+  return label ? [{ id: `cb-transfer-${id}`, provider: id, label: noticeHtml(label) }] : [];
+});
+const boxClass = 'mt-1 h-5 w-5 shrink-0 accent-[var(--tau)]';
 ---
 <Institutional lang={lang} title={t.consent.heading} path="/consent">
   <h1 class="text-2xl font-bold">{t.consent.heading}</h1>
@@ -26,7 +29,18 @@ const boxes = [
   <section class="mt-6" aria-labelledby="brief">
     <h2 id="brief" class="text-lg font-semibold">{t.consent.briefTitle}</h2>
     <ul class="mt-2 max-w-prose list-disc space-y-2 pl-5" data-testid="consent-bullets">
-      {bullets.map((b) => <li>{b}</li>)}
+      {bullets.map((b) =>
+        b === '{{PROVIDER_BULLET}}' ? (
+          <>
+            <li class="text-[var(--muted)]" role="status" data-provider-loading>{t.provider.loading}</li>
+            {PROVIDER_IDS.map((id) => (
+              <li data-provider-variant={id} data-testid={`provider-bullet-${id}`} hidden set:html={noticeHtml(PROVIDER_NOTICES[id][lang].bullet)} />
+            ))}
+          </>
+        ) : (
+          <li>{b}</li>
+        ),
+      )}
     </ul>
   </section>
 
@@ -35,13 +49,22 @@ const boxes = [
     <div class="mt-2 space-y-3">
       {boxes.map((box) => (
         <label for={box.id} class="flex max-w-prose items-start gap-3">
-          <input id={box.id} name={box.id} type="checkbox" class="mt-1 h-5 w-5 shrink-0 accent-[var(--tau)]" data-consent-box />
+          <input id={box.id} name={box.id} type="checkbox" class={boxClass} data-consent-box />
           <span>{box.label}</span>
         </label>
+      ))}
+      {transferBoxes.map((box) => (
+        <div data-provider-variant={box.provider} hidden>
+          <label for={box.id} class="flex max-w-prose items-start gap-3">
+            <input id={box.id} name={box.id} type="checkbox" class={boxClass} data-provider-box={box.provider} />
+            <span set:html={box.label} />
+          </label>
+        </div>
       ))}
     </div>
 
     <p id="error" class="mt-4 text-sm text-red-800" role="alert" hidden>{t.consent.error}</p>
+    <p class="mt-4 text-sm text-red-800" role="alert" data-provider-error data-testid="provider-error" hidden>{t.provider.unavailable}</p>
 
     <div class="mt-6 flex flex-col gap-3 sm:flex-row">
       <button
@@ -67,44 +90,70 @@ const boxes = [
   </p>
 
   <script>
-    // The session is created only here, only after every box is ticked. A
-    // reload starts from unticked boxes (the browser is told not to restore).
-    import { createConversation, createSession } from '../../lib/participantApi';
+    // The session is created only here, only after every box is ticked and
+    // only once the page knows which provider answers (its texts are what the
+    // participant consents to). A reload starts from unticked boxes (the
+    // browser is told not to restore).
+    import { createConversation, createSession, type ProviderId } from '../../lib/participantApi';
+    import { showProvider } from '../../lib/provider';
     import { clearSession, getSessionId, isSurveySubmitted, setConversationId, setSessionId } from '../../lib/session';
     import { STUDY } from '../../lib/studyConfig';
     import type { Language } from '../../lib/strings';
 
     const lang = document.documentElement.lang as Language;
     const form = document.getElementById('consent') as HTMLFormElement;
-    const boxes = Array.from(form.querySelectorAll<HTMLInputElement>('[data-consent-box]'));
     const start = document.getElementById('start') as HTMLButtonElement;
     const error = document.getElementById('error') as HTMLParagraphElement;
+    const transferBoxes = Array.from(form.querySelectorAll<HTMLInputElement>('[data-provider-box]'));
+    // The boxes that must be ticked: age, read, and the transfer box of the
+    // provider that answers, if its block has one.
+    const boxes = () => Array.from(form.querySelectorAll<HTMLInputElement>('[data-consent-box]'));
+    let provider: ProviderId | null = null;
 
     // A finished session (survey done) is never reused: this is a new participant.
     if (isSurveySubmitted()) clearSession();
     form.setAttribute('autocomplete', 'off');
-    const update = () => (start.disabled = !boxes.every((b) => b.checked));
+    const update = () => (start.disabled = provider === null || !boxes().every((b) => b.checked));
     const reset = () => {
-      boxes.forEach((b) => (b.checked = false));
+      form.querySelectorAll<HTMLInputElement>('input[type="checkbox"]').forEach((b) => (b.checked = false));
       update();
     };
-    boxes.forEach((b) => b.addEventListener('change', update));
+    form.addEventListener('change', update);
+
+    const loadProvider = async () => {
+      provider = null;
+      update();
+      const info = await showProvider();
+      transferBoxes.forEach((b) => {
+        b.checked = false;
+        b.toggleAttribute('data-consent-box', info !== null && b.dataset.providerBox === info.provider);
+      });
+      provider = info?.provider ?? null;
+      update();
+    };
+
     reset();
-    // Coming back through the browser's page cache keeps the old ticks; reset them.
+    void loadProvider();
+    // Coming back through the browser's page cache keeps the old ticks; reset
+    // them and ask again, since the provider may have changed meanwhile.
     window.addEventListener('pageshow', (event) => {
-      if (event.persisted) reset();
+      if (!event.persisted) return;
+      reset();
+      void loadProvider();
     });
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      if (!boxes.every((b) => b.checked)) return;
+      if (provider === null || !boxes().every((b) => b.checked)) return;
+      // What was consented to: the wording version and the provider block shown.
+      const consentVersion = `${STUDY.consentVersion}+${provider}`;
       start.disabled = true;
       error.hidden = true;
       const begin = async () => {
         // A retry after a failed conversation call reuses the session already created.
         let sessionId = getSessionId();
         if (!sessionId) {
-          const session = await createSession(STUDY.consentVersion, lang);
+          const session = await createSession(consentVersion, lang);
           sessionId = session.id;
           setSessionId(sessionId);
         }
@@ -124,7 +173,7 @@ const boxes = [
         }
       } catch {
         error.hidden = false;
-        start.disabled = false;
+        update();
       }
     });
   </script>

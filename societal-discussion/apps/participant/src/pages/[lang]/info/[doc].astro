@@ -1,11 +1,13 @@
 ---
 // Full notices, prerendered per language from src/content/notices. The
-// provider fence and the retention date are filled from the config modules so
-// the notice always says the same as the consent page.
+// retention date is filled from the config module; the provider fence gets
+// every provider's text, hidden, and the page script shows the one of the
+// provider that answers, so the notice always says the same as the consent
+// page.
 import Institutional from '../../../layouts/Institutional.astro';
 import { LANGUAGES, STRINGS, type Language } from '../../../lib/strings';
 import { STUDY } from '../../../lib/studyConfig';
-import { PROVIDER_NOTICE } from '../../../lib/providerNotice';
+import { PROVIDER_IDS, PROVIDER_NOTICES, noticeParagraphs, withModelSlot, type ProviderNotice } from '../../../lib/providerNotice';
 
 type Doc = 'privacy-notice' | 'research-notification';
 const DOCS: Doc[] = ['privacy-notice', 'research-notification'];
@@ -28,20 +30,32 @@ const files = import.meta.glob('../../../content/notices/*.md', { eager: true })
 >;
 const entry = files[`../../../content/notices/${doc}.${lang}.md`];
 if (!entry) throw new Error(`Missing notice file for ${doc} ${lang}`);
-const provider = PROVIDER_NOTICE[lang];
-const paragraphs = (text: string) => text.split('\n\n').map((p) => `<p>${p}</p>`).join('\n');
+// The loading and error lines, then one hidden block per provider.
+const fence = (field: keyof Pick<ProviderNotice, 'notice13' | 'notification3'>) =>
+  [
+    `<p class="text-[var(--muted)]" role="status" data-provider-loading>${t.provider.loading}</p>`,
+    `<p class="text-red-800" role="alert" data-provider-error data-testid="provider-error" hidden>${t.provider.unavailable}</p>`,
+    ...PROVIDER_IDS.map(
+      (id) => `<div data-provider-variant="${id}" data-testid="provider-notice-${id}" hidden>\n${noticeParagraphs(PROVIDER_NOTICES[id][lang][field])}\n</div>`,
+    ),
+  ].join('\n');
 // The Markdown compiler wraps each token in its own <p>, so the whole
-// paragraph is replaced, not just the token.
-const html = (await entry.compiledContent())
-  .replaceAll('{{RETENTION_END}}', STUDY.retentionEnd[lang])
-  .replace('<p>{{PROVIDER_NOTICE_13}}</p>', paragraphs(provider.notice13))
-  .replace('<p>{{PROVIDER_NOTIFICATION_3}}</p>', paragraphs(provider.notification3))
-  .replaceAll('[MODEL NAME]', STUDY.modelName.en)
-  .replaceAll('[MALLIN NIMI]', STUDY.modelName.fi);
+// paragraph is replaced, not just the token. A model name placeholder
+// anywhere in the Markdown becomes a span the page script fills.
+const html = withModelSlot(
+  (await entry.compiledContent())
+    .replaceAll('{{RETENTION_END}}', STUDY.retentionEnd[lang])
+    .replace('<p>{{PROVIDER_NOTICE_13}}</p>', fence('notice13'))
+    .replace('<p>{{PROVIDER_NOTIFICATION_3}}</p>', fence('notification3')),
+);
 ---
 <Institutional lang={lang} title={title} path={`/info/${doc}`}>
   <a href={`/${lang}/consent`} class="text-sm underline">{t.info.back}</a>
   <article class="notice mt-4 max-w-prose" data-testid="notice" set:html={html} />
+  <script>
+    import { showProvider } from '../../../lib/provider';
+    void showProvider();
+  </script>
 </Institutional>
 
 <style is:global>

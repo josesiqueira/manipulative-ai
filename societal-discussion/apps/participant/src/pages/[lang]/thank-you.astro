@@ -1,14 +1,15 @@
 ---
 // Thank-you with the debrief: the party per
 // conversation and whether the populist framing was on, the session code
-// with a copy button, "Delete my data", the provider note and the contacts.
+// with a copy button, "Delete my data", one provider note per provider that
+// answered in the session (from the debrief's "models") and the contacts.
 // Shown only when the server has a survey row for the session; otherwise the
 // plain thank-you text. At the end, a way to start over as a new participant
 // (another person on the same device): the finished session is never reused.
 import Institutional from '../../layouts/Institutional.astro';
 import { LANGUAGES, STRINGS, type Language } from '../../lib/strings';
 import { STUDY } from '../../lib/studyConfig';
-import { PROVIDER_NOTICE } from '../../lib/providerNotice';
+import { PROVIDER_IDS, PROVIDER_NOTICES, noticeHtml } from '../../lib/providerNotice';
 
 export function getStaticPaths() {
   return LANGUAGES.map((lang) => ({ params: { lang } }));
@@ -80,7 +81,11 @@ const section = 'mt-8 max-w-prose';
         <p id="delete-error" class="mt-2 text-sm text-red-800" role="alert" hidden>{d.deleteError}</p>
       </div>
       <p id="data-deleted" class="mt-2 font-medium" data-testid="data-deleted" role="status" tabindex="-1" hidden>{d.deleted}</p>
-      <p class="mt-4 text-sm text-[var(--muted)]">{PROVIDER_NOTICE[lang].debriefNote}</p>
+      <div id="provider-notes">
+        {PROVIDER_IDS.map((id) => (
+          <p class="mt-4 text-sm text-[var(--muted)]" data-debrief-note={id} data-testid="provider-note" hidden set:html={noticeHtml(PROVIDER_NOTICES[id][lang].debriefNote)} />
+        ))}
+      </div>
     </section>
 
     <section class={section}>
@@ -109,7 +114,8 @@ const section = 'mt-8 max-w-prose';
   </article>
 
   <script>
-    import { deleteSessionData, getDebrief, type Debrief } from '../../lib/participantApi';
+    import { deleteSessionData, getDebrief, type Debrief, type ProviderId } from '../../lib/participantApi';
+    import { fillModelName } from '../../lib/provider';
     import { clearSession, getSessionId } from '../../lib/session';
     import { PARTY_NAMES_EN, STRINGS, type Language } from '../../lib/strings';
 
@@ -143,9 +149,32 @@ const section = 'mt-8 max-w-prose';
         list.appendChild(li);
       });
       $('code').textContent = debrief.session_code;
+      renderProviderNotes(debrief);
       if (debrief.data_deleted) markDeleted(false);
       $('loading').hidden = true;
       $('debrief').hidden = false;
+    };
+
+    // One note per provider that answered, in order of first use, naming its
+    // models; a model name the server no longer has ('' after a deletion) is
+    // left out, and the note then reads without one.
+    const renderProviderNotes = (debrief: Debrief) => {
+      const box = $('provider-notes');
+      const names = new Map<ProviderId, string[]>();
+      for (const m of debrief.models ?? []) {
+        const list = names.get(m.provider) ?? [];
+        if (m.model_name && !list.includes(m.model_name)) list.push(m.model_name);
+        names.set(m.provider, list);
+      }
+      box.querySelectorAll<HTMLElement>('[data-debrief-note]').forEach((note) => (note.hidden = true));
+      const join = new Intl.ListFormat(lang, { type: 'conjunction' });
+      for (const [provider, list] of names) {
+        const note = box.querySelector<HTMLElement>(`[data-debrief-note="${provider}"]`);
+        if (!note) continue;
+        fillModelName(note, join.format(list));
+        note.hidden = false;
+        box.appendChild(note);
+      }
     };
 
     const markDeleted = (announce = true) => {

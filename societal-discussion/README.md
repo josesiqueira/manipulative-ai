@@ -170,9 +170,9 @@ API (`apps/api/src/config.py`; local values in `.env` at this folder's root):
 Participant app (build time, inlined by `astro build`): `PUBLIC_API_URL`
 (the API origin the browser calls; unset means `http://localhost:8000`; an
 explicit empty value means the app's own origin, which in development is
-the dev server's proxy) and `PUBLIC_PROVIDER_BLOCK` (`finnish`, the
-default, or `openai`: which provider texts and how many consent
-checkboxes). Admin app (build time): `NEXT_PUBLIC_API_URL`.
+the dev server's proxy). The provider texts and the number of consent
+checkboxes follow the provider that answers, read at page load from
+`GET /api/provider`. Admin app (build time): `NEXT_PUBLIC_API_URL`.
 
 ## Deployment
 
@@ -204,7 +204,6 @@ docker build --platform linux/amd64 -t image-registry.apps.2.rahti.csc.fi/manipu
 cd ../participant
 docker build --platform linux/amd64 \
   --build-arg PUBLIC_API_URL=https://api-vaalikeskustelu.2.rahtiapp.fi \
-  --build-arg PUBLIC_PROVIDER_BLOCK=openai \
   -t image-registry.apps.2.rahti.csc.fi/manipulative-ai-2/participant:latest .
 
 # Admin app: docker/Dockerfile.web from this folder

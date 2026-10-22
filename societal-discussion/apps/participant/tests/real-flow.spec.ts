@@ -22,7 +22,8 @@ test.describe('real flow', () => {
 
   test('consent, chat, survey, debrief, delete, admin tombstone', async ({ page, context, request }) => {
     await page.goto(`${APP}/fi/consent`);
-    for (const box of await page.locator('input[type=checkbox]').all()) await box.check();
+    await expect(page.locator('html')).toHaveAttribute('data-provider', /.+/);
+    for (const box of await page.locator('[data-consent-box]').all()) await box.check();
     await page.getByTestId('consent-start').click();
     await page.waitForURL(/\/fi\/chat/);
     const sessionId = await page.evaluate(() => localStorage.getItem('sessionId'));

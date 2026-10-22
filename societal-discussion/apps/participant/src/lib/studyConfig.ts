@@ -17,5 +17,4 @@ export const STUDY = {
   responsibleResearcherEmail: 'rebekah.rousi@uwasa.fi',
   dpoEmail: 'tietosuojavastaava@uwasa.fi',
   pohtivaUrl: 'https://www.fsd.tuni.fi/pohtiva/',
-  modelName: { fi: 'GPT-6 Astra', en: 'GPT-6 Astra' },
 } as const;

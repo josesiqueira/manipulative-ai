@@ -213,9 +213,9 @@ survey entry page and from there to the survey.
 - **Model for the Metso run**: OpenAI `gpt-6-astra`, the default in
   `apps/api/src/services/llm_models.py`, through
   `apps/api/src/services/llm_providers/openai_provider.py`; the admin panel
-  can select another model. The participant app is built with the OpenAI
-  provider texts (`PUBLIC_PROVIDER_BLOCK=openai`) and names the model in the
-  notices (`apps/participant/src/lib/studyConfig.ts`).
+  can select another model. The participant pages name the provider and
+  model that answer (see "The provider is on the record and in the notices"
+  below).
 - **Second provider**: Anthropic (`claude-sonnet-5-5` by default, or
   `claude-opus-5-5`), through
   `apps/api/src/services/llm_providers/anthropic_provider.py`, chosen with
@@ -270,9 +270,10 @@ gate that is part of the research protocol:
    privacy notice and research notification (`info/[doc].astro`, texts in
    `src/content/notices/`), and unticked checkboxes that must all be ticked
    before Start works: age 18+, and read-and-voluntary-and-aware that the
-   bot's viewpoint is undisclosed; a third box about the provider appears
-   only when the build uses the OpenAI provider block
-   (`PUBLIC_PROVIDER_BLOCK=openai`, `src/lib/providerNotice.ts`). "I do not
+   bot's viewpoint is undisclosed; a third box about the transfer outside
+   the EU appears when the answering provider is OpenAI or Anthropic
+   (`src/lib/providerNotice.ts`, read from `GET /api/provider`; Start stays
+   disabled until the provider is known). "I do not
    take part" leads to `declined.astro` and nothing is sent.
 3. **Session** is created only on acceptance (`POST /api/sessions` with
    `consent_version`, `age_confirmed`, `language`); the backend rejects
