@@ -326,7 +326,11 @@ differs by condition. The head is a male sample head (the
 AvatarSDK example from the TalkingHead repository, as recorded in
 `src/scripts/avatar.ts`), stored as
 `apps/participant/public/avatar/man.glb`, with a male Finnish and English
-voice to match, and a still image fallback. It belongs to no party and no
+voice to match, and a still image fallback. The sample head's teal
+long-sleeve shirt, printed with the vendor's logo, is drawn in plain
+charcoal (`#3a3d42`) since 23 October 2026 (`recolourShirt()` in
+`avatar.ts`): teal lies between colours used by three Finnish parties,
+while grey is used by none. The still image still shows the teal shirt. It belongs to no party and no
 person; it is not gender-neutral, and the head and voice pair is still an
 open choice (a woman's head with a woman's voice is the alternative).
 

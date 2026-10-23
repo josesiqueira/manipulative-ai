@@ -28,6 +28,21 @@ const HEAD = {
   baseline: { headRotateX: -0.04, eyeBlinkLeft: 0.05, eyeBlinkRight: 0.05 },
 };
 
+// The sample head's shirt is a strong teal printed with the vendor's logo.
+// Teal borders three Finnish parties' colours, so the shirt is drawn in plain
+// charcoal, a colour no party uses; the fabric's normal map keeps its folds.
+export const SHIRT_COLOR = '#3a3d42';
+
+export function recolourShirt(gltf: any): void {
+  gltf.scene.traverse((node: any) => {
+    if (node.isMesh && node.name === 'outfit_top' && node.material) {
+      node.material.map = null;
+      node.material.color.set(SHIRT_COLOR);
+      node.material.needsUpdate = true;
+    }
+  });
+}
+
 class LiveHead implements Speaker {
   readonly mode: AvatarMode = 'live';
   private done: (() => void) | null = null;
@@ -49,7 +64,13 @@ class LiveHead implements Speaker {
       avatarMood: 'neutral',
       dracoEnabled: false,
     });
-    await head.showAvatar({ ...HEAD, lipsyncLang: 'fi', ttsLang: 'fi-FI', ttsVoice: 'fi-FI-Standard-A' });
+    await head.showAvatar({ ...HEAD, lipsyncLang: 'fi', ttsLang: 'fi-FI', ttsVoice: 'fi-FI-Standard-A' }, null, (gltf: any) => {
+      try {
+        recolourShirt(gltf);
+      } catch (err) {
+        console.warn('Shirt colour not changed', err);
+      }
+    });
     return new LiveHead(head, audio);
   }
 
