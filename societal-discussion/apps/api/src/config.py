@@ -45,6 +45,12 @@ class Settings(BaseSettings):
     # weighted-random assignment across all 9 parties.
     forced_party: str = ""
 
+    # Base parties that participants can be assigned, comma-separated (for
+    # example "perussuomalaiset,vihreat,kokoomus,sdp"); each runs in both
+    # framings. Empty = all 9. The no-repeat weighted assignment works
+    # within this set.
+    active_parties: str = ""
+
     # CORS
     # Next.js admin (3000), Astro participant app dev (4321) and preview (8080).
     cors_origins: str = "http://localhost:3000,http://localhost:4321,http://127.0.0.1:4321,http://localhost:8080,http://127.0.0.1:8080"

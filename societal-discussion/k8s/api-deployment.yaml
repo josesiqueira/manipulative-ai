@@ -72,6 +72,9 @@ spec:
             # those conditions (uniform pick).
             - name: FORCED_PARTY
               value: ""
+            # Metso, 23 October 2026: four parties, each populist and anti-populist.
+            - name: ACTIVE_PARTIES
+              value: "perussuomalaiset,vihreat,kokoomus,sdp"
           volumeMounts:
             - name: sqlite-data
               mountPath: /data

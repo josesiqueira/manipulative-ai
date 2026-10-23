@@ -163,6 +163,7 @@ API (`apps/api/src/config.py`; local values in `.env` at this folder's root):
 | `ENCRYPTION_SECRET` | Fernet key for the API keys stored by the admin panel | Yes |
 | `CORS_ORIGINS` | Comma-separated allowed origins (the defaults include the local ports 3000, 4321, 8080) | Yes in production |
 | `FORCED_PARTY` | Pin every conversation to one condition, or a uniform pick from a comma-separated list; empty for the study | No |
+| `ACTIVE_PARTIES` | Base parties participants can be assigned, comma-separated, each in both framings (Metso: `perussuomalaiset,vihreat,kokoomus,sdp`); empty = all 9 | No |
 | `SPEECH_STT_URL`, `SPEECH_STT_MODEL` | Remote recognition server (OpenAI-compatible `/v1/audio/transcriptions`) and model name | No (local engine otherwise) |
 | `SPEECH_TTS_URL`, `SPEECH_TTS_MODEL`, `SPEECH_TTS_VOICE`, `SPEECH_TTS_SEND_LANGUAGE` | Remote voice server (`/v1/audio/speech`), model, voice, whether to send a language field | No (local engine otherwise) |
 | `SPEECH_API_KEY` | Bearer token for the remote speech servers | No |
@@ -188,7 +189,7 @@ Manifests in `k8s/`:
 
 | File | Resource |
 |---|---|
-| `api-deployment.yaml` | API Deployment (`FORCED_PARTY` empty; `Recreate` strategy because the volume is RWO) |
+| `api-deployment.yaml` | API Deployment (`FORCED_PARTY` empty, `ACTIVE_PARTIES` the four Metso parties; `Recreate` strategy because the volume is RWO) |
 | `speech-stt-*.yaml`, `speech-tts-*.yaml` | The two speech pods (recognition 0.9 CPU, voice 2 CPU), each with a Service and a path-based Route on the API host for `/api/speech/transcribe` and `/api/speech/synthesize` |
 | `api-service.yaml`, `api-route.yaml` | Service and Route for the API |
 | `participant-deployment.yaml`, `participant-service.yaml`, `participant-route.yaml` | The participant app on https://vaalikeskustelu.2.rahtiapp.fi |

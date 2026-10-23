@@ -3,8 +3,17 @@ import random
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ..config import get_settings
 from ..models import Conversation
-from .party_grounding import ALL_PARTIES
+from .party_grounding import ALL_PARTIES, base_party
+
+
+def assignable_parties() -> list[str]:
+    """The conditions participants can be assigned: ALL_PARTIES limited to
+    the base parties in ACTIVE_PARTIES (both framings each), or all 18."""
+    active = {p.strip() for p in get_settings().active_parties.split(",") if p.strip()}
+    pool = [p for p in ALL_PARTIES if base_party(p) in active] if active else list(ALL_PARTIES)
+    return pool or list(ALL_PARTIES)
 
 
 async def assign_party(db: AsyncSession, session_id: str) -> str:
@@ -23,13 +32,14 @@ async def assign_party(db: AsyncSession, session_id: str) -> str:
     )
     used_parties = {row[0] for row in result.all()}
 
-    available = [p for p in ALL_PARTIES if p not in used_parties]
+    pool = assignable_parties()
+    available = [p for p in pool if p not in used_parties]
     if not available:
-        available = list(ALL_PARTIES)
+        available = list(pool)
 
     # Use weighted random: favor globally underrepresented parties
     global_counts = await get_global_party_counts(db)
-    total = sum(global_counts.values()) + len(ALL_PARTIES)
+    total = sum(global_counts.get(p, 0) for p in pool) + len(pool)
     weights = []
     for party in available:
         count = global_counts.get(party, 0)

@@ -28,7 +28,8 @@ the participant is told they are talking to a chatbot about politics and
 the coming elections, but the bot's political alignment is the experimental
 manipulation.
 
-There are **18 conditions**: each of the 9 parties in a populist variant
+There are **18 conditions** (at the Metso demo only 8 were assigned, see
+section 6): each of the 9 parties in a populist variant
 (`<party>_populist`) and an anti-populist variant (`<party>_antipopulist`).
 Both variants read the identical party corpus and the identical
 behavioural instruction, and add one fixed framing section after the
@@ -202,6 +203,14 @@ conditions:
   far across the whole study, so the sample stays roughly balanced;
 - without revealing the assignment to the participant: the condition is
   never in any participant response until the debrief (section 11).
+
+`ACTIVE_PARTIES` (environment) limits the pool to the listed base parties,
+each in both framings; the two rules above then work within that pool. In
+the Metso deployment of 23 October 2026 it is
+`perussuomalaiset,vihreat,kokoomus,sdp`: participants were assigned only the
+8 conditions of Perussuomalaiset, Vihreät, Kokoomus and SDP (populist and
+anti-populist), and the other five parties never reached a participant
+(`k8s/api-deployment.yaml`). Empty means all 18 conditions.
 
 `FORCED_PARTY` (environment) can pin every conversation to one condition or
 to a uniform pick from a comma-separated list; it is empty in the Metso

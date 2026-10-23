@@ -51,3 +51,17 @@ async def test_test_mode_conversations_do_not_count(db_session):
     assert sum(counts.values()) == 0
     # A test-mode row does not block the party for the session either.
     assert await assign_party(db_session, session.id) in ALL_PARTIES
+
+
+async def test_active_parties_limits_assignment_to_their_eight_conditions(db_session, monkeypatch):
+    from src.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "active_parties", "perussuomalaiset, vihreat,kokoomus,sdp")
+    allowed = {
+        f"{p}_{f}" for p in ("perussuomalaiset", "vihreat", "kokoomus", "sdp") for f in ("populist", "antipopulist")
+    }
+    session = await _new_session(db_session)
+    seen = [await _assign_and_save(db_session, session) for _ in range(8)]
+    assert set(seen) == allowed and len(seen) == 8
+    # The ninth starts a new round, still inside the eight.
+    assert {await assign_party(db_session, session.id) for _ in range(30)} <= allowed
