@@ -22,46 +22,16 @@ const t = STRINGS[lang];
   <p id="error" class="mt-3 text-sm text-red-800" role="alert" hidden>{t.consent.error}</p>
 
   <script>
-    // Start: a stored session that the server still reports as consented gets
-    // a new conversation (no second consent in the same visit); anything else,
-    // including a session whose survey is done, goes to the consent page as a
-    // new participant.
-    import { createConversation, getSession } from '../../lib/participantApi';
-    import { clearSession, getSessionId, isSurveySubmitted, setConversationId } from '../../lib/session';
+    // Start always leads to the consent page: every participant reads the
+    // summary and ticks the boxes, also on a device where someone consented
+    // before. The consent page creates a new session each time.
     import type { Language } from '../../lib/strings';
 
     const lang = document.documentElement.lang as Language;
     const button = document.getElementById('start') as HTMLButtonElement;
-    const error = document.getElementById('error') as HTMLParagraphElement;
-    const starting = button.dataset.starting;
-
-    button.addEventListener('click', async () => {
+    button.addEventListener('click', () => {
       button.disabled = true;
-      error.hidden = true;
-      const label = button.textContent;
-      if (starting) button.textContent = starting;
-      try {
-        const id = isSurveySubmitted() ? null : getSessionId();
-        const session = id ? await getSession(id) : null;
-        if (!session || !session.consent_accepted_at) {
-          clearSession();
-          window.location.assign(`/${lang}/consent`);
-          return;
-        }
-        const conversationId = await createConversation(session.id, lang);
-        setConversationId(conversationId);
-        window.location.assign(`/${lang}/chat`);
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : '';
-        if (reason === 'session-missing' || reason === 'consent-required' || reason === 'session-finished') {
-          clearSession();
-          window.location.assign(`/${lang}/consent`);
-          return;
-        }
-        error.hidden = false;
-        button.textContent = label;
-        button.disabled = false;
-      }
+      window.location.assign(`/${lang}/consent`);
     });
   </script>
 </Institutional>

@@ -96,7 +96,7 @@ const boxClass = 'mt-1 h-5 w-5 shrink-0 accent-[var(--tau)]';
     // browser is told not to restore).
     import { createConversation, createSession, type ProviderId } from '../../lib/participantApi';
     import { showProvider } from '../../lib/provider';
-    import { clearSession, getSessionId, isSurveySubmitted, setConversationId, setSessionId } from '../../lib/session';
+    import { clearSession, getSessionId, setConversationId, setSessionId } from '../../lib/session';
     import { STUDY } from '../../lib/studyConfig';
     import type { Language } from '../../lib/strings';
 
@@ -110,8 +110,11 @@ const boxClass = 'mt-1 h-5 w-5 shrink-0 accent-[var(--tau)]';
     const boxes = () => Array.from(form.querySelectorAll<HTMLInputElement>('[data-consent-box]'));
     let provider: ProviderId | null = null;
 
-    // A finished session (survey done) is never reused: this is a new participant.
-    if (isSurveySubmitted()) clearSession();
+    // Every consent starts a new session: a session stored on this device
+    // from an earlier visit (perhaps another person's) is never reused. Only
+    // a session created on this page, before a failed conversation call, is
+    // reused by the retry below.
+    clearSession();
     form.setAttribute('autocomplete', 'off');
     const update = () => (start.disabled = provider === null || !boxes().every((b) => b.checked));
     const reset = () => {
@@ -138,6 +141,7 @@ const boxClass = 'mt-1 h-5 w-5 shrink-0 accent-[var(--tau)]';
     // them and ask again, since the provider may have changed meanwhile.
     window.addEventListener('pageshow', (event) => {
       if (!event.persisted) return;
+      clearSession();
       reset();
       void loadProvider();
     });

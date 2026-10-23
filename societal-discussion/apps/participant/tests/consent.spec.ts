@@ -167,15 +167,23 @@ test.describe('consent gate', () => {
     expect(await page.evaluate(() => localStorage.getItem('conversationId'))).toBe('c1');
   });
 
-  test('a consented session skips the consent page on the next start', async ({ page }) => {
+  test('Start always shows the consent page, and consent makes a new session, even with a consented session stored', async ({ page }) => {
     const fake = await fakeApi(page, { ok: { id: 'ok', consent_accepted_at: '2026-10-23T16:00:00+03:00' } });
     await page.goto('/fi/');
     await page.evaluate(() => localStorage.setItem('sessionId', 'ok'));
     await page.getByTestId('landing-start').click();
+    await expect(page).toHaveURL(/\/fi\/consent$/);
+    expect(conversationCalls(fake)).toHaveLength(0);
+    // The consent page forgets the stored session: another person may have left it.
+    expect(await page.evaluate(() => localStorage.getItem('sessionId'))).toBeNull();
+    await providerReady(page);
+    for (const box of await page.locator('[data-consent-box]').all()) await box.check();
+    await page.getByTestId('consent-start').click();
     await expect(page).toHaveURL(/\/fi\/chat$/);
-    expect(sessionCalls(fake)).toHaveLength(0);
-    expect(conversationCalls(fake)).toHaveLength(1);
-    expect(conversationCalls(fake)[0].body).toMatchObject({ session_id: 'ok', language: 'fi' });
+    expect(sessionCalls(fake)).toHaveLength(1);
+    const newId = await page.evaluate(() => localStorage.getItem('sessionId'));
+    expect(newId).not.toBe('ok');
+    expect(conversationCalls(fake).map((c) => (c.body as { session_id: string }).session_id)).toEqual([newId]);
   });
 
   test('consent with a stored finished session starts a new session instead', async ({ page }) => {
@@ -191,7 +199,7 @@ test.describe('consent gate', () => {
     expect(sessionCalls(fake)).toHaveLength(1);
     const newId = await page.evaluate(() => localStorage.getItem('sessionId'));
     expect(newId).not.toBe('done');
-    expect(conversationCalls(fake).map((c) => (c.body as { session_id: string }).session_id)).toEqual(['done', newId]);
+    expect(conversationCalls(fake).map((c) => (c.body as { session_id: string }).session_id)).toEqual([newId]);
   });
 
   test('a stored session whose survey is done never reaches the chat again', async ({ page }) => {

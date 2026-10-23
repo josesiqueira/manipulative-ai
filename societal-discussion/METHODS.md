@@ -216,9 +216,15 @@ spoken (the conversation is created with `starter_topic: null`,
 list that the HEPP2026 landing page offered still exists in the admin app's
 translations (`apps/web/src/lib/translations.ts`), but no participant page
 shows it. "Back to
-start" on the chat page ends the conversation and the landing page's Start
-creates a new one for the same session; "End conversation" leads to the
-survey entry page and from there to the survey.
+start" on the chat page ends the conversation; "End conversation" leads to
+the survey entry page and from there to the survey. The landing page's Start
+always leads to the consent page, and every consent creates a new session:
+a session stored in the browser from an earlier visit is never reused, so
+two people on one device never share a session or a consent (since
+23 October 2026; before that, Start skipped the consent page for a stored
+session that had consented and added a conversation to it). Only the open
+conversation is kept in the browser, so reloading the chat page does not
+lose it.
 
 ## 8. Language model
 
